@@ -3792,3 +3792,1053 @@ Regeln:
 3. Jede API prüft Berechtigungen.
 4. Eingaben werden validiert.
 5. Fehler zeigen keine internen Daten.
+
+Kapitel 12: KI-Konzept & Automatisierung
+
+Ziel
+
+Die KI-Funktionen von Facility OS sollen nicht einfach ein Chatbot sein, sondern ein digitaler Assistent für Objektleiter und Unternehmen.
+
+Grundprinzip:
+
+KI unterstützt Entscheidungen und reduziert Verwaltungsaufwand, ersetzt aber nicht die Verantwortung des Menschen.
+
+⸻
+
+12.1 Rolle der KI in Facility OS
+
+Die KI übernimmt drei Hauptaufgaben:
+
+1. Informationen auswerten
+2. Probleme früh erkennen
+3. Automatische Vorschläge machen
+
+⸻
+
+12.2 KI-Assistent für Objektleiter
+
+Zweck
+
+Der Objektleiter erhält Unterstützung bei täglichen Entscheidungen.
+
+Beispiele:
+
+“Welche Objekte benötigen heute Aufmerksamkeit?”
+
+KI analysiert:
+
+* offene Aufgaben
+* Tickets
+* Verspätungen
+* Krankmeldungen
+* Qualitätsdaten
+
+⸻
+
+Ausgabe:
+
+Guten Morgen.
+Heute benötigen 3 Objekte Aufmerksamkeit:
+1. Bürogebäude A
+- Ticket offen seit 2 Tagen
+2. Schule B
+- Mitarbeiter fehlt
+3. Einkaufszentrum C
+- Qualitätsprüfung fällig
+
+⸻
+
+12.3 Automatische Vertretungssuche
+
+Problem
+
+Bei Krankheit entstehen oft viele Telefonate.
+
+⸻
+
+Ablauf
+
+Mitarbeiter meldet krank.
+
+System:
+
+1. erkennt Ausfall
+2. prüft betroffene Schicht
+3. sucht passende Mitarbeiter
+
+Kriterien:
+
+* Qualifikation
+* Verfügbarkeit
+* Arbeitszeit
+* Entfernung
+* Erfahrung am Objekt
+
+⸻
+
+Ausgabe:
+
+Vertretungsvorschläge:
+Anna Müller
+✓ kennt Objekt
+✓ verfügbar
+Peter Schmidt
+✓ gleiche Qualifikation
+
+⸻
+
+12.4 Intelligente Aufgabenplanung
+
+Ziel
+
+Bessere Verteilung der Arbeit.
+
+KI berücksichtigt:
+
+* Objektgröße
+* Räume
+* Aufgabenumfang
+* Zeitvorgaben
+* historische Daten
+
+⸻
+
+Beispiel:
+
+System erkennt:
+
+“Die Sanitärreinigung benötigt durchschnittlich 25 Minuten statt geplant 15 Minuten.”
+
+Vorschlag:
+
+“Arbeitszeit oder Aufgabenplanung anpassen.”
+
+⸻
+
+12.5 Qualitätsanalyse
+
+Ziel
+
+Probleme erkennen, bevor Kunden Beschwerden melden.
+
+⸻
+
+KI analysiert:
+
+* wiederkehrende Tickets
+* Qualitätskontrollen
+* Beschwerden
+* Aufgabenabweichungen
+
+⸻
+
+Beispiel:
+
+Analyse:
+Objekt A
+Letzte 4 Wochen:
+- 5 Meldungen Sanitärbereich
+- Qualität sinkend
+Empfehlung:
+Kontrolle durchführen
+
+⸻
+
+12.6 Automatische Erinnerungen
+
+KI kann Hinweise erzeugen:
+
+Beispiele:
+
+* Aufgabe vergessen
+* Material knapp
+* Kontrolle fällig
+* Bericht fehlt
+* Mitarbeiter verspätet
+
+⸻
+
+12.7 KI-Kommunikationsassistent
+
+Unterstützung bei Texten:
+
+Beispiele:
+
+Objektleiter:
+
+“Erstelle eine Nachricht an Mitarbeiter wegen geänderter Arbeitszeiten.”
+
+⸻
+
+Kunde:
+
+“Erstelle eine professionelle Antwort auf eine Mängelmeldung.”
+
+⸻
+
+12.8 Dokumenten-KI
+
+Später:
+
+Analyse von:
+
+* Verträgen
+* Objektanweisungen
+* Sicherheitsdokumenten
+
+Beispiele:
+
+“Welche Besonderheiten gelten für dieses Objekt?”
+
+⸻
+
+Antwort:
+
+Objekt:
+Krankenhaus A
+Wichtig:
+- Schutzkleidung erforderlich
+- bestimmte Bereiche nur nach Freigabe
+- Desinfektionsplan beachten
+
+⸻
+
+12.9 KI und Datenschutz
+
+Wichtige Regeln:
+
+* Keine unnötige Verarbeitung personenbezogener Daten
+* klare Kennzeichnung von KI-Vorschlägen
+* Entscheidungen bleiben beim Menschen
+* Zugriff nur entsprechend der Rolle
+
+⸻
+
+12.10 KI-Funktionen nach Tarif
+
+Free
+
+Keine erweiterten KI-Funktionen.
+
+⸻
+
+Pro
+
+Einfache Unterstützung:
+
+* automatische Hinweise
+* Erinnerungen
+* einfache Auswertungen
+
+⸻
+
+Pro+
+
+Volle KI-Unterstützung:
+
+* Vertretungsassistent
+* Optimierung
+* Prognosen
+* intelligente Analysen
+* KI-Kommunikation
+
+⸻
+
+12.11 Technische Umsetzung
+
+Die KI wird als eigenes Modul aufgebaut:
+
+ai/
+├── assistant/
+├── recommendations/
+├── analytics/
+├── replacement/
+├── automation/
+└── document-analysis/
+
+⸻
+
+12.12 KI-Datenfluss
+
+Beispiel:
+
+Daten
+↓
+Analyse
+↓
+KI-Modell
+↓
+Vorschlag
+↓
+Benutzerentscheidung
+↓
+Aktion
+
+⸻
+
+12.13 Wichtigste KI-Funktion für den Start
+
+Für die erste praktische Nutzung hat die höchste Priorität:
+
+Intelligente Vertretungssuche
+
+Warum?
+
+* löst ein echtes tägliches Problem
+* spart Objektleitern Zeit
+* zeigt den innovativen Vorteil von Facility OS
+
+Kapitel 13: Kommunikations- & Benachrichtigungssystem
+
+Ziel
+
+Das Kommunikationssystem ersetzt unstrukturierte Kommunikation über Telefon, SMS oder WhatsApp durch eine zentrale, nachvollziehbare Plattform.
+
+Grundprinzip:
+
+Jede relevante Information erreicht automatisch die richtigen Personen zur richtigen Zeit.
+
+⸻
+
+13.1 Kommunikationsarten
+
+Facility OS unterstützt verschiedene Kommunikationswege.
+
+Systembenachrichtigungen
+
+Automatisch erzeugte Informationen.
+
+Beispiele:
+
+* Arbeitsbeginn bestätigt
+* Arbeitsende bestätigt
+* Neue Aufgabe erhalten
+* Ticket wurde aktualisiert
+* Materialbestand unterschritten
+* Qualitätskontrolle fällig
+
+⸻
+
+Direkte Nachrichten
+
+Nachrichten zwischen zwei Benutzern.
+
+Beispiele:
+
+Mitarbeiter → Objektleiter
+
+„Der Staubsauger im Objekt A ist defekt.”
+
+Objektleiter → Mitarbeiter
+
+„Bitte heute zusätzlich den Besprechungsraum reinigen.”
+
+⸻
+
+Objekt-Chat
+
+Jedes Objekt besitzt einen eigenen Chat.
+
+Teilnehmer:
+
+* Objektleiter
+* Zugewiesene Mitarbeiter
+* Optional: Qualitätsmanager
+
+Vorteil:
+
+Alle Informationen bleiben dem Objekt zugeordnet.
+
+⸻
+
+Ticket-Kommunikation
+
+Jedes Ticket besitzt einen eigenen Verlauf.
+
+Beispiel:
+
+Ticket #1045
+08:12
+Mitarbeiter:
+Fenster beschädigt.
+08:15
+Objektleiter:
+Hausmeister informiert.
+09:03
+Hausmeister:
+Reparatur für morgen geplant.
+
+⸻
+
+13.2 Benachrichtigungskategorien
+
+Information
+
+Normale Hinweise.
+
+Beispiele:
+
+* Neue Nachricht
+* Neue Aufgabe
+* Bericht erstellt
+
+⸻
+
+Warnung
+
+Aktion erforderlich.
+
+Beispiele:
+
+* Materialbestand niedrig
+* Aufgabe überfällig
+* Qualitätskontrolle offen
+
+⸻
+
+Kritisch
+
+Sofortige Aufmerksamkeit.
+
+Beispiele:
+
+* Mitarbeiter fehlt
+* Objekt nicht besetzt
+* Sicherheitsvorfall
+* Notfallmeldung
+
+⸻
+
+13.3 Empfängerlogik
+
+Nicht jede Nachricht geht an alle Benutzer.
+
+Das System entscheidet automatisch anhand von:
+
+* Rolle
+* Organisation
+* Objektzuweisung
+* Zuständigkeit
+
+Beispiel:
+
+Material fehlt
+↓
+Objektleiter
++
+Lagerverantwortlicher
+↓
+Nicht:
+alle Mitarbeiter
+
+⸻
+
+13.4 Push-Benachrichtigungen
+
+Die App unterstützt Push-Mitteilungen.
+
+Beispiele:
+
+📌 Neue Aufgabe erhalten
+
+📌 Ticket wurde gelöst
+
+📌 Schicht beginnt in 30 Minuten
+
+📌 Qualitätskontrolle geplant
+
+⸻
+
+13.5 Automatische Benachrichtigungen
+
+Facility OS informiert Benutzer automatisch.
+
+Check-in
+
+Empfänger:
+
+Objektleiter
+
+Nachricht:
+
+Anna Müller hat sich im Objekt Bürogebäude A eingecheckt.
+
+⸻
+
+Check-out
+
+Empfänger:
+
+Objektleiter
+
+Nachricht:
+
+Schicht erfolgreich abgeschlossen.
+
+⸻
+
+Ticket erstellt
+
+Empfänger:
+
+Objektleiter
+
+Optional:
+
+Admin
+
+⸻
+
+Krankmeldung
+
+Empfänger:
+
+Objektleiter
+
+Personalverantwortliche (falls vorhanden)
+
+Später:
+
+KI startet Vertretungssuche.
+
+⸻
+
+13.6 Eskalationssystem
+
+Wenn wichtige Ereignisse nicht bearbeitet werden, erfolgt eine automatische Eskalation.
+
+Beispiel:
+
+Ticket
+
+Status:
+
+Neu
+
+↓
+
+24 Stunden keine Bearbeitung
+
+↓
+
+Erinnerung
+
+↓
+
+48 Stunden
+
+↓
+
+Objektleiter erhält Warnung
+
+↓
+
+72 Stunden
+
+↓
+
+Admin wird informiert
+
+⸻
+
+13.7 Nachrichtenstatus
+
+Jede Nachricht besitzt einen Status.
+
+Erstellt
+↓
+Gesendet
+↓
+Zugestellt
+↓
+Gelesen
+↓
+Archiviert
+
+⸻
+
+13.8 Dateianhänge
+
+Nachrichten können enthalten:
+
+* Fotos
+* PDFs
+* Dokumente
+* Checklisten
+
+Beispiel:
+
+Ticket:
+
+Foto des beschädigten Waschbeckens.
+
+⸻
+
+13.9 Objektbezogene Informationen
+
+Jedes Objekt besitzt einen Informationsbereich.
+
+Beispiele:
+
+* Zugangscode geändert
+* Baustelle am Eingang
+* Aufzug außer Betrieb
+* Kunde wünscht Sonderreinigung
+
+Diese Hinweise erscheinen automatisch beim Check-in.
+
+⸻
+
+13.10 Kommunikation mit Kunden
+
+Kunden kommunizieren ausschließlich über Facility OS.
+
+Mögliche Aktionen:
+
+* Ticket erstellen
+* Ticket kommentieren
+* Bericht ansehen
+* Rückfragen stellen
+
+Nicht möglich:
+
+* Interne Mitarbeiter-Chats einsehen
+* Personalplanung sehen
+* Unternehmensinterne Informationen abrufen
+
+⸻
+
+13.11 Kommunikationshistorie
+
+Alle relevanten Nachrichten werden dokumentiert.
+
+Beispiel:
+
+Objekt:
+Bürogebäude A
+12.07.2026
+08:10
+Ticket erstellt
+08:15
+Objektleiter informiert
+09:20
+Bearbeitung begonnen
+10:05
+Ticket abgeschlossen
+
+⸻
+
+13.12 Benachrichtigungseinstellungen
+
+Jeder Benutzer kann festlegen, welche Benachrichtigungen er erhalten möchte.
+
+Beispiele:
+
+☑ Neue Aufgaben
+
+☑ Tickets
+
+☑ Schicht-Erinnerungen
+
+☑ Materialwarnungen
+
+☐ Allgemeine Informationen
+
+Rollenabhängige Pflichtbenachrichtigungen (z. B. Sicherheitsmeldungen) können jedoch nicht deaktiviert werden.
+
+⸻
+
+13.13 Kommunikation mit KI (Pro+)
+
+Der KI-Assistent unterstützt bei der Kommunikation.
+
+Beispiele:
+
+* Zusammenfassung aller offenen Tickets
+* Tagesübersicht für den Objektleiter
+* Formulierung professioneller Antworten an Kunden
+* Priorisierung eingehender Meldungen
+* Erkennung ähnlicher oder doppelter Tickets
+
+⸻
+
+13.14 Kommunikationsprinzipien
+
+Facility OS verfolgt folgende Grundsätze:
+
+* Kommunikation ist objektbezogen.
+* Informationen sind nachvollziehbar.
+* Wichtige Ereignisse werden automatisch weitergeleitet.
+* Nachrichten gehen nur an berechtigte Empfänger.
+* Alle relevanten Vorgänge bleiben dokumentiert.
+
+Kapitel 14: Objektmanagement
+
+Ziel
+
+Das Objektmanagement ist das Herzstück von Facility OS.
+
+Ein Objekt ist nicht nur eine Adresse, sondern enthält alle Informationen, die für die tägliche Arbeit notwendig sind.
+
+Grundprinzip:
+
+Alle Informationen zu einem Objekt sind zentral gespeichert und rollenabhängig verfügbar.
+
+⸻
+
+14.1 Was ist ein Objekt?
+
+Ein Objekt ist jeder Standort, an dem Dienstleistungen erbracht werden.
+
+Beispiele:
+
+* Bürogebäude
+* Schule
+* Kindergarten
+* Krankenhaus
+* Pflegeheim
+* Hotel
+* Einkaufszentrum
+* Industriegebäude
+* Sporthalle
+* Wohnanlage
+* Arztpraxis
+
+⸻
+
+14.2 Objektstruktur
+
+Jedes Objekt besitzt eine hierarchische Struktur.
+
+Organisation
+│
+└── Kunde
+    │
+    └── Objekt
+        │
+        ├── Gebäude
+        │   ├── Etagen
+        │   │   ├── Räume
+        │   │   └── Bereiche
+        │   └── Außenflächen
+        │
+        ├── Mitarbeiter
+        ├── Objektleiter
+        ├── Aufgaben
+        ├── QR-Codes
+        ├── Dokumente
+        ├── Materiallager
+        ├── Tickets
+        ├── Qualitätskontrollen
+        └── Berichte
+
+⸻
+
+14.3 Stammdaten eines Objekts
+
+Jedes Objekt enthält mindestens folgende Informationen:
+
+Allgemeine Daten
+
+* Objekt-ID
+* Objektname
+* Kundennummer
+* Interne Objektnummer
+* Status (aktiv, pausiert, beendet)
+
+⸻
+
+Standort
+
+* Straße
+* Hausnummer
+* Postleitzahl
+* Ort
+* Land
+
+⸻
+
+Ansprechpartner
+
+Kundenseitig:
+
+* Name
+* Funktion
+* Telefon
+* Mobil
+* E-Mail
+
+Intern:
+
+* Objektleiter
+* Stellvertretung
+* Bereichsleiter
+
+⸻
+
+14.4 Vertragsinformationen
+
+Jedes Objekt kann Vertragsdaten enthalten.
+
+Beispiele:
+
+* Vertragsbeginn
+* Vertragsende
+* Kündigungsfrist
+* Leistungsumfang
+* vereinbarte Stunden
+* Leistungsintervall
+
+Diese Informationen sind nur für berechtigte Rollen sichtbar.
+
+⸻
+
+14.5 Arbeitszeiten
+
+Für jedes Objekt können Arbeitszeiten hinterlegt werden.
+
+Beispiele:
+
+Montag bis Freitag
+
+06:00–10:00 Uhr
+
+oder
+
+18:00–22:00 Uhr
+
+Zusätzlich können hinterlegt werden:
+
+* Feiertagsregelungen
+* Wochenenddienste
+* Sonderzeiten
+
+⸻
+
+14.6 Räume und Bereiche
+
+Ein Objekt besteht aus Bereichen und Räumen.
+
+Beispiele:
+
+Gebäude A
+
+* Erdgeschoss
+    * Empfang
+    * Büro 101
+    * Büro 102
+    * WC Damen
+    * WC Herren
+* Obergeschoss
+    * Konferenzraum
+    * Küche
+    * Archiv
+* Außenbereich
+    * Parkplatz
+    * Eingangsbereich
+
+Jeder Raum erhält eine eindeutige Raum-ID.
+
+⸻
+
+14.7 Rauminformationen
+
+Jeder Raum kann folgende Informationen enthalten:
+
+* Raumname
+* Raumnummer
+* Etage
+* Raumtyp
+* Quadratmeter
+* Bodenbelag
+* Reinigungsintervall
+* Besonderheiten
+
+Beispiele für Besonderheiten:
+
+* Alarmanlage aktiv
+* Zutritt nur mit Schlüssel
+* Nur mit Schutzkleidung betreten
+* Medizinischer Bereich
+
+⸻
+
+14.8 Objektanweisungen
+
+Objektanweisungen sind dauerhaft hinterlegte Hinweise.
+
+Beispiele:
+
+* Müllcontainer nur dienstags leeren.
+* Alarmanlage vor Verlassen aktivieren.
+* Fenster im 2. Obergeschoss nicht öffnen.
+* Schlüssel nach Schicht zurückgeben.
+* Aufzug nur für Materialtransport nutzen.
+
+Neue oder vertretende Mitarbeiter sehen diese Hinweise automatisch beim ersten Einsatz.
+
+⸻
+
+14.9 Dokumentenverwaltung
+
+Zu jedem Objekt können Dokumente hinterlegt werden.
+
+Beispiele:
+
+* Leistungsverzeichnis
+* Reinigungspläne
+* Sicherheitsunterweisungen
+* Flucht- und Rettungspläne
+* Verträge
+* Sicherheitsdatenblätter
+* Objektfotos
+
+Dokumente können versioniert werden.
+
+⸻
+
+14.10 QR-Code-System
+
+Ein Objekt kann mehrere QR-Codes besitzen.
+
+Beispiele:
+
+Haupteingang
+
+Start der Schicht
+
+⸻
+
+Materiallager
+
+Materialbestand anzeigen
+
+⸻
+
+Maschinenraum
+
+Wartungsinformationen
+
+⸻
+
+Einzelne Räume
+
+Direkter Aufruf der Raumaufgaben
+
+Jeder QR-Code besitzt eine eindeutige Kennung und kann deaktiviert oder ersetzt werden.
+
+⸻
+
+14.11 Objektkalender
+
+Jedes Objekt besitzt einen Kalender.
+
+Darin können gespeichert werden:
+
+* Sonderreinigungen
+* Glasreinigung
+* Grundreinigung
+* Qualitätskontrollen
+* Wartungen
+* Kundentermine
+* Betriebsferien
+
+⸻
+
+14.12 Objektstatus
+
+Jedes Objekt besitzt einen aktuellen Status.
+
+Beispiele:
+
+🟢 Normalbetrieb
+
+🟡 Eingeschränkter Betrieb
+
+🟠 Sonderauftrag aktiv
+
+🔴 Geschlossen
+
+⚫ Vertrag beendet
+
+Der Status beeinflusst automatisch Planungen und Benachrichtigungen.
+
+⸻
+
+14.13 Qualitätsinformationen
+
+Für jedes Objekt werden Qualitätsdaten gespeichert.
+
+Beispiele:
+
+* letzte Kontrolle
+* Bewertung
+* offene Mängel
+* Reklamationen
+* durchschnittliche Qualität
+* Trend der letzten Monate
+
+Diese Daten fließen später in die KI-Analysen ein.
+
+⸻
+
+14.14 Materialverwaltung pro Objekt
+
+Jedes Objekt kann eigene Lagerbestände besitzen.
+
+Beispiele:
+
+* WC-Papier
+* Handtuchpapier
+* Müllbeutel
+* Glasreiniger
+* Allzweckreiniger
+* Mikrofasertücher
+
+Das System kann Mindestbestände überwachen und Nachbestellungen auslösen.
+
+⸻
+
+14.15 Objekt-Dashboard
+
+Beim Öffnen eines Objekts erhält der Objektleiter eine vollständige Übersicht.
+
+Angezeigt werden:
+
+* Objektinformationen
+* Mitarbeiter im Einsatz
+* heutige Aufgaben
+* offene Tickets
+* Qualitätsstatus
+* Materialbestand
+* letzte Berichte
+* letzte Kommunikation
+* anstehende Termine
+
+Damit wird das Objekt zur zentralen Arbeitsoberfläche.
+
+⸻
+
+14.16 Berechtigungen
+
+Nicht jeder Benutzer sieht alle Objektdaten.
+
+Rolle	Zugriff
+Mitarbeiter	Zugewiesene Aufgaben, Räume, Hinweise
+Objektleiter	Vollständige Objektverwaltung
+Admin	Alle Objekte aller Organisationen
+Kunde	Eigene Berichte, Tickets und Objektstatus
+
+⸻
+
+14.17 Erweiterungen (Roadmap)
+
+Für spätere Versionen sind geplant:
+
+* Interaktive Gebäudepläne
+* Digitale Schlüsselverwaltung
+* NFC-Tags als Alternative zu QR-Codes
+* IoT-Sensoren (z. B. Füllstände oder Temperatur)
+* Integration von Smart-Building-Systemen
+* Digitale Wartungsbücher
+* BIM-Anbindung (Building Information Modeling)
