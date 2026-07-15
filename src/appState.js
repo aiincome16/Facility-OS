@@ -13,15 +13,28 @@ import {
     removeFromStorage
 } from "./services/storageService.js";
 
-const initialState = Object.freeze({
+/************************************************
+ * GRUNDZUSTAND
+ ************************************************/
+
+const INITIAL_STATE = Object.freeze({
 
     initialized: false,
+
+    dataLoaded: false,
 
     loading: false,
 
     error: null,
 
-    currentRoute: APP_CONFIG.DEFAULT_ROUTE,
+    dataSource: null,
+
+    dataLoadedAt: null,
+
+    dataWarnings: [],
+
+    currentRoute:
+        APP_CONFIG.DEFAULT_ROUTE,
 
     currentUser: null,
 
@@ -39,71 +52,184 @@ const initialState = Object.freeze({
 
     tasks: [],
 
+    materials: [],
+
+    materialStock: [],
+
     shifts: [],
+
+    checkins: [],
+
+    checkouts: [],
 
     tickets: [],
 
     messages: [],
 
-    materials: [],
+    notifications: [],
 
-    notifications: []
+    objectGuide: [],
 
+    objectSettings: [],
+
+    taskLogs: [],
+
+    timeDeviations: [],
+
+    keybook: [],
+
+    customerAccess: [],
+
+    customerRequests: [],
+
+    workOrders: [],
+
+    objectSecurity: [],
+
+    objectWaste: [],
+
+    userPerformance: [],
+
+    help: []
 });
 
-let appState = createInitialState();
+/************************************************
+ * INTERNE VARIABLEN
+ ************************************************/
 
-const listeners = new Set();
+let appState =
+    createInitialState();
+
+const listeners =
+    new Set();
+
+/************************************************
+ * INTERNE HELFER
+ ************************************************/
 
 function createInitialState() {
 
     return {
-        ...initialState,
+
+        ...INITIAL_STATE,
+
+        dataWarnings: [],
 
         users: [],
+
         objects: [],
+
         rooms: [],
+
         tasks: [],
-        shifts: [],
-        tickets: [],
-        messages: [],
+
         materials: [],
-        notifications: []
+
+        materialStock: [],
+
+        shifts: [],
+
+        checkins: [],
+
+        checkouts: [],
+
+        tickets: [],
+
+        messages: [],
+
+        notifications: [],
+
+        objectGuide: [],
+
+        objectSettings: [],
+
+        taskLogs: [],
+
+        timeDeviations: [],
+
+        keybook: [],
+
+        customerAccess: [],
+
+        customerRequests: [],
+
+        workOrders: [],
+
+        objectSecurity: [],
+
+        objectWaste: [],
+
+        userPerformance: [],
+
+        help: []
     };
+}
+
+function cloneValue(value) {
+
+    if (
+        typeof structuredClone ===
+        "function"
+    ) {
+
+        return structuredClone(value);
+    }
+
+    return JSON.parse(
+        JSON.stringify(value)
+    );
+}
+
+function normalizeArray(value) {
+
+    return Array.isArray(value)
+        ? [...value]
+        : [];
 }
 
 function notifyListeners() {
 
-    listeners.forEach((listener) => {
+    const stateSnapshot =
+        getAppState();
 
-        try {
+    listeners.forEach(
+        (listener) => {
 
-            listener(getAppState());
+            try {
 
-        } catch (error) {
+                listener(
+                    stateSnapshot
+                );
 
-            console.error(
-                "Fehler in einem App-State-Listener:",
-                error
-            );
+            } catch (error) {
+
+                console.error(
+                    "Fehler in einem App-State-Listener:",
+                    error
+                );
+            }
         }
-    });
+    );
 }
 
 function persistSession() {
 
     const session = {
 
-        currentUser: appState.currentUser,
+        currentUser:
+            appState.currentUser,
 
-        currentObject: appState.currentObject,
+        currentObject:
+            appState.currentObject,
 
-        currentShift: appState.currentShift,
+        currentShift:
+            appState.currentShift,
 
-        shiftStarted: appState.shiftStarted,
+        shiftStarted:
+            appState.shiftStarted,
 
-        savedAt: new Date().toISOString()
-
+        savedAt:
+            new Date().toISOString()
     };
 
     saveToStorage(
@@ -112,32 +238,98 @@ function persistSession() {
     );
 }
 
+function isSessionExpired(
+    savedAt
+) {
+
+    if (!savedAt) {
+        return true;
+    }
+
+    const savedAtTime =
+        new Date(savedAt).getTime();
+
+    if (
+        Number.isNaN(savedAtTime)
+    ) {
+
+        return true;
+    }
+
+    const timeoutMinutes =
+        Number(
+            APP_CONFIG
+                .SESSION_TIMEOUT_MINUTES
+        );
+
+    const timeoutMs =
+        timeoutMinutes *
+        60 *
+        1000;
+
+    return (
+        Date.now() - savedAtTime >
+        timeoutMs
+    );
+}
+
+/************************************************
+ * INITIALISIERUNG
+ ************************************************/
+
 export function initializeAppState() {
 
-    const storedSession = loadFromStorage(
-        APP_CONFIG.STORAGE_KEYS.SESSION,
-        null
-    );
+    const storedSession =
+        loadFromStorage(
+            APP_CONFIG.STORAGE_KEYS.SESSION,
+            null
+        );
 
-    if (storedSession?.currentUser) {
+    if (
+        storedSession?.currentUser &&
+        !isSessionExpired(
+            storedSession.savedAt
+        )
+    ) {
 
         appState = {
+
             ...appState,
 
-            currentUser: storedSession.currentUser,
+            currentUser:
+                cloneValue(
+                    storedSession.currentUser
+                ),
 
             currentObject:
-                storedSession.currentObject ?? null,
+                storedSession.currentObject
+                    ? cloneValue(
+                        storedSession.currentObject
+                    )
+                    : null,
 
             currentShift:
-                storedSession.currentShift ?? null,
+                storedSession.currentShift
+                    ? cloneValue(
+                        storedSession.currentShift
+                    )
+                    : null,
 
             shiftStarted:
-                Boolean(storedSession.shiftStarted),
+                Boolean(
+                    storedSession.shiftStarted
+                ),
 
             currentRoute:
-                APP_CONFIG.AUTHENTICATED_DEFAULT_ROUTE
+                APP_CONFIG
+                    .AUTHENTICATED_DEFAULT_ROUTE
         };
+
+    } else {
+
+        removeFromStorage(
+            APP_CONFIG.STORAGE_KEYS.SESSION
+        );
     }
 
     appState.initialized = true;
@@ -147,32 +339,24 @@ export function initializeAppState() {
     return getAppState();
 }
 
+/************************************************
+ * STATE LESEN
+ ************************************************/
+
 export function getAppState() {
 
-    return {
-        ...appState,
-
-        users: [...appState.users],
-
-        objects: [...appState.objects],
-
-        rooms: [...appState.rooms],
-
-        tasks: [...appState.tasks],
-
-        shifts: [...appState.shifts],
-
-        tickets: [...appState.tickets],
-
-        messages: [...appState.messages],
-
-        materials: [...appState.materials],
-
-        notifications: [...appState.notifications]
-    };
+    return cloneValue(
+        appState
+    );
 }
 
-export function updateAppState(partialState) {
+/************************************************
+ * STATE AKTUALISIEREN
+ ************************************************/
+
+export function updateAppState(
+    partialState
+) {
 
     if (
         !partialState ||
@@ -186,8 +370,12 @@ export function updateAppState(partialState) {
     }
 
     appState = {
+
         ...appState,
-        ...partialState
+
+        ...cloneValue(
+            partialState
+        )
     };
 
     notifyListeners();
@@ -195,44 +383,282 @@ export function updateAppState(partialState) {
     return getAppState();
 }
 
-export function setLoading(loading) {
+/************************************************
+ * DATEN ÜBERNEHMEN
+ ************************************************/
 
-    updateAppState({
-        loading: Boolean(loading)
-    });
-}
+export function setDataCollections(
+    collections,
+    metadata = {}
+) {
 
-export function setError(error) {
+    if (
+        !collections ||
+        typeof collections !== "object" ||
+        Array.isArray(collections)
+    ) {
 
-    updateAppState({
-        error: error
-            ? String(error.message ?? error)
-            : null
-    });
-}
-
-export function setCurrentRoute(route) {
-
-    updateAppState({
-        currentRoute: route
-    });
-}
-
-export function setCurrentUser(user) {
-
-    if (!user?.id || !user?.role) {
-
-        throw new Error(
-            "Der Benutzer benötigt mindestens eine ID und eine Rolle."
+        throw new TypeError(
+            "Die geladenen Daten müssen als Objekt übergeben werden."
         );
     }
 
     appState = {
+
         ...appState,
 
-        currentUser: {
-            ...user
-        },
+        users:
+            normalizeArray(
+                collections.users
+            ),
+
+        objects:
+            normalizeArray(
+                collections.objects
+            ),
+
+        rooms:
+            normalizeArray(
+                collections.rooms
+            ),
+
+        tasks:
+            normalizeArray(
+                collections.tasks
+            ),
+
+        materials:
+            normalizeArray(
+                collections.materials
+            ),
+
+        materialStock:
+            normalizeArray(
+                collections.materialStock
+            ),
+
+        shifts:
+            normalizeArray(
+                collections.shifts
+            ),
+
+        checkins:
+            normalizeArray(
+                collections.checkins
+            ),
+
+        checkouts:
+            normalizeArray(
+                collections.checkouts
+            ),
+
+        tickets:
+            normalizeArray(
+                collections.tickets
+            ),
+
+        messages:
+            normalizeArray(
+                collections.messages
+            ),
+
+        notifications:
+            normalizeArray(
+                collections.notifications
+            ),
+
+        objectGuide:
+            normalizeArray(
+                collections.objectGuide
+            ),
+
+        objectSettings:
+            normalizeArray(
+                collections.objectSettings
+            ),
+
+        taskLogs:
+            normalizeArray(
+                collections.taskLogs
+            ),
+
+        timeDeviations:
+            normalizeArray(
+                collections.timeDeviations
+            ),
+
+        keybook:
+            normalizeArray(
+                collections.keybook
+            ),
+
+        customerAccess:
+            normalizeArray(
+                collections.customerAccess
+            ),
+
+        customerRequests:
+            normalizeArray(
+                collections.customerRequests
+            ),
+
+        workOrders:
+            normalizeArray(
+                collections.workOrders
+            ),
+
+        objectSecurity:
+            normalizeArray(
+                collections.objectSecurity
+            ),
+
+        objectWaste:
+            normalizeArray(
+                collections.objectWaste
+            ),
+
+        userPerformance:
+            normalizeArray(
+                collections.userPerformance
+            ),
+
+        help:
+            normalizeArray(
+                collections.help
+            ),
+
+        dataLoaded: true,
+
+        dataSource:
+            metadata.source ??
+            null,
+
+        dataLoadedAt:
+            metadata.loadedAt ??
+            new Date().toISOString(),
+
+        dataWarnings:
+            normalizeArray(
+                metadata.warnings
+            ),
+
+        loading: false,
+
+        error: null
+    };
+
+    notifyListeners();
+
+    return getAppState();
+}
+
+/************************************************
+ * LADESTATUS
+ ************************************************/
+
+export function setLoading(
+    loading
+) {
+
+    updateAppState({
+
+        loading:
+            Boolean(loading)
+    });
+}
+
+export function setError(
+    error
+) {
+
+    updateAppState({
+
+        error:
+            error
+                ? String(
+                    error.message ??
+                    error
+                )
+                : null,
+
+        loading: false
+    });
+}
+
+export function clearError() {
+
+    updateAppState({
+        error: null
+    });
+}
+
+/************************************************
+ * ROUTING
+ ************************************************/
+
+export function setCurrentRoute(
+    route
+) {
+
+    if (
+        typeof route !== "string" ||
+        route.trim() === ""
+    ) {
+
+        return;
+    }
+
+    updateAppState({
+
+        currentRoute:
+            route.trim()
+    });
+}
+
+/************************************************
+ * BENUTZER
+ ************************************************/
+
+export function setCurrentUser(
+    user
+) {
+
+    if (
+        !user ||
+        typeof user !== "object"
+    ) {
+
+        throw new TypeError(
+            "Es wurde kein gültiger Benutzer übergeben."
+        );
+    }
+
+    if (!user.id) {
+
+        throw new Error(
+            "Der Benutzer benötigt eine ID."
+        );
+    }
+
+    if (!user.role) {
+
+        throw new Error(
+            "Der Benutzer benötigt eine Rolle."
+        );
+    }
+
+    appState = {
+
+        ...appState,
+
+        currentUser:
+            cloneValue(user),
+
+        currentObject: null,
+
+        currentShift: null,
+
+        shiftStarted: false,
 
         error: null
     };
@@ -240,44 +666,114 @@ export function setCurrentUser(user) {
     persistSession();
 
     notifyListeners();
+
+    return getAppState();
 }
 
 export function logoutCurrentUser() {
 
-    appState = createInitialState();
+    appState = {
 
-    appState.initialized = true;
+        ...appState,
+
+        currentUser: null,
+
+        currentObject: null,
+
+        currentShift: null,
+
+        shiftStarted: false,
+
+        currentRoute:
+            APP_CONFIG.DEFAULT_ROUTE,
+
+        error: null
+    };
 
     removeFromStorage(
         APP_CONFIG.STORAGE_KEYS.SESSION
     );
 
     notifyListeners();
+
+    return getAppState();
 }
 
-export function setCurrentObject(object) {
+/************************************************
+ * OBJEKT
+ ************************************************/
+
+export function setCurrentObject(
+    object
+) {
 
     appState = {
+
         ...appState,
 
-        currentObject: object
-            ? { ...object }
-            : null
+        currentObject:
+            object
+                ? cloneValue(object)
+                : null
     };
 
     persistSession();
 
     notifyListeners();
+
+    return getAppState();
 }
 
-export function startShift(shift = null) {
+/************************************************
+ * SCHICHT
+ ************************************************/
+
+export function setCurrentShift(
+    shift
+) {
 
     appState = {
+
         ...appState,
 
-        currentShift: shift
-            ? { ...shift }
-            : null,
+        currentShift:
+            shift
+                ? cloneValue(shift)
+                : null,
+
+        shiftStarted:
+            Boolean(
+                shift &&
+                shift.status === "ACTIVE"
+            )
+    };
+
+    persistSession();
+
+    notifyListeners();
+
+    return getAppState();
+}
+
+export function startShift(
+    shift = null
+) {
+
+    const activeShift = {
+
+        ...(shift
+            ? cloneValue(shift)
+            : {}),
+
+        status: "ACTIVE"
+    };
+
+    appState = {
+
+        ...appState,
+
+        currentShift:
+            activeShift,
 
         shiftStarted: true
     };
@@ -285,11 +781,14 @@ export function startShift(shift = null) {
     persistSession();
 
     notifyListeners();
+
+    return getAppState();
 }
 
 export function stopShift() {
 
     appState = {
+
         ...appState,
 
         currentShift: null,
@@ -300,11 +799,201 @@ export function stopShift() {
     persistSession();
 
     notifyListeners();
+
+    return getAppState();
 }
+
+/************************************************
+ * DATENSUCHE
+ ************************************************/
+
+export function findUserById(
+    userId
+) {
+
+    return (
+        appState.users.find(
+            (user) =>
+                user.id === userId
+        ) ?? null
+    );
+}
+
+export function findObjectById(
+    objectId
+) {
+
+    return (
+        appState.objects.find(
+            (object) =>
+                object.id === objectId
+        ) ?? null
+    );
+}
+
+export function findRoomById(
+    roomId
+) {
+
+    return (
+        appState.rooms.find(
+            (room) =>
+                room.id === roomId
+        ) ?? null
+    );
+}
+
+export function findTaskById(
+    taskId
+) {
+
+    return (
+        appState.tasks.find(
+            (task) =>
+                task.id === taskId
+        ) ?? null
+    );
+}
+
+export function getObjectsForUser(
+    userId
+) {
+
+    const user =
+        findUserById(
+            userId
+        );
+
+    if (!user) {
+        return [];
+    }
+
+    const assignedObjectIds =
+        Array.isArray(
+            user.assignedObjectIds
+        )
+            ? user.assignedObjectIds
+            : [];
+
+    return appState.objects.filter(
+        (object) => {
+
+            return (
+                assignedObjectIds.includes(
+                    object.id
+                ) ||
+                object.objectLeaderId ===
+                    userId
+            );
+        }
+    );
+}
+
+export function getRoomsForObject(
+    objectId
+) {
+
+    return appState.rooms
+        .filter(
+            (room) =>
+                room.objectId ===
+                objectId
+        )
+        .sort(
+            (firstRoom, secondRoom) => {
+
+                return (
+                    Number(
+                        firstRoom.sequence ?? 0
+                    ) -
+                    Number(
+                        secondRoom.sequence ?? 0
+                    )
+                );
+            }
+        );
+}
+
+export function getTasksForObject(
+    objectId
+) {
+
+    return appState.tasks
+        .filter(
+            (task) =>
+                task.objectId ===
+                objectId
+        )
+        .sort(
+            (firstTask, secondTask) => {
+
+                return (
+                    Number(
+                        firstTask.sequence ?? 0
+                    ) -
+                    Number(
+                        secondTask.sequence ?? 0
+                    )
+                );
+            }
+        );
+}
+
+export function getTasksForRoom(
+    roomId
+) {
+
+    return appState.tasks
+        .filter(
+            (task) =>
+                task.roomId ===
+                roomId
+        )
+        .sort(
+            (firstTask, secondTask) => {
+
+                return (
+                    Number(
+                        firstTask.sequence ?? 0
+                    ) -
+                    Number(
+                        secondTask.sequence ?? 0
+                    )
+                );
+            }
+        );
+}
+
+export function getTicketsForObject(
+    objectId
+) {
+
+    return appState.tickets.filter(
+        (ticket) =>
+            ticket.objectId ===
+            objectId
+    );
+}
+
+export function getNotificationsForUser(
+    userId
+) {
+
+    return appState.notifications.filter(
+        (notification) =>
+            notification.userId ===
+            userId
+    );
+}
+
+/************************************************
+ * STATE ZURÜCKSETZEN
+ ************************************************/
 
 export function resetAppState() {
 
-    appState = createInitialState();
+    appState =
+        createInitialState();
 
     appState.initialized = true;
 
@@ -313,21 +1002,36 @@ export function resetAppState() {
     );
 
     notifyListeners();
+
+    return getAppState();
 }
 
-export function subscribeToAppState(listener) {
+/************************************************
+ * LISTENER
+ ************************************************/
 
-    if (typeof listener !== "function") {
+export function subscribeToAppState(
+    listener
+) {
+
+    if (
+        typeof listener !==
+        "function"
+    ) {
 
         throw new TypeError(
             "Der App-State-Listener muss eine Funktion sein."
         );
     }
 
-    listeners.add(listener);
+    listeners.add(
+        listener
+    );
 
     return function unsubscribe() {
 
-        listeners.delete(listener);
+        listeners.delete(
+            listener
+        );
     };
 }
