@@ -1,0 +1,104 @@
+[
+  {
+    "id": "OBJ-001",
+    "name": "Verwaltungsgebäude Musterstadt",
+    "customerName": "Beispiel Verwaltung GmbH",
+    "customerId": "CUS-001",
+    "objectLeaderId": "USR-001",
+    "address": {
+      "street": "Musterstraße 12",
+      "postalCode": "06295",
+      "city": "Lutherstadt Eisleben",
+      "country": "Deutschland"
+    },
+    "contact": {
+      "name": "Herr Beispiel",
+      "phone": "",
+      "email": "kontakt@beispiel-verwaltung.test"
+    },
+    "assignedEmployeeIds": [
+      "USR-002"
+    ],
+    "roomIds": [
+      "ROOM-001",
+      "ROOM-002",
+      "ROOM-003",
+      "ROOM-004"
+    ],
+    "active": true,
+    "qrRequired": true,
+    "gpsRequired": true,
+    "guideEnabled": true,
+    "customerPortalEnabled": true,
+    "checkinSettings": {
+      "passwordFallbackAllowed": true,
+      "contactPermissionRequired": true
+    },
+    "checkoutSettings": {
+      "materialCheckRequired": true,
+      "problemCheckRequired": true,
+      "wasteCheckRequired": true,
+      "securityCheckRequired": true,
+      "keyReturnRequired": true
+    },
+    "security": {
+      "alarmSystem": true,
+      "alarmInstructions": "Alarmanlage nach dem letzten Rundgang aktivieren.",
+      "closingTime": "20:00"
+    },
+    "notes": "Haupteingang nach Arbeitsende abschließen.",
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-01T08:00:00.000Z"
+  },
+  {
+    "id": "OBJ-002",
+    "name": "Arztpraxis Zentrum",
+    "customerName": "Praxiszentrum Beispiel",
+    "customerId": "CUS-002",
+    "objectLeaderId": "USR-001",
+    "address": {
+      "street": "Gesundheitsweg 5",
+      "postalCode": "06268",
+      "city": "Querfurt",
+      "country": "Deutschland"
+    },
+    "contact": {
+      "name": "Frau Muster",
+      "phone": "",
+      "email": "kontakt@praxiszentrum.test"
+    },
+    "assignedEmployeeIds": [
+      "USR-003"
+    ],
+    "roomIds": [
+      "ROOM-005",
+      "ROOM-006",
+      "ROOM-007",
+      "ROOM-008"
+    ],
+    "active": true,
+    "qrRequired": true,
+    "gpsRequired": true,
+    "guideEnabled": true,
+    "customerPortalEnabled": false,
+    "checkinSettings": {
+      "passwordFallbackAllowed": true,
+      "contactPermissionRequired": true
+    },
+    "checkoutSettings": {
+      "materialCheckRequired": true,
+      "problemCheckRequired": true,
+      "wasteCheckRequired": true,
+      "securityCheckRequired": true,
+      "keyReturnRequired": false
+    },
+    "security": {
+      "alarmSystem": false,
+      "alarmInstructions": "",
+      "closingTime": "19:30"
+    },
+    "notes": "Behandlungsräume nur nach Freigabe betreten.",
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-01T08:00:00.000Z"
+  }
+]
