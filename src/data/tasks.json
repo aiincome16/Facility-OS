@@ -1,0 +1,284 @@
+[
+  {
+    "id": "TASK-001",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-001",
+    "title": "Eingangsbereich reinigen",
+    "description": "Boden saugen und feucht wischen. Eingangsmatten ausschütteln.",
+    "category": "BODENREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 10,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Eingangsmatten ausschütteln",
+      "Grobschmutz entfernen",
+      "Boden saugen",
+      "Boden feucht wischen"
+    ],
+    "materials": [
+      "MAT-001",
+      "MAT-002"
+    ]
+  },
+  {
+    "id": "TASK-002",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-001",
+    "title": "Glasflächen kontrollieren",
+    "description": "Fingerabdrücke und sichtbare Verschmutzungen an Eingangstüren entfernen.",
+    "category": "GLASREINIGUNG",
+    "sequence": 2,
+    "frequency": "DAILY",
+    "estimatedMinutes": 5,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Glasflächen auf Verschmutzungen prüfen",
+      "Fingerabdrücke entfernen",
+      "Türgriffe desinfizieren"
+    ],
+    "materials": [
+      "MAT-003",
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-003",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-002",
+    "title": "Büroräume reinigen",
+    "description": "Freie Oberflächen abwischen, Böden reinigen und Abfallbehälter leeren.",
+    "category": "UNTERHALTSREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 35,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Abfallbehälter leeren",
+      "Freie Oberflächen abwischen",
+      "Boden saugen",
+      "Bei Bedarf feucht wischen"
+    ],
+    "materials": [
+      "MAT-001",
+      "MAT-002",
+      "MAT-005"
+    ]
+  },
+  {
+    "id": "TASK-004",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-002",
+    "title": "Kontaktflächen desinfizieren",
+    "description": "Türgriffe, Lichtschalter und gemeinsam genutzte Kontaktflächen desinfizieren.",
+    "category": "DESINFEKTION",
+    "sequence": 2,
+    "frequency": "DAILY",
+    "estimatedMinutes": 10,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Türgriffe desinfizieren",
+      "Lichtschalter desinfizieren",
+      "Gemeinschaftlich genutzte Flächen desinfizieren"
+    ],
+    "materials": [
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-005",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-003",
+    "title": "Sanitäranlagen reinigen",
+    "description": "Toiletten, Waschbecken, Spiegel und Böden vollständig reinigen.",
+    "category": "SANITAERREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 20,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Toiletten reinigen und desinfizieren",
+      "Waschbecken reinigen",
+      "Spiegel reinigen",
+      "Boden feucht wischen"
+    ],
+    "materials": [
+      "MAT-002",
+      "MAT-004",
+      "MAT-006"
+    ]
+  },
+  {
+    "id": "TASK-006",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-003",
+    "title": "Verbrauchsmaterial auffüllen",
+    "description": "Toilettenpapier, Papierhandtücher und Seife kontrollieren und auffüllen.",
+    "category": "MATERIALKONTROLLE",
+    "sequence": 2,
+    "frequency": "DAILY",
+    "estimatedMinutes": 5,
+    "documentationRequired": true,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Toilettenpapier prüfen",
+      "Papierhandtücher prüfen",
+      "Seifenspender prüfen",
+      "Fehlendes Material melden"
+    ],
+    "materials": [
+      "MAT-007",
+      "MAT-008",
+      "MAT-009"
+    ]
+  },
+  {
+    "id": "TASK-007",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-004",
+    "title": "Teeküche reinigen",
+    "description": "Arbeitsflächen, Spüle und Boden reinigen. Abfall entsorgen.",
+    "category": "KUECHENREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 15,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Abfallbehälter leeren",
+      "Spüle reinigen",
+      "Freie Arbeitsflächen abwischen",
+      "Boden feucht wischen"
+    ],
+    "materials": [
+      "MAT-002",
+      "MAT-005"
+    ]
+  },
+  {
+    "id": "TASK-008",
+    "objectId": "OBJ-002",
+    "roomId": "ROOM-005",
+    "title": "Empfang und Wartebereich reinigen",
+    "description": "Boden, Sitzflächen, Tische und Kontaktflächen reinigen.",
+    "category": "UNTERHALTSREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 15,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Abfallbehälter leeren",
+      "Sitzflächen abwischen",
+      "Tische reinigen",
+      "Boden saugen und feucht wischen"
+    ],
+    "materials": [
+      "MAT-001",
+      "MAT-002",
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-009",
+    "objectId": "OBJ-002",
+    "roomId": "ROOM-005",
+    "title": "Kontaktflächen desinfizieren",
+    "description": "Türgriffe, Empfangstheke und häufig berührte Flächen desinfizieren.",
+    "category": "DESINFEKTION",
+    "sequence": 2,
+    "frequency": "DAILY",
+    "estimatedMinutes": 5,
+    "documentationRequired": false,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Türgriffe desinfizieren",
+      "Empfangstheke desinfizieren",
+      "Weitere Kontaktflächen kontrollieren"
+    ],
+    "materials": [
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-010",
+    "objectId": "OBJ-002",
+    "roomId": "ROOM-006",
+    "title": "Behandlungsraum 1 reinigen",
+    "description": "Freigegebene Flächen und Boden nach Praxisvorgaben reinigen.",
+    "category": "PRAXISREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 20,
+    "documentationRequired": true,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Freigabe vor Betreten prüfen",
+      "Abfall nach Vorgabe entsorgen",
+      "Freie Oberflächen desinfizieren",
+      "Boden feucht wischen",
+      "Medizinische Geräte nicht verschieben"
+    ],
+    "materials": [
+      "MAT-002",
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-011",
+    "objectId": "OBJ-002",
+    "roomId": "ROOM-007",
+    "title": "Behandlungsraum 2 reinigen",
+    "description": "Freigegebene Flächen und Boden nach Praxisvorgaben reinigen.",
+    "category": "PRAXISREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 20,
+    "documentationRequired": true,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Freigabe vor Betreten prüfen",
+      "Abfall nach Vorgabe entsorgen",
+      "Freie Oberflächen desinfizieren",
+      "Boden feucht wischen",
+      "Medizinische Geräte nicht verschieben"
+    ],
+    "materials": [
+      "MAT-002",
+      "MAT-004"
+    ]
+  },
+  {
+    "id": "TASK-012",
+    "objectId": "OBJ-002",
+    "roomId": "ROOM-008",
+    "title": "Sanitärbereich reinigen",
+    "description": "Sanitäranlagen vollständig reinigen, desinfizieren und Material auffüllen.",
+    "category": "SANITAERREINIGUNG",
+    "sequence": 1,
+    "frequency": "DAILY",
+    "estimatedMinutes": 20,
+    "documentationRequired": true,
+    "photoRequired": false,
+    "active": true,
+    "instructions": [
+      "Toilette reinigen und desinfizieren",
+      "Waschbecken reinigen",
+      "Spiegel reinigen",
+      "Boden feucht w
