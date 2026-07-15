@@ -1,0 +1,176 @@
+[
+  {
+    "id": "PERF-001",
+    "userId": "USR-002",
+    "period": {
+      "type": "MONTH",
+      "year": 2026,
+      "month": 7,
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-31"
+    },
+    "objectIds": [
+      "OBJ-001"
+    ],
+    "metrics": {
+      "plannedShifts": 12,
+      "completedShifts": 10,
+      "absentShifts": 1,
+      "replacementShifts": 0,
+      "attendanceRate": 83.3,
+      "onTimeCheckins": 9,
+      "lateCheckins": 1,
+      "punctualityRate": 90,
+      "plannedTasks": 64,
+      "completedTasks": 62,
+      "openTasks": 2,
+      "taskCompletionRate": 96.9,
+      "documentationRequired": 8,
+      "documentationCompleted": 8,
+      "documentationRate": 100,
+      "ticketsCreated": 3,
+      "customerComplaints": 0,
+      "positiveCustomerFeedback": 2,
+      "materialChecksCompleted": 9,
+      "securityChecksCompleted": 10
+    },
+    "points": {
+      "attendance": 80,
+      "punctuality": 90,
+      "taskCompletion": 97,
+      "documentation": 100,
+      "quality": 92,
+      "total": 459,
+      "maximum": 500
+    },
+    "rating": {
+      "overall": 4.6,
+      "quality": 4.7,
+      "reliability": 4.4,
+      "communication": 4.5,
+      "documentation": 4.8
+    },
+    "status": "GOOD",
+    "employeeVisible": true,
+    "customerVisible": false,
+    "managerComment": "Sehr gute Dokumentation und zuverlässige Aufgabenerledigung.",
+    "createdAt": "2026-07-15T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "PERF-002",
+    "userId": "USR-003",
+    "period": {
+      "type": "MONTH",
+      "year": 2026,
+      "month": 7,
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-31"
+    },
+    "objectIds": [
+      "OBJ-002"
+    ],
+    "metrics": {
+      "plannedShifts": 11,
+      "completedShifts": 10,
+      "absentShifts": 0,
+      "replacementShifts": 1,
+      "attendanceRate": 90.9,
+      "onTimeCheckins": 10,
+      "lateCheckins": 0,
+      "punctualityRate": 100,
+      "plannedTasks": 58,
+      "completedTasks": 57,
+      "openTasks": 1,
+      "taskCompletionRate": 98.3,
+      "documentationRequired": 14,
+      "documentationCompleted": 14,
+      "documentationRate": 100,
+      "ticketsCreated": 2,
+      "customerComplaints": 0,
+      "positiveCustomerFeedback": 3,
+      "materialChecksCompleted": 10,
+      "securityChecksCompleted": 10
+    },
+    "points": {
+      "attendance": 91,
+      "punctuality": 100,
+      "taskCompletion": 98,
+      "documentation": 100,
+      "quality": 95,
+      "total": 484,
+      "maximum": 500
+    },
+    "rating": {
+      "overall": 4.8,
+      "quality": 4.8,
+      "reliability": 4.9,
+      "communication": 4.7,
+      "documentation": 4.9
+    },
+    "status": "EXCELLENT",
+    "employeeVisible": true,
+    "customerVisible": false,
+    "managerComment": "Sehr zuverlässig, pünktlich und für Vertretungen geeignet.",
+    "createdAt": "2026-07-15T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "PERF-003",
+    "userId": "USR-002",
+    "period": {
+      "type": "OBJECT",
+      "year": 2026,
+      "month": 7,
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-31"
+    },
+    "objectIds": [
+      "OBJ-001"
+    ],
+    "metrics": {
+      "plannedShifts": 8,
+      "completedShifts": 7,
+      "absentShifts": 1,
+      "replacementShifts": 0,
+      "attendanceRate": 87.5,
+      "onTimeCheckins": 6,
+      "lateCheckins": 1,
+      "punctualityRate": 85.7,
+      "plannedTasks": 42,
+      "completedTasks": 41,
+      "openTasks": 1,
+      "taskCompletionRate": 97.6,
+      "documentationRequired": 6,
+      "documentationCompleted": 6,
+      "documentationRate": 100,
+      "ticketsCreated": 2,
+      "customerComplaints": 0,
+      "positiveCustomerFeedback": 1,
+      "materialChecksCompleted": 7,
+      "securityChecksCompleted": 7
+    },
+    "points": {
+      "attendance": 88,
+      "punctuality": 86,
+      "taskCompletion": 98,
+      "documentation": 100,
+      "quality": 93,
+      "total": 465,
+      "maximum": 500
+    },
+    "rating": {
+      "overall": 4.6,
+      "quality": 4.7,
+      "reliability": 4.4,
+      "communication": 4.5,
+      "documentation": 4.8
+    },
+    "status": "GOOD",
+    "employeeVisible": true,
+    "customerVisible": false,
+    "managerComment": "Gute Leistung im Verwaltungsgebäude.",
+    "createdAt": "2026-07-15T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
