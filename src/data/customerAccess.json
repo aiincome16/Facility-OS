@@ -1,0 +1,160 @@
+[
+  {
+    "id": "CUSTACCESS-001",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "active": true,
+
+    "access": {
+      "dashboard": true,
+      "objectOverview": true,
+      "rooms": true,
+      "tasks": true,
+      "taskStatus": true,
+      "performanceReports": true,
+      "serviceReports": true,
+      "tickets": true,
+      "messages": true,
+      "documents": true,
+      "photos": false,
+      "checkinTimes": false,
+      "checkoutTimes": false,
+      "employeeNames": false,
+      "employeeContactData": false,
+      "materialData": false,
+      "internalNotes": false,
+      "timeDeviations": false,
+      "keybook": false,
+      "securityData": false
+    },
+
+    "permissions": {
+      "createTicket": true,
+      "editOwnTicket": true,
+      "closeOwnTicket": false,
+      "sendMessage": true,
+      "uploadAttachment": true,
+      "downloadDocuments": true,
+      "requestAdditionalService": true,
+      "viewTicketHistory": true,
+      "viewResolvedTickets": true,
+      "exportReports": true
+    },
+
+    "visibilityRules": {
+      "onlyCustomerVisibleTickets": true,
+      "onlyReleasedReports": true,
+      "onlyReleasedDocuments": true,
+      "hideEmployeePersonalData": true,
+      "hideInternalComments": true,
+      "hideExactWorkingTimes": true,
+      "hideSecurityInstructions": true
+    },
+
+    "notificationSettings": {
+      "ticketCreated": true,
+      "ticketUpdated": true,
+      "ticketResolved": true,
+      "newMessage": true,
+      "reportReleased": true,
+      "documentReleased": true,
+      "serviceCompleted": false
+    },
+
+    "objectLeaderApprovalRequired": {
+      "ticketPublication": false,
+      "photoPublication": true,
+      "reportPublication": true,
+      "documentPublication": true,
+      "messagePublication": false
+    },
+
+    "validFrom": "2026-07-01",
+    "validUntil": null,
+
+    "createdByUserId": "USR-004",
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedByUserId": "USR-004",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "CUSTACCESS-002",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-002",
+    "active": false,
+
+    "access": {
+      "dashboard": false,
+      "objectOverview": false,
+      "rooms": false,
+      "tasks": false,
+      "taskStatus": false,
+      "performanceReports": false,
+      "serviceReports": false,
+      "tickets": false,
+      "messages": false,
+      "documents": false,
+      "photos": false,
+      "checkinTimes": false,
+      "checkoutTimes": false,
+      "employeeNames": false,
+      "employeeContactData": false,
+      "materialData": false,
+      "internalNotes": false,
+      "timeDeviations": false,
+      "keybook": false,
+      "securityData": false
+    },
+
+    "permissions": {
+      "createTicket": false,
+      "editOwnTicket": false,
+      "closeOwnTicket": false,
+      "sendMessage": false,
+      "uploadAttachment": false,
+      "downloadDocuments": false,
+      "requestAdditionalService": false,
+      "viewTicketHistory": false,
+      "viewResolvedTickets": false,
+      "exportReports": false
+    },
+
+    "visibilityRules": {
+      "onlyCustomerVisibleTickets": true,
+      "onlyReleasedReports": true,
+      "onlyReleasedDocuments": true,
+      "hideEmployeePersonalData": true,
+      "hideInternalComments": true,
+      "hideExactWorkingTimes": true,
+      "hideSecurityInstructions": true
+    },
+
+    "notificationSettings": {
+      "ticketCreated": false,
+      "ticketUpdated": false,
+      "ticketResolved": false,
+      "newMessage": false,
+      "reportReleased": false,
+      "documentReleased": false,
+      "serviceCompleted": false
+    },
+
+    "objectLeaderApprovalRequired": {
+      "ticketPublication": true,
+      "photoPublication": true,
+      "reportPublication": true,
+      "documentPublication": true,
+      "messagePublication": true
+    },
+
+    "validFrom": null,
+    "validUntil": null,
+
+    "createdByUserId": "USR-004",
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedByUserId": "USR-004",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
