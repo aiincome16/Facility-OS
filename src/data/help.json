@@ -1,0 +1,402 @@
+[
+  {
+    "id": "HELP-001",
+    "category": "LOGIN",
+    "title": "Anmeldung funktioniert nicht",
+    "question": "Was kann ich tun, wenn ich mich nicht anmelden kann?",
+    "answer": "Prüfe zuerst deine Zugangsdaten und deine Internetverbindung. Falls die Anmeldung weiterhin nicht funktioniert, wende dich an die Administration oder die zuständige Objektleitung.",
+    "roles": [
+      "SUPER_ADMIN",
+      "ADMIN",
+      "OBJEKTLEITER",
+      "MITARBEITER",
+      "BUCHHALTUNG",
+      "KUNDE"
+    ],
+    "keywords": [
+      "Login",
+      "Anmeldung",
+      "Passwort",
+      "Zugang"
+    ],
+    "priority": 1,
+    "active": true
+  },
+  {
+    "id": "HELP-002",
+    "category": "CHECKIN",
+    "title": "QR-Code funktioniert nicht",
+    "question": "Was mache ich, wenn der QR-Code nicht gelesen wird?",
+    "answer": "Reinige die Kameralinse, halte das Smartphone ruhig und sorge für ausreichendes Licht. Falls der QR-Code weiterhin nicht funktioniert, nutze den zugelassenen Passwort-Fallback oder informiere die Objektleitung.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "QR-Code",
+      "Check-in",
+      "Kamera",
+      "Passwort"
+    ],
+    "priority": 2,
+    "active": true
+  },
+  {
+    "id": "HELP-003",
+    "category": "CHECKIN",
+    "title": "GPS wird nicht erkannt",
+    "question": "Warum kann ich nicht einchecken?",
+    "answer": "Prüfe, ob die Standortfreigabe für Facility OS aktiviert ist. Der Check-in kann nur innerhalb des freigegebenen Objektbereichs erfolgen. Bei technischen Problemen informiere die Objektleitung.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "GPS",
+      "Standort",
+      "Check-in",
+      "Entfernung"
+    ],
+    "priority": 3,
+    "active": true
+  },
+  {
+    "id": "HELP-004",
+    "category": "SHIFT",
+    "title": "Schicht wird nicht angezeigt",
+    "question": "Was mache ich, wenn meine geplante Schicht fehlt?",
+    "answer": "Prüfe zunächst das Datum und das ausgewählte Objekt. Aktualisiere danach die App. Falls die Schicht weiterhin fehlt, kontaktiere die Objektleitung.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Schicht",
+      "Einsatz",
+      "Planung",
+      "Objekt"
+    ],
+    "priority": 4,
+    "active": true
+  },
+  {
+    "id": "HELP-005",
+    "category": "TASKS",
+    "title": "Aufgabe kann nicht ausgeführt werden",
+    "question": "Was mache ich, wenn eine Aufgabe nicht möglich ist?",
+    "answer": "Wähle die Aufgabe aus und dokumentiere den Grund. Möglich sind Text, Foto oder Audio. Typische Gründe sind verschlossene Räume, fehlendes Material oder Sicherheitsprobleme.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Aufgabe",
+      "nicht möglich",
+      "Raum verschlossen",
+      "Dokumentation"
+    ],
+    "priority": 5,
+    "active": true
+  },
+  {
+    "id": "HELP-006",
+    "category": "TASKS",
+    "title": "Zeitabweichung",
+    "question": "Warum muss ich eine Aufgabe begründen?",
+    "answer": "Eine Begründung wird verlangt, wenn die tatsächliche Bearbeitungszeit deutlich von der geplanten Zeit abweicht. Die Dokumentation schützt Mitarbeiter und Unternehmen und macht Abweichungen nachvollziehbar.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN",
+      "BUCHHALTUNG"
+    ],
+    "keywords": [
+      "Zeitabweichung",
+      "Sollzeit",
+      "Istzeit",
+      "Begründung"
+    ],
+    "priority": 6,
+    "active": true
+  },
+  {
+    "id": "HELP-007",
+    "category": "MATERIAL",
+    "title": "Material fehlt",
+    "question": "Wie melde ich fehlendes Material?",
+    "answer": "Öffne den Materialbereich und wähle das fehlende Material aus. Gib den aktuellen Bestand an und sende die Meldung. Bei kritischem Material wird die Objektleitung sofort benachrichtigt.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "Material",
+      "Bestand",
+      "Nachbestellung",
+      "Mangel"
+    ],
+    "priority": 7,
+    "active": true
+  },
+  {
+    "id": "HELP-008",
+    "category": "TICKETS",
+    "title": "Schaden melden",
+    "question": "Wie dokumentiere ich einen Schaden?",
+    "answer": "Erstelle ein neues Ticket, wähle den Typ Schaden und beschreibe die Situation. Ergänze ein Foto, sofern dies sicher und erlaubt ist. Bei akuter Gefahr den Bereich nicht betreten und sofort die Objektleitung informieren.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN",
+      "KUNDE"
+    ],
+    "keywords": [
+      "Schaden",
+      "Ticket",
+      "Foto",
+      "Gefahr"
+    ],
+    "priority": 8,
+    "active": true
+  },
+  {
+    "id": "HELP-009",
+    "category": "ABSENCE",
+    "title": "Krankmeldung",
+    "question": "Wie melde ich mich krank?",
+    "answer": "Öffne den Bereich Krank oder abwesend, wähle die betroffene Schicht und sende die Meldung. Die Objektleitung wird informiert und kann eine Vertretung suchen.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Krank",
+      "Abwesenheit",
+      "Ausfall",
+      "Vertretung"
+    ],
+    "priority": 9,
+    "active": true
+  },
+  {
+    "id": "HELP-010",
+    "category": "VACATION",
+    "title": "Urlaub beantragen",
+    "question": "Wie stelle ich einen Urlaubsantrag?",
+    "answer": "Öffne den Urlaubsbereich, wähle den gewünschten Zeitraum und sende den Antrag. Der Antrag ist erst nach Freigabe durch die zuständige Stelle verbindlich.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "Urlaub",
+      "Urlaubsantrag",
+      "Resturlaub",
+      "Freigabe"
+    ],
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": "HELP-011",
+    "category": "REPLACEMENT",
+    "title": "Vertretungseinsatz",
+    "question": "Was muss ich bei einer Vertretung beachten?",
+    "answer": "Lies vor Schichtbeginn die vollständige Objektanleitung. Bei neuen oder unbekannten Objekten kann eine vollständige Dokumentation aller Aufgaben erforderlich sein.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Vertretung",
+      "Objektanleitung",
+      "Dokumentation",
+      "Einsatz"
+    ],
+    "priority": 11,
+    "active": true
+  },
+  {
+    "id": "HELP-012",
+    "category": "KEYBOOK",
+    "title": "Schlüssel verloren",
+    "question": "Was muss ich bei einem verlorenen Schlüssel tun?",
+    "answer": "Informiere sofort die Objektleitung. Erstelle eine Meldung mit hoher Priorität. Gib an, welcher Schlüssel betroffen ist, wann er zuletzt gesehen wurde und welche Bereiche zugänglich sind.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "Schlüssel",
+      "verloren",
+      "Schlüsselbuch",
+      "Sicherheit"
+    ],
+    "priority": 12,
+    "active": true
+  },
+  {
+    "id": "HELP-013",
+    "category": "SECURITY",
+    "title": "Alarmanlage funktioniert nicht",
+    "question": "Was mache ich bei einer Störung der Alarmanlage?",
+    "answer": "Verlasse das Objekt nicht ungesichert. Informiere sofort die Objektleitung und gegebenenfalls den Wachdienst. Dokumentiere die Störung als Sicherheitsticket.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "Alarmanlage",
+      "Störung",
+      "Wachdienst",
+      "Sicherheit"
+    ],
+    "priority": 13,
+    "active": true
+  },
+  {
+    "id": "HELP-014",
+    "category": "SECURITY",
+    "title": "Unbefugte Person im Objekt",
+    "question": "Wie verhalte ich mich bei einer unbekannten Person?",
+    "answer": "Bringe dich nicht in Gefahr. Halte Abstand, informiere die Objektleitung und gegebenenfalls den Sicherheitsdienst oder die Polizei. Fotografiere Personen nicht ohne ausdrückliche Erlaubnis oder rechtliche Grundlage.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Unbefugte Person",
+      "Gefahr",
+      "Sicherheitsdienst",
+      "Polizei"
+    ],
+    "priority": 14,
+    "active": true
+  },
+  {
+    "id": "HELP-015",
+    "category": "WASTE",
+    "title": "Unbekannter oder gefährlicher Abfall",
+    "question": "Was mache ich bei unbekanntem Abfall?",
+    "answer": "Berühre den Abfall nicht. Sichere den Bereich, sofern dies gefahrlos möglich ist. Informiere die Objektleitung und erstelle ein Ticket. Medizinische Abfälle und scharfe Gegenstände dürfen nicht durch Reinigungspersonal entsorgt werden.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Abfall",
+      "Sondermüll",
+      "medizinischer Abfall",
+      "Gefahr"
+    ],
+    "priority": 15,
+    "active": true
+  },
+  {
+    "id": "HELP-016",
+    "category": "CHECKOUT",
+    "title": "Check-out nicht möglich",
+    "question": "Warum kann ich meine Schicht nicht beenden?",
+    "answer": "Prüfe, ob alle Pflichtpunkte bestätigt wurden. Dazu können Material, Probleme, Müll, Sicherheit, offene Aufgaben und Schlüsselrückgabe gehören.",
+    "roles": [
+      "MITARBEITER",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Check-out",
+      "Schichtende",
+      "Pflichtprüfung",
+      "Schlüssel"
+    ],
+    "priority": 16,
+    "active": true
+  },
+  {
+    "id": "HELP-017",
+    "category": "CUSTOMER",
+    "title": "Kundenanfrage erstellen",
+    "question": "Wie kann ein Kunde eine Anfrage stellen?",
+    "answer": "Im Kundenportal kann unter Meldung oder Anfrage ein neuer Vorgang erstellt werden. Sichtbar sind nur die für den Kunden freigegebenen Objekte und Informationen.",
+    "roles": [
+      "KUNDE",
+      "OBJEKTLEITER",
+      "ADMIN"
+    ],
+    "keywords": [
+      "Kunde",
+      "Anfrage",
+      "Kundenportal",
+      "Ticket"
+    ],
+    "priority": 17,
+    "active": true
+  },
+  {
+    "id": "HELP-018",
+    "category": "ACCOUNTING",
+    "title": "Arbeitszeit stimmt nicht",
+    "question": "Wie wird eine fehlerhafte Arbeitszeit korrigiert?",
+    "answer": "Die Buchhaltung oder Administration prüft Check-in, Check-out, Schichtdaten und vorhandene Begründungen. Änderungen müssen nachvollziehbar dokumentiert und freigegeben werden.",
+    "roles": [
+      "BUCHHALTUNG",
+      "ADMIN",
+      "SUPER_ADMIN",
+      "OBJEKTLEITER"
+    ],
+    "keywords": [
+      "Arbeitszeit",
+      "Korrektur",
+      "Buchhaltung",
+      "Abrechnung"
+    ],
+    "priority": 18,
+    "active": true
+  },
+  {
+    "id": "HELP-019",
+    "category": "ADMIN",
+    "title": "Benutzer deaktivieren",
+    "question": "Wie wird ein Benutzerzugang gesperrt?",
+    "answer": "Öffne die Benutzerverwaltung, wähle den Benutzer aus und setze den Status auf inaktiv. Bestehende Protokolle und historische Daten bleiben erhalten.",
+    "roles": [
+      "ADMIN",
+      "SUPER_ADMIN"
+    ],
+    "keywords": [
+      "Benutzer",
+      "deaktivieren",
+      "Zugang",
+      "Rolle"
+    ],
+    "priority": 19,
+    "active": true
+  },
+  {
+    "id": "HELP-020",
+    "category": "EMERGENCY",
+    "title": "Akuter Notfall",
+    "question": "Was ist bei einem akuten Notfall zu tun?",
+    "answer": "Bei unmittelbarer Gefahr für Personen oder Gebäude zuerst den örtlichen Notruf verständigen. Danach die Objektleitung informieren und den Vorgang dokumentieren. Eigenschutz hat immer Vorrang.",
+    "roles": [
+      "SUPER_ADMIN",
+      "ADMIN",
+      "OBJEKTLEITER",
+      "MITARBEITER",
+      "BUCHHALTUNG",
+      "KUNDE"
+    ],
+    "keywords": [
+      "Notfall",
+      "Gefahr",
+      "Notruf",
+      "Eigenschutz"
+    ],
+    "priority": 0,
+    "active": true
+  }
+]
