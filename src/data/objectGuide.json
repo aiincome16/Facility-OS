@@ -1,0 +1,376 @@
+[
+  {
+    "id": "GUIDE-001",
+    "objectId": "OBJ-001",
+    "title": "Objektanleitung Verwaltungsgebäude",
+    "version": "1.0",
+    "active": true,
+    "requiredForReplacement": true,
+    "requiredForNewEmployees": true,
+    "languages": [
+      "de"
+    ],
+    "generalInstructions": [
+      "Am Haupteingang einchecken.",
+      "Schlüssel aus dem Schlüsselkasten entnehmen und Übergabe dokumentieren.",
+      "Mit dem Eingangsbereich beginnen.",
+      "Anschließend Büroräume, Sanitärbereich und Teeküche reinigen.",
+      "Nach Abschluss alle Fenster und Türen kontrollieren.",
+      "Alarmanlage aktivieren und Schlüssel zurückgeben."
+    ],
+    "accessInstructions": {
+      "mainEntrance": "Der Haupteingang befindet sich an der Vorderseite des Gebäudes.",
+      "entryMethod": "Schlüssel aus dem gesicherten Schlüsselkasten verwenden.",
+      "keyLocation": "Schlüsselkasten rechts neben dem Haupteingang.",
+      "accessCodeRequired": true,
+      "accessCodeHint": "Zugangscode wird nur berechtigten Mitarbeitern angezeigt."
+    },
+    "materialStorage": {
+      "location": "Materialschrank im Erdgeschoss neben dem Sanitärbereich.",
+      "qrCodeRequired": true,
+      "instructions": [
+        "Materialbestand vor Arbeitsbeginn kurz prüfen.",
+        "Fehlendes Material direkt über die App melden.",
+        "Reinigungsmittel nach Verwendung verschließen.",
+        "Tücher nach Farbsystem getrennt lagern."
+      ]
+    },
+    "dosageInstructions": [
+      {
+        "materialId": "MAT-002",
+        "materialName": "Neutralreiniger",
+        "dosage": "20 ml auf 5 Liter Wasser",
+        "warning": "Nicht überdosieren."
+      },
+      {
+        "materialId": "MAT-006",
+        "materialName": "Sanitärreiniger",
+        "dosage": "25 ml auf 5 Liter Wasser",
+        "warning": "Nicht mit chlorhaltigen Mitteln mischen."
+      }
+    ],
+    "securityInstructions": {
+      "alarmSystem": true,
+      "alarmLocation": "Bedienfeld neben dem Haupteingang.",
+      "activationRequired": true,
+      "activationSteps": [
+        "Prüfen, ob alle Personen das Gebäude verlassen haben.",
+        "Fenster und Türen kontrollieren.",
+        "Haupteingang schließen.",
+        "Alarmanlage nach Objektvorgabe aktivieren.",
+        "Aktivierung in der App bestätigen."
+      ],
+      "emergencyContact": {
+        "name": "Objektleitung",
+        "userId": "USR-001",
+        "phone": ""
+      }
+    },
+    "wasteInstructions": {
+      "required": true,
+      "collectionPoint": "Müllcontainer hinter dem Gebäude.",
+      "instructions": [
+        "Restmüll und Papier getrennt entsorgen.",
+        "Keine vertraulichen Unterlagen aus Bürobereichen mitnehmen.",
+        "Müllcontainer nach Verwendung schließen."
+      ]
+    },
+    "roomGuides": [
+      {
+        "roomId": "ROOM-001",
+        "title": "Eingangsbereich",
+        "sequence": 1,
+        "instructions": [
+          "Eingangsmatten ausschütteln.",
+          "Grobschmutz entfernen.",
+          "Boden saugen und feucht wischen.",
+          "Glasflächen und Türgriffe kontrollieren."
+        ],
+        "importantNotes": [
+          "Eingangstür nicht unbeaufsichtigt offen stehen lassen."
+        ]
+      },
+      {
+        "roomId": "ROOM-002",
+        "title": "Büroräume",
+        "sequence": 2,
+        "instructions": [
+          "Abfallbehälter leeren.",
+          "Nur freie Oberflächen reinigen.",
+          "Schreibtischunterlagen und Dokumente nicht verschieben.",
+          "Böden saugen und bei Bedarf feucht wischen."
+        ],
+        "importantNotes": [
+          "Persönliche Gegenstände nicht öffnen oder umstellen."
+        ]
+      },
+      {
+        "roomId": "ROOM-003",
+        "title": "Sanitärbereich",
+        "sequence": 3,
+        "instructions": [
+          "Rotes und gelbes Farbsystem verwenden.",
+          "Toiletten und Waschbecken reinigen.",
+          "Spiegel reinigen.",
+          "Verbrauchsmaterial auffüllen.",
+          "Boden zuletzt feucht wischen."
+        ],
+        "importantNotes": [
+          "Materialmängel sofort melden."
+        ]
+      },
+      {
+        "roomId": "ROOM-004",
+        "title": "Teeküche",
+        "sequence": 4,
+        "instructions": [
+          "Abfallbehälter leeren.",
+          "Spüle und freie Arbeitsflächen reinigen.",
+          "Boden feucht wischen."
+        ],
+        "importantNotes": [
+          "Keine Lebensmittel entsorgen.",
+          "Keine privaten Schränke öffnen."
+        ]
+      }
+    ],
+    "checkoutChecklist": [
+      {
+        "id": "CHECK-001",
+        "label": "Materialbestand geprüft",
+        "required": true
+      },
+      {
+        "id": "CHECK-002",
+        "label": "Probleme und Schäden gemeldet",
+        "required": true
+      },
+      {
+        "id": "CHECK-003",
+        "label": "Müll entsorgt",
+        "required": true
+      },
+      {
+        "id": "CHECK-004",
+        "label": "Fenster und Türen kontrolliert",
+        "required": true
+      },
+      {
+        "id": "CHECK-005",
+        "label": "Alarmanlage aktiviert",
+        "required": true
+      },
+      {
+        "id": "CHECK-006",
+        "label": "Schlüssel zurückgegeben",
+        "required": true
+      }
+    ],
+    "media": [
+      {
+        "id": "MEDIA-001",
+        "type": "IMAGE",
+        "title": "Haupteingang",
+        "url": "",
+        "description": "Ansicht des Haupteingangs und des Schlüsselkastens."
+      },
+      {
+        "id": "MEDIA-002",
+        "type": "AUDIO",
+        "title": "Kurzanleitung Objekt",
+        "url": "",
+        "description": "Gesprochene Einführung für neue Mitarbeiter und Vertretungen."
+      }
+    ],
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "GUIDE-002",
+    "objectId": "OBJ-002",
+    "title": "Objektanleitung Praxiszentrum",
+    "version": "1.0",
+    "active": true,
+    "requiredForReplacement": true,
+    "requiredForNewEmployees": true,
+    "languages": [
+      "de"
+    ],
+    "generalInstructions": [
+      "Vor dem Betreten prüfen, ob der Praxisbetrieb beendet ist.",
+      "Behandlungsräume nur nach Freigabe betreten.",
+      "Mit Empfang und Wartebereich beginnen.",
+      "Danach Behandlungsräume und Sanitärbereich reinigen.",
+      "Medizinische Geräte nicht verschieben oder reinigen, sofern keine ausdrückliche Freigabe besteht.",
+      "Nach Abschluss Türen schließen und Auschecken durchführen."
+    ],
+    "accessInstructions": {
+      "mainEntrance": "Eingang über den Haupteingang des Praxiszentrums.",
+      "entryMethod": "Zugang mit persönlichem Schlüssel.",
+      "keyLocation": "Schlüssel wird durch die Objektleitung ausgegeben.",
+      "accessCodeRequired": false,
+      "accessCodeHint": ""
+    },
+    "materialStorage": {
+      "location": "Reinigungsraum hinter dem Empfang.",
+      "qrCodeRequired": true,
+      "instructions": [
+        "Desinfektionsmittelbestand täglich prüfen.",
+        "Verbrauchsmaterialien im Sanitärschrank kontrollieren.",
+        "Reinigungswagen nach Gebrauch vollständig zurückstellen.",
+        "Materialmangel sofort melden."
+      ]
+    },
+    "dosageInstructions": [
+      {
+        "materialId": "MAT-002",
+        "materialName": "Neutralreiniger",
+        "dosage": "20 ml auf 5 Liter Wasser",
+        "warning": "Nicht auf medizinischen Geräten verwenden."
+      },
+      {
+        "materialId": "MAT-006",
+        "materialName": "Sanitärreiniger",
+        "dosage": "25 ml auf 5 Liter Wasser",
+        "warning": "Nicht mit Desinfektionsmitteln mischen."
+      }
+    ],
+    "securityInstructions": {
+      "alarmSystem": false,
+      "alarmLocation": "",
+      "activationRequired": false,
+      "activationSteps": [
+        "Fenster kontrollieren.",
+        "Behandlungsräume schließen.",
+        "Haupteingang abschließen.",
+        "Objektabschluss in der App bestätigen."
+      ],
+      "emergencyContact": {
+        "name": "Objektleitung",
+        "userId": "USR-001",
+        "phone": ""
+      }
+    },
+    "wasteInstructions": {
+      "required": true,
+      "collectionPoint": "Abfallbereich im Innenhof.",
+      "instructions": [
+        "Normalen Restmüll getrennt entsorgen.",
+        "Medizinische Abfälle nicht anfassen oder entsorgen.",
+        "Unklare Abfälle in der App melden.",
+        "Abfallbereich nach Entsorgung schließen."
+      ]
+    },
+    "roomGuides": [
+      {
+        "roomId": "ROOM-005",
+        "title": "Empfang und Wartebereich",
+        "sequence": 1,
+        "instructions": [
+          "Abfallbehälter leeren.",
+          "Sitzflächen und Tische reinigen.",
+          "Kontaktflächen desinfizieren.",
+          "Boden saugen und feucht wischen."
+        ],
+        "importantNotes": [
+          "Dokumente und Patientenunterlagen nicht berühren."
+        ]
+      },
+      {
+        "roomId": "ROOM-006",
+        "title": "Behandlungsraum 1",
+        "sequence": 2,
+        "instructions": [
+          "Freigabe vor dem Betreten prüfen.",
+          "Abfall nach Praxisvorgabe behandeln.",
+          "Freie Flächen desinfizieren.",
+          "Boden feucht wischen."
+        ],
+        "importantNotes": [
+          "Medizinische Geräte nicht verschieben.",
+          "Keine Schränke öffnen."
+        ]
+      },
+      {
+        "roomId": "ROOM-007",
+        "title": "Behandlungsraum 2",
+        "sequence": 3,
+        "instructions": [
+          "Freigabe vor dem Betreten prüfen.",
+          "Freie Flächen desinfizieren.",
+          "Boden feucht wischen.",
+          "Raum nach Abschluss schließen."
+        ],
+        "importantNotes": [
+          "Medizinische Geräte nicht verschieben.",
+          "Beschädigungen sofort dokumentieren."
+        ]
+      },
+      {
+        "roomId": "ROOM-008",
+        "title": "Sanitärbereich",
+        "sequence": 4,
+        "instructions": [
+          "Toilette und Waschbecken reinigen.",
+          "Kontaktflächen desinfizieren.",
+          "Spiegel reinigen.",
+          "Verbrauchsmaterial auffüllen.",
+          "Boden feucht wischen."
+        ],
+        "importantNotes": [
+          "Desinfektions- und Verbrauchsmaterialbestand prüfen."
+        ]
+      }
+    ],
+    "checkoutChecklist": [
+      {
+        "id": "CHECK-007",
+        "label": "Materialbestand geprüft",
+        "required": true
+      },
+      {
+        "id": "CHECK-008",
+        "label": "Probleme und Schäden gemeldet",
+        "required": true
+      },
+      {
+        "id": "CHECK-009",
+        "label": "Medizinische Abfälle nicht berührt",
+        "required": true
+      },
+      {
+        "id": "CHECK-010",
+        "label": "Müll ordnungsgemäß entsorgt",
+        "required": true
+      },
+      {
+        "id": "CHECK-011",
+        "label": "Behandlungsräume geschlossen",
+        "required": true
+      },
+      {
+        "id": "CHECK-012",
+        "label": "Haupteingang abgeschlossen",
+        "required": true
+      }
+    ],
+    "media": [
+      {
+        "id": "MEDIA-003",
+        "type": "IMAGE",
+        "title": "Reinigungsraum",
+        "url": "",
+        "description": "Standort des Reinigungswagens und der Reinigungsmittel."
+      },
+      {
+        "id": "MEDIA-004",
+        "type": "AUDIO",
+        "title": "Praxisanleitung",
+        "url": "",
+        "description": "Gesprochene Einführung zu Hygiene- und Sicherheitsregeln."
+      }
+    ],
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
