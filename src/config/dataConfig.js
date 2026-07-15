@@ -124,77 +124,53 @@ export const DATA_CONFIG = Object.freeze({
      */
     FILES: Object.freeze({
 
-        users:
-            "./src/data/users.json",
+        users:"./src/data/users.json",
 
-        objects:
-            "./src/data/objects.json",
+        objects:"./src/data/objects.json",
 
-        rooms:
-            "./src/data/rooms.json",
+        rooms:"./src/data/rooms.json",
 
-        tasks:
-            "./src/data/tasks.json",
+        tasks:"./src/data/tasks.json",
 
-        materials:
-            "./src/data/materials.json",
+        materials:"./src/data/materials.json",
 
-        materialStock:
-            "./src/data/materialStock.json",
+        materialStock:"./src/data/materialStock.json",
 
-        shifts:
-            "./src/data/shifts.json",
+        shifts:"./src/data/shifts.json",
 
-        checkins:
-            "./src/data/checkins.json",
+        checkins:"./src/data/checkins.json",
 
-        checkouts:
-            "./src/data/checkouts.json",
+        checkouts:"./src/data/checkouts.json",
 
-        tickets:
-            "./src/data/tickets.json",
+        tickets:"./src/data/tickets.json",
 
-        messages:
-            "./src/data/messages.json",
+        messages:"./src/data/messages.json",
 
-        notifications:
-            "./src/data/notifications.json",
+        notifications:"./src/data/notifications.json",
 
-        objectGuide:
-            "./src/data/objectGuide.json",
+        objectGuide:"./src/data/objectGuide.json",
 
-        objectSettings:
-            "./src/data/objectSettings.json",
+        objectSettings:"./src/data/objectSettings.json",
 
-        taskLogs:
-            "./src/data/taskLogs.json",
+        taskLogs:"./src/data/taskLogs.json",
 
-        timeDeviations:
-            "./src/data/timeDeviations.json",
+        timeDeviations:"./src/data/timeDeviations.json",
 
-        keybook:
-            "./src/data/keybook.json",
+        keybook:"./src/data/keybook.json",
 
-        customerAccess:
-            "./src/data/customerAccess.json",
+        customerAccess:"./src/data/customerAccess.json",
 
-        customerRequests:
-            "./src/data/customerRequests.json",
+        customerRequests:"./src/data/customerRequests.json",
 
-        workOrders:
-            "./src/data/workOrders.json",
+        workOrders:"./src/data/workOrders.json",
 
-        objectSecurity:
-            "./src/data/objectSecurity.json",
+        objectSecurity:"./src/data/objectSecurity.json",
 
-        objectWaste:
-            "./src/data/objectWaste.json",
+        objectWaste:"./src/data/objectWaste.json",
 
-        userPerformance:
-            "./src/data/userPerformance.json",
+        userPerformance:"./src/data/userPerformance.json",
 
-        help:
-            "./src/data/help.json"
+        help:"./src/data/help.json"
     }),
 
     /**
