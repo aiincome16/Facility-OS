@@ -1,0 +1,155 @@
+[
+  {
+    "id": "MSG-001",
+    "senderUserId": "USR-001",
+    "recipientUserIds": [
+      "USR-002"
+    ],
+    "objectId": "OBJ-001",
+    "subject": "Hinweis zur heutigen Schicht",
+    "message": "Bitte heute besonders auf die Glasflächen im Eingangsbereich achten.",
+    "type": "INTERNAL",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [],
+    "attachments": [],
+    "createdAt": "2026-07-15T14:00:00.000Z",
+    "updatedAt": "2026-07-15T14:00:00.000Z"
+  },
+  {
+    "id": "MSG-002",
+    "senderUserId": "USR-002",
+    "recipientUserIds": [
+      "USR-001"
+    ],
+    "objectId": "OBJ-001",
+    "subject": "Materialbestand",
+    "message": "Die Papierhandtücher sind fast aufgebraucht. Ich habe bereits eine Materialmeldung erstellt.",
+    "type": "INTERNAL",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [
+      "USR-001"
+    ],
+    "attachments": [],
+    "createdAt": "2026-07-15T08:12:00.000Z",
+    "updatedAt": "2026-07-15T08:20:00.000Z"
+  },
+  {
+    "id": "MSG-003",
+    "senderUserId": "USR-001",
+    "recipientUserIds": [
+      "USR-003"
+    ],
+    "objectId": "OBJ-001",
+    "subject": "Vertretung am 16.07.2026",
+    "message": "Du bist morgen als Vertretung im Verwaltungsgebäude eingeteilt. Bitte lies vor Schichtbeginn die Objektanleitung.",
+    "type": "REPLACEMENT",
+    "priority": "HIGH",
+    "status": "SENT",
+    "readByUserIds": [],
+    "attachments": [],
+    "createdAt": "2026-07-15T10:05:00.000Z",
+    "updatedAt": "2026-07-15T10:05:00.000Z"
+  },
+  {
+    "id": "MSG-004",
+    "senderUserId": "USR-003",
+    "recipientUserIds": [
+      "USR-001"
+    ],
+    "objectId": "OBJ-002",
+    "subject": "Beschädigter Seifenspender",
+    "message": "Der Seifenspender im Behandlungsraum 1 ist locker. Das Ticket wurde erstellt.",
+    "type": "DAMAGE",
+    "priority": "HIGH",
+    "status": "SENT",
+    "readByUserIds": [
+      "USR-001"
+    ],
+    "attachments": [
+      {
+        "id": "ATT-002",
+        "type": "PHOTO",
+        "url": "",
+        "fileName": "seifenspender.jpg"
+      }
+    ],
+    "createdAt": "2026-07-15T09:16:00.000Z",
+    "updatedAt": "2026-07-15T09:25:00.000Z"
+  },
+  {
+    "id": "MSG-005",
+    "senderUserId": "USR-006",
+    "recipientUserIds": [
+      "USR-001"
+    ],
+    "objectId": "OBJ-001",
+    "subject": "Zusätzliche Glasreinigung",
+    "message": "Bitte bestätigen Sie, ob die Eingangstür am Freitag zusätzlich außen gereinigt werden kann.",
+    "type": "CUSTOMER",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [],
+    "attachments": [],
+    "createdAt": "2026-07-15T10:31:00.000Z",
+    "updatedAt": "2026-07-15T10:31:00.000Z"
+  },
+  {
+    "id": "MSG-006",
+    "senderUserId": "USR-001",
+    "recipientUserIds": [
+      "USR-006"
+    ],
+    "objectId": "OBJ-001",
+    "subject": "Ihre Anfrage wurde aufgenommen",
+    "message": "Ihre Anfrage zur zusätzlichen Glasreinigung wurde aufgenommen und wird geprüft.",
+    "type": "CUSTOMER",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [
+      "USR-006"
+    ],
+    "attachments": [],
+    "createdAt": "2026-07-15T10:45:00.000Z",
+    "updatedAt": "2026-07-15T10:50:00.000Z"
+  },
+  {
+    "id": "MSG-007",
+    "senderUserId": "USR-004",
+    "recipientUserIds": [
+      "USR-001",
+      "USR-005"
+    ],
+    "objectId": null,
+    "subject": "Monatsauswertung vorbereiten",
+    "message": "Bitte die offenen Zeitabweichungen bis zum Monatsende prüfen.",
+    "type": "ADMIN",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [],
+    "attachments": [],
+    "createdAt": "2026-07-15T11:00:00.000Z",
+    "updatedAt": "2026-07-15T11:00:00.000Z"
+  },
+  {
+    "id": "MSG-008",
+    "senderUserId": "USR-001",
+    "recipientUserIds": [
+      "USR-002",
+      "USR-003"
+    ],
+    "objectId": null,
+    "subject": "Allgemeiner Hinweis",
+    "message": "Bitte Materialmängel immer direkt über die App melden.",
+    "type": "BROADCAST",
+    "priority": "NORMAL",
+    "status": "SENT",
+    "readByUserIds": [
+      "USR-002"
+    ],
+    "attachments": [],
+    "createdAt": "2026-07-15T12:00:00.000Z",
+    "updatedAt": "2026-07-15T12:00:00.000Z"
+  }
+]
