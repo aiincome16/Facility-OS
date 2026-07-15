@@ -1,0 +1,128 @@
+/************************************************
+ * Facility OS
+ * permissions.js
+ ************************************************/
+
+import { USER_ROLES } from "./appConfig.js";
+
+export const PERMISSIONS = Object.freeze({
+
+    VIEW_ADMIN_DASHBOARD: "VIEW_ADMIN_DASHBOARD",
+
+    VIEW_MANAGER_DASHBOARD: "VIEW_MANAGER_DASHBOARD",
+
+    VIEW_EMPLOYEE_DASHBOARD: "VIEW_EMPLOYEE_DASHBOARD",
+
+    VIEW_ACCOUNTING_DASHBOARD: "VIEW_ACCOUNTING_DASHBOARD",
+
+    VIEW_CUSTOMER_DASHBOARD: "VIEW_CUSTOMER_DASHBOARD",
+
+    MANAGE_USERS: "MANAGE_USERS",
+
+    MANAGE_OBJECTS: "MANAGE_OBJECTS",
+
+    MANAGE_ROOMS: "MANAGE_ROOMS",
+
+    MANAGE_TASKS: "MANAGE_TASKS",
+
+    MANAGE_SHIFTS: "MANAGE_SHIFTS",
+
+    VIEW_REPORTS: "VIEW_REPORTS",
+
+    MANAGE_MATERIALS: "MANAGE_MATERIALS",
+
+    MANAGE_TICKETS: "MANAGE_TICKETS",
+
+    USE_CHECKIN: "USE_CHECKIN",
+
+    USE_CHECKOUT: "USE_CHECKOUT",
+
+    VIEW_OWN_TASKS: "VIEW_OWN_TASKS",
+
+    VIEW_ASSIGNED_OBJECTS: "VIEW_ASSIGNED_OBJECTS",
+
+    VIEW_CUSTOMER_DATA: "VIEW_CUSTOMER_DATA"
+
+});
+
+const ALL_PERMISSIONS = Object.values(PERMISSIONS);
+
+export const ROLE_PERMISSIONS = Object.freeze({
+
+    [USER_ROLES.SUPER_ADMIN]: ALL_PERMISSIONS,
+
+    [USER_ROLES.ADMIN]: [
+        PERMISSIONS.VIEW_ADMIN_DASHBOARD,
+        PERMISSIONS.MANAGE_USERS,
+        PERMISSIONS.MANAGE_OBJECTS,
+        PERMISSIONS.MANAGE_ROOMS,
+        PERMISSIONS.MANAGE_TASKS,
+        PERMISSIONS.MANAGE_SHIFTS,
+        PERMISSIONS.VIEW_REPORTS,
+        PERMISSIONS.MANAGE_MATERIALS,
+        PERMISSIONS.MANAGE_TICKETS,
+        PERMISSIONS.VIEW_ASSIGNED_OBJECTS,
+        PERMISSIONS.VIEW_CUSTOMER_DATA
+    ],
+
+    [USER_ROLES.OBJEKTLEITER]: [
+        PERMISSIONS.VIEW_MANAGER_DASHBOARD,
+        PERMISSIONS.MANAGE_USERS,
+        PERMISSIONS.MANAGE_OBJECTS,
+        PERMISSIONS.MANAGE_ROOMS,
+        PERMISSIONS.MANAGE_TASKS,
+        PERMISSIONS.MANAGE_SHIFTS,
+        PERMISSIONS.VIEW_REPORTS,
+        PERMISSIONS.MANAGE_MATERIALS,
+        PERMISSIONS.MANAGE_TICKETS,
+        PERMISSIONS.VIEW_ASSIGNED_OBJECTS,
+        PERMISSIONS.VIEW_CUSTOMER_DATA
+    ],
+
+    [USER_ROLES.MITARBEITER]: [
+        PERMISSIONS.VIEW_EMPLOYEE_DASHBOARD,
+        PERMISSIONS.USE_CHECKIN,
+        PERMISSIONS.USE_CHECKOUT,
+        PERMISSIONS.VIEW_OWN_TASKS,
+        PERMISSIONS.VIEW_ASSIGNED_OBJECTS,
+        PERMISSIONS.MANAGE_TICKETS
+    ],
+
+    [USER_ROLES.BUCHHALTUNG]: [
+        PERMISSIONS.VIEW_ACCOUNTING_DASHBOARD,
+        PERMISSIONS.VIEW_REPORTS
+    ],
+
+    [USER_ROLES.KUNDE]: [
+        PERMISSIONS.VIEW_CUSTOMER_DASHBOARD,
+        PERMISSIONS.VIEW_CUSTOMER_DATA,
+        PERMISSIONS.MANAGE_TICKETS
+    ]
+
+});
+
+export function hasPermission(role, permission) {
+
+    if (!role || !permission) {
+        return false;
+    }
+
+    const permissions = ROLE_PERMISSIONS[role];
+
+    if (!Array.isArray(permissions)) {
+        return false;
+    }
+
+    return permissions.includes(permission);
+}
+
+export function getPermissionsForRole(role) {
+
+    const permissions = ROLE_PERMISSIONS[role];
+
+    if (!Array.isArray(permissions)) {
+        return [];
+    }
+
+    return [...permissions];
+}
