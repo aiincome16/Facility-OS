@@ -1,0 +1,156 @@
+[
+  {
+    "id": "CHECKIN-001",
+    "shiftId": "SHIFT-002",
+    "userId": "USR-003",
+    "objectId": "OBJ-002",
+    "checkinAt": "2026-07-15T16:32:00.000Z",
+    "method": "QR",
+    "status": "VALID",
+    "qrCodeId": "QR-OBJ-002",
+    "passwordFallbackUsed": false,
+    "gps": {
+      "required": true,
+      "captured": true,
+      "latitude": 51.3811,
+      "longitude": 11.6003,
+      "accuracyMeters": 18,
+      "distanceToObjectMeters": 24,
+      "withinAllowedRadius": true
+    },
+    "device": {
+      "deviceType": "MOBILE",
+      "platform": "iOS",
+      "browser": "Safari"
+    },
+    "contactPermission": {
+      "required": true,
+      "granted": true
+    },
+    "replacement": false,
+    "guideRequired": false,
+    "offlineCreated": false,
+    "synced": true,
+    "notes": "",
+    "createdAt": "2026-07-15T16:32:00.000Z"
+  },
+  {
+    "id": "CHECKIN-002",
+    "shiftId": "SHIFT-003",
+    "userId": "USR-002",
+    "objectId": "OBJ-001",
+    "checkinAt": "2026-07-14T17:03:00.000Z",
+    "method": "QR",
+    "status": "VALID",
+    "qrCodeId": "QR-OBJ-001",
+    "passwordFallbackUsed": false,
+    "gps": {
+      "required": true,
+      "captured": true,
+      "latitude": 51.5275,
+      "longitude": 11.5486,
+      "accuracyMeters": 12,
+      "distanceToObjectMeters": 17,
+      "withinAllowedRadius": true
+    },
+    "device": {
+      "deviceType": "MOBILE",
+      "platform": "Android",
+      "browser": "Chrome"
+    },
+    "contactPermission": {
+      "required": true,
+      "granted": true
+    },
+    "replacement": false,
+    "guideRequired": false,
+    "offlineCreated": false,
+    "synced": true,
+    "notes": "",
+    "createdAt": "2026-07-14T17:03:00.000Z"
+  },
+  {
+    "id": "CHECKIN-003",
+    "shiftId": "SHIFT-004",
+    "userId": "USR-003",
+    "objectId": "OBJ-002",
+    "checkinAt": "2026-07-14T16:28:00.000Z",
+    "method": "PASSWORD",
+    "status": "VALID",
+    "qrCodeId": null,
+    "passwordFallbackUsed": true,
+    "gps": {
+      "required": true,
+      "captured": true,
+      "latitude": 51.3812,
+      "longitude": 11.6001,
+      "accuracyMeters": 21,
+      "distanceToObjectMeters": 31,
+      "withinAllowedRadius": true
+    },
+    "device": {
+      "deviceType": "MOBILE",
+      "platform": "iOS",
+      "browser": "Safari"
+    },
+    "contactPermission": {
+      "required": true,
+      "granted": true
+    },
+    "replacement": false,
+    "guideRequired": false,
+    "offlineCreated": false,
+    "synced": true,
+    "notes": "QR-Code war nicht lesbar. Passwort-Fallback wurde verwendet.",
+    "createdAt": "2026-07-14T16:28:00.000Z"
+  },
+  {
+    "id": "CHECKIN-004",
+    "shiftId": "SHIFT-005",
+    "userId": "USR-003",
+    "objectId": "OBJ-001",
+    "checkinAt": null,
+    "method": null,
+    "status": "PENDING",
+    "qrCodeId": null,
+    "passwordFallbackUsed": false,
+    "gps": {
+      "required": true,
+      "captured": false,
+      "latitude": null,
+      "longitude": null,
+      "accuracyMeters": null,
+      "distanceToObjectMeters": null,
+      "withinAllowedRadius": null
+    },
+    "device": {
+      "deviceType": null,
+      "platform": null,
+      "browser": null
+    },
+    "contactPermission": {
+      "required": true,
+      "granted": false
+    },
+    "replacement": true,
+    "guideRequired": true,
+    "offlineCreated": false,
+    "synced": false,
+    "notes": "Geplante Vertretungsschicht. Objektanleitung muss vor dem Check-in bestätigt werden.",
+    "createdAt": "2026-07-15T10:00:00.000Z"
+  },
+  {
+    "id": "CHECKIN-005",
+    "shiftId": "SHIFT-001",
+    "userId": "USR-002",
+    "objectId": "OBJ-001",
+    "checkinAt": null,
+    "method": null,
+    "status": "PENDING",
+    "qrCodeId": null,
+    "passwordFallbackUsed": false,
+    "gps": {
+      "required": true,
+      "captured": false,
+      "latitude": null,
+      "longitude": null
