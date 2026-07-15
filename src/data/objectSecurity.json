@@ -1,0 +1,253 @@
+[
+  {
+    "id": "SEC-001",
+    "objectId": "OBJ-001",
+    "active": true,
+
+    "access": {
+      "mainEntrance": "Haupteingang Vorderseite",
+      "secondaryEntrances": [
+        "Hintereingang Hofseite"
+      ],
+      "authorizedUserIds": [
+        "USR-001",
+        "USR-002",
+        "USR-003"
+      ],
+      "accessCodeRequired": true,
+      "accessCodeVisibleToAuthorizedUsersOnly": true,
+      "visitorAccessAllowed": false
+    },
+
+    "closing": {
+      "closingTime": "20:00",
+      "lastEmployeeMustSecureObject": true,
+      "doorCheckRequired": true,
+      "windowCheckRequired": true,
+      "lightCheckRequired": true,
+      "electricalEquipmentCheckRequired": false
+    },
+
+    "alarmSystem": {
+      "enabled": true,
+      "activationRequired": true,
+      "deactivationRequired": true,
+      "controlPanelLocation": "Neben dem Haupteingang",
+      "instructions": [
+        "Vor Aktivierung prüfen, ob sich noch Personen im Gebäude befinden.",
+        "Alle Fenster und Außentüren kontrollieren.",
+        "Haupteingang schließen.",
+        "Alarmanlage aktivieren.",
+        "Aktivierung in Facility OS bestätigen."
+      ],
+      "confirmationRequired": true,
+      "incidentPhotoRequired": false
+    },
+
+    "emergencyContacts": [
+      {
+        "id": "EMERGENCY-001",
+        "type": "OBJECT_LEADER",
+        "name": "Anna Beispiel",
+        "userId": "USR-001",
+        "phone": "",
+        "availableFrom": "06:00",
+        "availableUntil": "22:00"
+      },
+      {
+        "id": "EMERGENCY-002",
+        "type": "CUSTOMER_CONTACT",
+        "name": "Herr Beispiel",
+        "userId": null,
+        "phone": "",
+        "availableFrom": "08:00",
+        "availableUntil": "18:00"
+      },
+      {
+        "id": "EMERGENCY-003",
+        "type": "SECURITY_SERVICE",
+        "name": "Wachdienst Beispiel",
+        "userId": null,
+        "phone": "",
+        "availableFrom": "00:00",
+        "availableUntil": "23:59"
+      }
+    ],
+
+    "incidentRules": {
+      "unauthorizedPerson": {
+        "reportImmediately": true,
+        "contactSecurityService": true,
+        "contactObjectLeader": true,
+        "photoAllowed": false
+      },
+      "openDoorOrWindow": {
+        "secureIfPossible": true,
+        "reportImmediately": true,
+        "photoRequired": false
+      },
+      "alarmFailure": {
+        "reportImmediately": true,
+        "contactObjectLeader": true,
+        "contactSecurityService": true,
+        "doNotLeaveObjectUnsecured": true
+      },
+      "burglaryOrDamage": {
+        "doNotEnterAffectedArea": true,
+        "contactPolice": true,
+        "contactObjectLeader": true,
+        "createHighPriorityTicket": true
+      }
+    },
+
+    "checkoutChecklist": [
+      {
+        "id": "SEC-CHECK-001",
+        "label": "Alle Außentüren kontrolliert",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-002",
+        "label": "Alle Fenster kontrolliert",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-003",
+        "label": "Licht ausgeschaltet",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-004",
+        "label": "Keine Personen mehr im Gebäude",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-005",
+        "label": "Alarmanlage aktiviert",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-006",
+        "label": "Haupteingang abgeschlossen",
+        "required": true
+      }
+    ],
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "SEC-002",
+    "objectId": "OBJ-002",
+    "active": true,
+
+    "access": {
+      "mainEntrance": "Haupteingang Praxiszentrum",
+      "secondaryEntrances": [],
+      "authorizedUserIds": [
+        "USR-001",
+        "USR-003"
+      ],
+      "accessCodeRequired": false,
+      "accessCodeVisibleToAuthorizedUsersOnly": true,
+      "visitorAccessAllowed": false
+    },
+
+    "closing": {
+      "closingTime": "19:30",
+      "lastEmployeeMustSecureObject": true,
+      "doorCheckRequired": true,
+      "windowCheckRequired": true,
+      "lightCheckRequired": true,
+      "electricalEquipmentCheckRequired": false
+    },
+
+    "alarmSystem": {
+      "enabled": false,
+      "activationRequired": false,
+      "deactivationRequired": false,
+      "controlPanelLocation": "",
+      "instructions": [
+        "Behandlungsräume schließen.",
+        "Fenster kontrollieren.",
+        "Haupteingang abschließen.",
+        "Objektabschluss in Facility OS bestätigen."
+      ],
+      "confirmationRequired": false,
+      "incidentPhotoRequired": true
+    },
+
+    "emergencyContacts": [
+      {
+        "id": "EMERGENCY-004",
+        "type": "OBJECT_LEADER",
+        "name": "Anna Beispiel",
+        "userId": "USR-001",
+        "phone": "",
+        "availableFrom": "06:00",
+        "availableUntil": "22:00"
+      },
+      {
+        "id": "EMERGENCY-005",
+        "type": "CUSTOMER_CONTACT",
+        "name": "Frau Muster",
+        "userId": null,
+        "phone": "",
+        "availableFrom": "07:00",
+        "availableUntil": "19:00"
+      }
+    ],
+
+    "incidentRules": {
+      "unauthorizedPerson": {
+        "reportImmediately": true,
+        "contactSecurityService": false,
+        "contactObjectLeader": true,
+        "photoAllowed": false
+      },
+      "openDoorOrWindow": {
+        "secureIfPossible": true,
+        "reportImmediately": true,
+        "photoRequired": true
+      },
+      "alarmFailure": {
+        "reportImmediately": false,
+        "contactObjectLeader": true,
+        "contactSecurityService": false,
+        "doNotLeaveObjectUnsecured": true
+      },
+      "burglaryOrDamage": {
+        "doNotEnterAffectedArea": true,
+        "contactPolice": true,
+        "contactObjectLeader": true,
+        "createHighPriorityTicket": true
+      }
+    },
+
+    "checkoutChecklist": [
+      {
+        "id": "SEC-CHECK-007",
+        "label": "Behandlungsräume geschlossen",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-008",
+        "label": "Fenster kontrolliert",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-009",
+        "label": "Licht ausgeschaltet",
+        "required": true
+      },
+      {
+        "id": "SEC-CHECK-010",
+        "label": "Haupteingang abgeschlossen",
+        "required": true
+      }
+    ],
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
