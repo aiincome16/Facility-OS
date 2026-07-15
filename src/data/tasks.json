@@ -281,4 +281,16 @@
       "Toilette reinigen und desinfizieren",
       "Waschbecken reinigen",
       "Spiegel reinigen",
-      "Boden feucht w
+      "Boden feucht wischen",
+      "Verbrauchsmaterial prüfen"
+    ],
+    "materials": [
+      "MAT-002",
+      "MAT-004",
+      "MAT-006",
+      "MAT-007",
+      "MAT-008",
+      "MAT-009"
+    ]
+  }
+]
