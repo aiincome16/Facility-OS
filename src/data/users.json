@@ -1,0 +1,77 @@
+[
+  {
+    "id": "USR-001",
+    "name": "Anna Beispiel",
+    "firstName": "Anna",
+    "lastName": "Beispiel",
+    "role": "OBJEKTLEITER",
+    "email": "anna.beispiel@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": [
+      "OBJ-001",
+      "OBJ-002"
+    ]
+  },
+  {
+    "id": "USR-002",
+    "name": "Max Muster",
+    "firstName": "Max",
+    "lastName": "Muster",
+    "role": "MITARBEITER",
+    "email": "max.muster@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": [
+      "OBJ-001"
+    ]
+  },
+  {
+    "id": "USR-003",
+    "name": "Lisa Reinigung",
+    "firstName": "Lisa",
+    "lastName": "Reinigung",
+    "role": "MITARBEITER",
+    "email": "lisa.reinigung@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": [
+      "OBJ-002"
+    ]
+  },
+  {
+    "id": "USR-004",
+    "name": "Thomas Verwaltung",
+    "firstName": "Thomas",
+    "lastName": "Verwaltung",
+    "role": "ADMIN",
+    "email": "thomas.verwaltung@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": []
+  },
+  {
+    "id": "USR-005",
+    "name": "Sandra Buchhaltung",
+    "firstName": "Sandra",
+    "lastName": "Buchhaltung",
+    "role": "BUCHHALTUNG",
+    "email": "sandra.buchhaltung@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": []
+  },
+  {
+    "id": "USR-006",
+    "name": "Kunde Beispiel GmbH",
+    "firstName": "Kunde",
+    "lastName": "Beispiel GmbH",
+    "role": "KUNDE",
+    "email": "kunde@facility-os.test",
+    "phone": "",
+    "active": true,
+    "assignedObjectIds": [
+      "OBJ-001"
+    ]
+  }
+]
