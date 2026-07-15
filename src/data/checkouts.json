@@ -1,0 +1,352 @@
+[
+  {
+    "id": "CHECKOUT-001",
+    "shiftId": "SHIFT-003",
+    "userId": "USR-002",
+    "objectId": "OBJ-001",
+    "checkoutAt": "2026-07-14T19:08:00.000Z",
+    "status": "COMPLETED",
+    "plannedEnd": "2026-07-14T19:00:00.000Z",
+    "actualEnd": "2026-07-14T19:08:00.000Z",
+    "actualMinutes": 125,
+    "timeDeviation": {
+      "detected": false,
+      "type": null,
+      "differenceMinutes": 5,
+      "reasonRequired": false,
+      "reason": "",
+      "documentationType": null,
+      "attachmentIds": []
+    },
+    "materialCheck": {
+      "required": true,
+      "confirmed": true,
+      "status": "LOW",
+      "notes": "Papierhandtücher und Glasreiniger fast aufgebraucht.",
+      "ticketId": "TICKET-001"
+    },
+    "problemCheck": {
+      "required": true,
+      "confirmed": true,
+      "problemFound": true,
+      "notes": "Ein Büroraum war zeitweise verschlossen.",
+      "ticketId": "TICKET-005"
+    },
+    "wasteCheck": {
+      "required": true,
+      "confirmed": true,
+      "wasteRemoved": true,
+      "collectionPointUsed": true,
+      "notes": ""
+    },
+    "securityCheck": {
+      "required": true,
+      "confirmed": true,
+      "doorsChecked": true,
+      "windowsChecked": true,
+      "alarmActivated": true,
+      "alarmConfirmation": "CONFIRMED",
+      "notes": ""
+    },
+    "keyReturn": {
+      "required": true,
+      "confirmed": true,
+      "keybookEntryId": "KEY-002",
+      "notes": ""
+    },
+    "openTaskCheck": {
+      "required": true,
+      "confirmed": true,
+      "openTasksFound": false,
+      "openTaskIds": [],
+      "notes": ""
+    },
+    "employeeConfirmation": {
+      "confirmed": true,
+      "confirmedAt": "2026-07-14T19:08:00.000Z"
+    },
+    "offlineCreated": false,
+    "synced": true,
+    "createdAt": "2026-07-14T19:08:00.000Z"
+  },
+  {
+    "id": "CHECKOUT-002",
+    "shiftId": "SHIFT-004",
+    "userId": "USR-003",
+    "objectId": "OBJ-002",
+    "checkoutAt": "2026-07-14T17:52:00.000Z",
+    "status": "COMPLETED",
+    "plannedEnd": "2026-07-14T18:00:00.000Z",
+    "actualEnd": "2026-07-14T17:52:00.000Z",
+    "actualMinutes": 84,
+    "timeDeviation": {
+      "detected": false,
+      "type": null,
+      "differenceMinutes": -6,
+      "reasonRequired": false,
+      "reason": "",
+      "documentationType": null,
+      "attachmentIds": []
+    },
+    "materialCheck": {
+      "required": true,
+      "confirmed": true,
+      "status": "OK",
+      "notes": "",
+      "ticketId": null
+    },
+    "problemCheck": {
+      "required": true,
+      "confirmed": true,
+      "problemFound": false,
+      "notes": "",
+      "ticketId": null
+    },
+    "wasteCheck": {
+      "required": true,
+      "confirmed": true,
+      "wasteRemoved": true,
+      "collectionPointUsed": true,
+      "notes": "Nur normaler Restmüll entsorgt. Medizinische Abfälle nicht berührt."
+    },
+    "securityCheck": {
+      "required": true,
+      "confirmed": true,
+      "doorsChecked": true,
+      "windowsChecked": true,
+      "alarmActivated": false,
+      "alarmConfirmation": "NOT_REQUIRED",
+      "notes": ""
+    },
+    "keyReturn": {
+      "required": false,
+      "confirmed": true,
+      "keybookEntryId": null,
+      "notes": ""
+    },
+    "openTaskCheck": {
+      "required": true,
+      "confirmed": true,
+      "openTasksFound": false,
+      "openTaskIds": [],
+      "notes": ""
+    },
+    "employeeConfirmation": {
+      "confirmed": true,
+      "confirmedAt": "2026-07-14T17:52:00.000Z"
+    },
+    "offlineCreated": false,
+    "synced": true,
+    "createdAt": "2026-07-14T17:52:00.000Z"
+  },
+  {
+    "id": "CHECKOUT-003",
+    "shiftId": "SHIFT-002",
+    "userId": "USR-003",
+    "objectId": "OBJ-002",
+    "checkoutAt": null,
+    "status": "PENDING",
+    "plannedEnd": "2026-07-15T18:00:00.000Z",
+    "actualEnd": null,
+    "actualMinutes": null,
+    "timeDeviation": {
+      "detected": false,
+      "type": null,
+      "differenceMinutes": null,
+      "reasonRequired": false,
+      "reason": "",
+      "documentationType": null,
+      "attachmentIds": []
+    },
+    "materialCheck": {
+      "required": true,
+      "confirmed": false,
+      "status": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "problemCheck": {
+      "required": true,
+      "confirmed": false,
+      "problemFound": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "wasteCheck": {
+      "required": true,
+      "confirmed": false,
+      "wasteRemoved": null,
+      "collectionPointUsed": null,
+      "notes": ""
+    },
+    "securityCheck": {
+      "required": true,
+      "confirmed": false,
+      "doorsChecked": null,
+      "windowsChecked": null,
+      "alarmActivated": false,
+      "alarmConfirmation": "NOT_REQUIRED",
+      "notes": ""
+    },
+    "keyReturn": {
+      "required": false,
+      "confirmed": true,
+      "keybookEntryId": null,
+      "notes": ""
+    },
+    "openTaskCheck": {
+      "required": true,
+      "confirmed": false,
+      "openTasksFound": null,
+      "openTaskIds": [],
+      "notes": ""
+    },
+    "employeeConfirmation": {
+      "confirmed": false,
+      "confirmedAt": null
+    },
+    "offlineCreated": false,
+    "synced": false,
+    "createdAt": "2026-07-15T16:32:00.000Z"
+  },
+  {
+    "id": "CHECKOUT-004",
+    "shiftId": "SHIFT-001",
+    "userId": "USR-002",
+    "objectId": "OBJ-001",
+    "checkoutAt": null,
+    "status": "NOT_STARTED",
+    "plannedEnd": "2026-07-15T19:00:00.000Z",
+    "actualEnd": null,
+    "actualMinutes": null,
+    "timeDeviation": {
+      "detected": false,
+      "type": null,
+      "differenceMinutes": null,
+      "reasonRequired": false,
+      "reason": "",
+      "documentationType": null,
+      "attachmentIds": []
+    },
+    "materialCheck": {
+      "required": true,
+      "confirmed": false,
+      "status": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "problemCheck": {
+      "required": true,
+      "confirmed": false,
+      "problemFound": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "wasteCheck": {
+      "required": true,
+      "confirmed": false,
+      "wasteRemoved": null,
+      "collectionPointUsed": null,
+      "notes": ""
+    },
+    "securityCheck": {
+      "required": true,
+      "confirmed": false,
+      "doorsChecked": null,
+      "windowsChecked": null,
+      "alarmActivated": null,
+      "alarmConfirmation": null,
+      "notes": ""
+    },
+    "keyReturn": {
+      "required": true,
+      "confirmed": false,
+      "keybookEntryId": null,
+      "notes": ""
+    },
+    "openTaskCheck": {
+      "required": true,
+      "confirmed": false,
+      "openTasksFound": null,
+      "openTaskIds": [],
+      "notes": ""
+    },
+    "employeeConfirmation": {
+      "confirmed": false,
+      "confirmedAt": null
+    },
+    "offlineCreated": false,
+    "synced": false,
+    "createdAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "CHECKOUT-005",
+    "shiftId": "SHIFT-005",
+    "userId": "USR-003",
+    "objectId": "OBJ-001",
+    "checkoutAt": null,
+    "status": "NOT_STARTED",
+    "plannedEnd": "2026-07-16T19:00:00.000Z",
+    "actualEnd": null,
+    "actualMinutes": null,
+    "timeDeviation": {
+      "detected": false,
+      "type": null,
+      "differenceMinutes": null,
+      "reasonRequired": false,
+      "reason": "",
+      "documentationType": null,
+      "attachmentIds": []
+    },
+    "materialCheck": {
+      "required": true,
+      "confirmed": false,
+      "status": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "problemCheck": {
+      "required": true,
+      "confirmed": false,
+      "problemFound": null,
+      "notes": "",
+      "ticketId": null
+    },
+    "wasteCheck": {
+      "required": true,
+      "confirmed": false,
+      "wasteRemoved": null,
+      "collectionPointUsed": null,
+      "notes": ""
+    },
+    "securityCheck": {
+      "required": true,
+      "confirmed": false,
+      "doorsChecked": null,
+      "windowsChecked": null,
+      "alarmActivated": null,
+      "alarmConfirmation": null,
+      "notes": ""
+    },
+    "keyReturn": {
+      "required": true,
+      "confirmed": false,
+      "keybookEntryId": null,
+      "notes": ""
+    },
+    "openTaskCheck": {
+      "required": true,
+      "confirmed": false,
+      "openTasksFound": null,
+      "openTaskIds": [],
+      "notes": ""
+    },
+    "employeeConfirmation": {
+      "confirmed": false,
+      "confirmedAt": null
+    },
+    "offlineCreated": false,
+    "synced": false,
+    "createdAt": "2026-07-15T10:00:00.000Z"
+  }
+]
