@@ -1,0 +1,264 @@
+[
+  {
+    "id": "OBJSET-001",
+    "objectId": "OBJ-001",
+    "active": true,
+
+    "checkin": {
+      "qrRequired": true,
+      "gpsRequired": true,
+      "passwordFallbackAllowed": true,
+      "contactPermissionRequired": true,
+      "manualCheckinAllowed": false,
+      "earlyCheckinMinutes": 15,
+      "lateCheckinToleranceMinutes": 10
+    },
+
+    "checkout": {
+      "materialCheckRequired": true,
+      "problemCheckRequired": true,
+      "wasteCheckRequired": true,
+      "securityCheckRequired": true,
+      "keyReturnRequired": true,
+      "openTaskCheckRequired": true,
+      "minimumCheckoutMinutesBeforeEnd": 30
+    },
+
+    "taskDocumentation": {
+      "defaultDocumentationRequired": false,
+      "photoRequiredByDefault": false,
+      "audioAllowed": true,
+      "textAllowed": true,
+      "notRequiredOptionAllowed": true,
+      "replacementFullDocumentationDays": 3,
+      "timeDeviationDocumentationRequired": true
+    },
+
+    "timeDeviation": {
+      "enabled": true,
+      "allowedEarlyMinutes": 10,
+      "allowedLateMinutes": 10,
+      "allowedShorterMinutes": 15,
+      "allowedLongerMinutes": 20,
+      "reasonRequired": true,
+      "photoAllowed": true,
+      "audioAllowed": true
+    },
+
+    "replacement": {
+      "autoSearchEnabled": true,
+      "managerApprovalRequired": true,
+      "broadcastEnabled": true,
+      "guideRequired": true,
+      "contactPermissionRequired": true
+    },
+
+    "objectGuide": {
+      "enabled": true,
+      "requiredForNewEmployees": true,
+      "requiredForReplacements": true,
+      "audioEnabled": true,
+      "multilingualEnabled": true
+    },
+
+    "material": {
+      "inventoryEnabled": true,
+      "minimumStockWarningsEnabled": true,
+      "photoRecognitionEnabled": false,
+      "qrCabinetEnabled": true,
+      "employeeCanRequestOrder": true,
+      "managerApprovalRequired": true
+    },
+
+    "security": {
+      "alarmConfirmationRequired": true,
+      "doorCheckRequired": true,
+      "windowCheckRequired": true,
+      "closingTimeRequired": true,
+      "securityIncidentPhotoRequired": false
+    },
+
+    "waste": {
+      "wasteConfirmationRequired": true,
+      "wasteScheduleEnabled": true,
+      "specialWasteInstructionsEnabled": false
+    },
+
+    "keybook": {
+      "enabled": true,
+      "handoverRequired": true,
+      "returnRequired": true,
+      "signatureRequired": false,
+      "photoRequired": false
+    },
+
+    "customerPortal": {
+      "enabled": true,
+      "showTaskStatus": true,
+      "showPerformanceReports": true,
+      "showEmployeeNames": false,
+      "showCheckinTimes": false,
+      "allowTickets": true,
+      "allowMessages": true,
+      "allowPhotos": false
+    },
+
+    "notifications": {
+      "shiftReminderEnabled": true,
+      "shiftReminderMinutes": 30,
+      "materialWarningEnabled": true,
+      "absenceNotificationEnabled": true,
+      "ticketNotificationEnabled": true,
+      "customerRequestNotificationEnabled": true
+    },
+
+    "performance": {
+      "enabled": true,
+      "pointsEnabled": true,
+      "employeeVisible": true,
+      "customerVisible": false
+    },
+
+    "offline": {
+      "enabled": true,
+      "allowTaskCompletionOffline": true,
+      "allowTicketCreationOffline": true,
+      "allowCheckinOffline": false,
+      "syncWhenOnline": true
+    },
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "OBJSET-002",
+    "objectId": "OBJ-002",
+    "active": true,
+
+    "checkin": {
+      "qrRequired": true,
+      "gpsRequired": true,
+      "passwordFallbackAllowed": true,
+      "contactPermissionRequired": true,
+      "manualCheckinAllowed": false,
+      "earlyCheckinMinutes": 10,
+      "lateCheckinToleranceMinutes": 5
+    },
+
+    "checkout": {
+      "materialCheckRequired": true,
+      "problemCheckRequired": true,
+      "wasteCheckRequired": true,
+      "securityCheckRequired": true,
+      "keyReturnRequired": false,
+      "openTaskCheckRequired": true,
+      "minimumCheckoutMinutesBeforeEnd": 20
+    },
+
+    "taskDocumentation": {
+      "defaultDocumentationRequired": true,
+      "photoRequiredByDefault": false,
+      "audioAllowed": true,
+      "textAllowed": true,
+      "notRequiredOptionAllowed": true,
+      "replacementFullDocumentationDays": 5,
+      "timeDeviationDocumentationRequired": true
+    },
+
+    "timeDeviation": {
+      "enabled": true,
+      "allowedEarlyMinutes": 5,
+      "allowedLateMinutes": 5,
+      "allowedShorterMinutes": 10,
+      "allowedLongerMinutes": 15,
+      "reasonRequired": true,
+      "photoAllowed": true,
+      "audioAllowed": true
+    },
+
+    "replacement": {
+      "autoSearchEnabled": true,
+      "managerApprovalRequired": true,
+      "broadcastEnabled": true,
+      "guideRequired": true,
+      "contactPermissionRequired": true
+    },
+
+    "objectGuide": {
+      "enabled": true,
+      "requiredForNewEmployees": true,
+      "requiredForReplacements": true,
+      "audioEnabled": true,
+      "multilingualEnabled": true
+    },
+
+    "material": {
+      "inventoryEnabled": true,
+      "minimumStockWarningsEnabled": true,
+      "photoRecognitionEnabled": false,
+      "qrCabinetEnabled": true,
+      "employeeCanRequestOrder": true,
+      "managerApprovalRequired": true
+    },
+
+    "security": {
+      "alarmConfirmationRequired": false,
+      "doorCheckRequired": true,
+      "windowCheckRequired": true,
+      "closingTimeRequired": true,
+      "securityIncidentPhotoRequired": true
+    },
+
+    "waste": {
+      "wasteConfirmationRequired": true,
+      "wasteScheduleEnabled": true,
+      "specialWasteInstructionsEnabled": true
+    },
+
+    "keybook": {
+      "enabled": false,
+      "handoverRequired": false,
+      "returnRequired": false,
+      "signatureRequired": false,
+      "photoRequired": false
+    },
+
+    "customerPortal": {
+      "enabled": false,
+      "showTaskStatus": false,
+      "showPerformanceReports": false,
+      "showEmployeeNames": false,
+      "showCheckinTimes": false,
+      "allowTickets": false,
+      "allowMessages": false,
+      "allowPhotos": false
+    },
+
+    "notifications": {
+      "shiftReminderEnabled": true,
+      "shiftReminderMinutes": 20,
+      "materialWarningEnabled": true,
+      "absenceNotificationEnabled": true,
+      "ticketNotificationEnabled": true,
+      "customerRequestNotificationEnabled": false
+    },
+
+    "performance": {
+      "enabled": true,
+      "pointsEnabled": true,
+      "employeeVisible": true,
+      "customerVisible": false
+    },
+
+    "offline": {
+      "enabled": true,
+      "allowTaskCompletionOffline": true,
+      "allowTicketCreationOffline": true,
+      "allowCheckinOffline": false,
+      "syncWhenOnline": true
+    },
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
