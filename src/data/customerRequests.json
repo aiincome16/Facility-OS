@@ -1,0 +1,244 @@
+[
+  {
+    "id": "REQ-001",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-001",
+    "type": "ADDITIONAL_SERVICE",
+    "category": "GLASS_CLEANING",
+    "priority": "MEDIUM",
+    "status": "OPEN",
+    "title": "Zusätzliche Glasreinigung",
+    "description": "Die Eingangstür soll am Freitag zusätzlich von außen gereinigt werden.",
+    "requestedDate": "2026-07-17",
+    "preferredTime": "16:00",
+    "recurring": false,
+    "recurrenceRule": null,
+    "attachments": [],
+    "customerVisible": true,
+    "requiresApproval": true,
+    "approval": {
+      "status": "PENDING",
+      "approvedByUserId": null,
+      "approvedAt": null,
+      "rejectedByUserId": null,
+      "rejectedAt": null,
+      "reason": ""
+    },
+    "assignment": {
+      "assignedToUserId": "USR-001",
+      "assignedEmployeeId": null,
+      "plannedShiftId": null
+    },
+    "pricing": {
+      "priceRequired": true,
+      "estimatedPrice": null,
+      "currency": "EUR",
+      "customerApprovalRequired": true,
+      "customerApproved": false,
+      "customerApprovedAt": null
+    },
+    "relatedTicketId": "TICKET-003",
+    "createdAt": "2026-07-15T10:30:00.000Z",
+    "updatedAt": "2026-07-15T10:30:00.000Z",
+    "completedAt": null
+  },
+  {
+    "id": "REQ-002",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-003",
+    "type": "COMPLAINT",
+    "category": "SERVICE_QUALITY",
+    "priority": "HIGH",
+    "status": "IN_PROGRESS",
+    "title": "Seifenspender nicht aufgefüllt",
+    "description": "Der Seifenspender im Sanitärbereich war am Morgen leer.",
+    "requestedDate": "2026-07-14",
+    "preferredTime": null,
+    "recurring": false,
+    "recurrenceRule": null,
+    "attachments": [],
+    "customerVisible": true,
+    "requiresApproval": false,
+    "approval": {
+      "status": "NOT_REQUIRED",
+      "approvedByUserId": null,
+      "approvedAt": null,
+      "rejectedByUserId": null,
+      "rejectedAt": null,
+      "reason": ""
+    },
+    "assignment": {
+      "assignedToUserId": "USR-001",
+      "assignedEmployeeId": "USR-002",
+      "plannedShiftId": null
+    },
+    "pricing": {
+      "priceRequired": false,
+      "estimatedPrice": null,
+      "currency": "EUR",
+      "customerApprovalRequired": false,
+      "customerApproved": true,
+      "customerApprovedAt": null
+    },
+    "relatedTicketId": null,
+    "resolution": {
+      "actionTaken": "Bestand wurde geprüft und aufgefüllt.",
+      "customerInformed": true,
+      "customerInformedAt": "2026-07-15T09:00:00.000Z"
+    },
+    "createdAt": "2026-07-14T08:15:00.000Z",
+    "updatedAt": "2026-07-15T09:00:00.000Z",
+    "completedAt": null
+  },
+  {
+    "id": "REQ-003",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-002",
+    "type": "CHANGE_REQUEST",
+    "category": "CLEANING_PLAN",
+    "priority": "LOW",
+    "status": "APPROVED",
+    "title": "Besprechungsraum zusätzlich aufnehmen",
+    "description": "Der neue Besprechungsraum soll ab August regelmäßig gereinigt werden.",
+    "requestedDate": "2026-08-01",
+    "preferredTime": "18:00",
+    "recurring": true,
+    "recurrenceRule": {
+      "frequency": "WEEKLY",
+      "weekdays": [
+        "MONDAY",
+        "WEDNESDAY",
+        "FRIDAY"
+      ]
+    },
+    "attachments": [],
+    "customerVisible": true,
+    "requiresApproval": true,
+    "approval": {
+      "status": "APPROVED",
+      "approvedByUserId": "USR-001",
+      "approvedAt": "2026-07-13T10:00:00.000Z",
+      "rejectedByUserId": null,
+      "rejectedAt": null,
+      "reason": "In Reinigungsplan ab August aufgenommen."
+    },
+    "assignment": {
+      "assignedToUserId": "USR-001",
+      "assignedEmployeeId": "USR-002",
+      "plannedShiftId": null
+    },
+    "pricing": {
+      "priceRequired": true,
+      "estimatedPrice": 85,
+      "currency": "EUR",
+      "customerApprovalRequired": true,
+      "customerApproved": true,
+      "customerApprovedAt": "2026-07-14T11:00:00.000Z"
+    },
+    "relatedTicketId": null,
+    "createdAt": "2026-07-12T13:00:00.000Z",
+    "updatedAt": "2026-07-14T11:00:00.000Z",
+    "completedAt": null
+  },
+  {
+    "id": "REQ-004",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "roomId": null,
+    "type": "INFORMATION",
+    "category": "REPORT",
+    "priority": "LOW",
+    "status": "COMPLETED",
+    "title": "Leistungsnachweis Juni",
+    "description": "Bitte den Leistungsnachweis für Juni im Kundenportal bereitstellen.",
+    "requestedDate": "2026-07-05",
+    "preferredTime": null,
+    "recurring": false,
+    "recurrenceRule": null,
+    "attachments": [],
+    "customerVisible": true,
+    "requiresApproval": false,
+    "approval": {
+      "status": "NOT_REQUIRED",
+      "approvedByUserId": null,
+      "approvedAt": null,
+      "rejectedByUserId": null,
+      "rejectedAt": null,
+      "reason": ""
+    },
+    "assignment": {
+      "assignedToUserId": "USR-004",
+      "assignedEmployeeId": null,
+      "plannedShiftId": null
+    },
+    "pricing": {
+      "priceRequired": false,
+      "estimatedPrice": null,
+      "currency": "EUR",
+      "customerApprovalRequired": false,
+      "customerApproved": true,
+      "customerApprovedAt": null
+    },
+    "relatedTicketId": null,
+    "resolution": {
+      "actionTaken": "Leistungsnachweis wurde im Kundenportal veröffentlicht.",
+      "customerInformed": true,
+      "customerInformedAt": "2026-07-06T09:00:00.000Z"
+    },
+    "createdAt": "2026-07-05T08:00:00.000Z",
+    "updatedAt": "2026-07-06T09:00:00.000Z",
+    "completedAt": "2026-07-06T09:00:00.000Z"
+  },
+  {
+    "id": "REQ-005",
+    "customerUserId": "USR-006",
+    "customerId": "CUS-001",
+    "objectId": "OBJ-001",
+    "roomId": "ROOM-001",
+    "type": "SPECIAL_CLEANING",
+    "category": "EVENT_CLEANING",
+    "priority": "HIGH",
+    "status": "PENDING_CUSTOMER_APPROVAL",
+    "title": "Sonderreinigung nach Veranstaltung",
+    "description": "Nach einer Veranstaltung wird am 25.07.2026 eine zusätzliche Reinigung benötigt.",
+    "requestedDate": "2026-07-25",
+    "preferredTime": "21:00",
+    "recurring": false,
+    "recurrenceRule": null,
+    "attachments": [],
+    "customerVisible": true,
+    "requiresApproval": true,
+    "approval": {
+      "status": "APPROVED",
+      "approvedByUserId": "USR-001",
+      "approvedAt": "2026-07-15T12:00:00.000Z",
+      "rejectedByUserId": null,
+      "rejectedAt": null,
+      "reason": "Personal ist verfügbar."
+    },
+    "assignment": {
+      "assignedToUserId": "USR-001",
+      "assignedEmployeeId": null,
+      "plannedShiftId": null
+    },
+    "pricing": {
+      "priceRequired": true,
+      "estimatedPrice": 150,
+      "currency": "EUR",
+      "customerApprovalRequired": true,
+      "customerApproved": false,
+      "customerApprovedAt": null
+    },
+    "relatedTicketId": null,
+    "createdAt": "2026-07-15T11:30:00.000Z",
+    "updatedAt": "2026-07-15T12:00:00.000Z",
+    "completedAt": null
+  }
+]
