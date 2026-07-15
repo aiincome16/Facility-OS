@@ -1,0 +1,170 @@
+[
+  {
+    "id": "MAT-001",
+    "name": "Staubsauger",
+    "category": "GERAET",
+    "unit": "Stück",
+    "description": "Staubsauger für Teppich- und Bodenflächen.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-002",
+    "name": "Neutralreiniger",
+    "category": "REINIGUNGSMITTEL",
+    "unit": "Liter",
+    "description": "Neutraler Reiniger für abwaschbare Oberflächen und Böden.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": true,
+    "dosage": {
+      "amount": 20,
+      "unit": "ml",
+      "waterAmount": 5,
+      "waterUnit": "Liter"
+    }
+  },
+  {
+    "id": "MAT-003",
+    "name": "Glasreiniger",
+    "category": "REINIGUNGSMITTEL",
+    "unit": "Liter",
+    "description": "Reiniger für Glas- und Spiegelflächen.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-004",
+    "name": "Flächendesinfektion",
+    "category": "DESINFEKTIONSMITTEL",
+    "unit": "Liter",
+    "description": "Gebrauchsfertiges Mittel zur Flächendesinfektion.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false,
+    "safetyNote": "Einwirkzeit und Herstellerangaben beachten."
+  },
+  {
+    "id": "MAT-005",
+    "name": "Müllbeutel",
+    "category": "VERBRAUCHSMATERIAL",
+    "unit": "Rolle",
+    "description": "Müllbeutel für Papier- und Restabfallbehälter.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-006",
+    "name": "Sanitärreiniger",
+    "category": "REINIGUNGSMITTEL",
+    "unit": "Liter",
+    "description": "Reiniger für Sanitärbereiche und kalkhaltige Verschmutzungen.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": true,
+    "dosage": {
+      "amount": 25,
+      "unit": "ml",
+      "waterAmount": 5,
+      "waterUnit": "Liter"
+    },
+    "safetyNote": "Nicht mit chlorhaltigen Reinigungsmitteln mischen."
+  },
+  {
+    "id": "MAT-007",
+    "name": "Toilettenpapier",
+    "category": "HYGIENEMATERIAL",
+    "unit": "Rolle",
+    "description": "Verbrauchsmaterial für Sanitärbereiche.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-008",
+    "name": "Papierhandtücher",
+    "category": "HYGIENEMATERIAL",
+    "unit": "Packung",
+    "description": "Papierhandtücher für Handtuchspender.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-009",
+    "name": "Flüssigseife",
+    "category": "HYGIENEMATERIAL",
+    "unit": "Liter",
+    "description": "Nachfüllseife für Sanitärbereiche.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-010",
+    "name": "Mikrofasertuch Blau",
+    "category": "REINIGUNGSZUBEHOER",
+    "unit": "Stück",
+    "description": "Blaues Mikrofasertuch für allgemeine Oberflächen.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false,
+    "colorSystem": "BLAU"
+  },
+  {
+    "id": "MAT-011",
+    "name": "Mikrofasertuch Rot",
+    "category": "REINIGUNGSZUBEHOER",
+    "unit": "Stück",
+    "description": "Rotes Mikrofasertuch für Sanitärbereiche.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false,
+    "colorSystem": "ROT"
+  },
+  {
+    "id": "MAT-012",
+    "name": "Mikrofasertuch Gelb",
+    "category": "REINIGUNGSZUBEHOER",
+    "unit": "Stück",
+    "description": "Gelbes Mikrofasertuch für Waschbecken und Sanitärflächen.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false,
+    "colorSystem": "GELB"
+  },
+  {
+    "id": "MAT-013",
+    "name": "Mikrofasertuch Grün",
+    "category": "REINIGUNGSZUBEHOER",
+    "unit": "Stück",
+    "description": "Grünes Mikrofasertuch für Küchen- und Lebensmittelbereiche.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false,
+    "colorSystem": "GRUEN"
+  },
+  {
+    "id": "MAT-014",
+    "name": "Wischmopp",
+    "category": "REINIGUNGSZUBEHOER",
+    "unit": "Stück",
+    "description": "Wischmopp für die Feuchtreinigung von Bodenflächen.",
+    "active": true,
+    "consumable": false,
+    "requiresDosage": false
+  },
+  {
+    "id": "MAT-015",
+    "name": "Einweghandschuhe",
+    "category": "SCHUTZAUSRUESTUNG",
+    "unit": "Packung",
+    "description": "Einweghandschuhe für Reinigungs- und Desinfektionsarbeiten.",
+    "active": true,
+    "consumable": true,
+    "requiresDosage": false
+  }
+]
