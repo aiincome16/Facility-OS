@@ -1,0 +1,277 @@
+[
+  {
+    "id": "WASTE-001",
+    "objectId": "OBJ-001",
+    "active": true,
+
+    "wasteTypes": [
+      {
+        "id": "WASTE-TYPE-001",
+        "name": "Restmüll",
+        "category": "RESTMUELL",
+        "allowed": true,
+        "employeeMayDispose": true,
+        "containerLocation": "Müllcontainer hinter dem Gebäude",
+        "containerColor": "GRAU",
+        "specialInstructions": [
+          "Müllbeutel vollständig verschließen.",
+          "Container nach Entsorgung schließen."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-002",
+        "name": "Papier und Pappe",
+        "category": "PAPIER",
+        "allowed": true,
+        "employeeMayDispose": true,
+        "containerLocation": "Papiercontainer hinter dem Gebäude",
+        "containerColor": "BLAU",
+        "specialInstructions": [
+          "Kartons möglichst zerkleinern.",
+          "Keine vertraulichen Unterlagen entsorgen."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-003",
+        "name": "Verpackungen",
+        "category": "VERPACKUNG",
+        "allowed": true,
+        "employeeMayDispose": true,
+        "containerLocation": "Gelber Container hinter dem Gebäude",
+        "containerColor": "GELB",
+        "specialInstructions": [
+          "Nur restentleerte Verpackungen entsorgen."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-004",
+        "name": "Vertrauliche Unterlagen",
+        "category": "DATENSCHUTZ",
+        "allowed": false,
+        "employeeMayDispose": false,
+        "containerLocation": "Gesicherter Datenschutzbehälter",
+        "containerColor": "VERSCHLOSSEN",
+        "specialInstructions": [
+          "Nicht öffnen.",
+          "Nicht mit normalem Papier entsorgen.",
+          "Bei Unsicherheit Objektleitung informieren."
+        ]
+      }
+    ],
+
+    "collectionSchedule": [
+      {
+        "id": "WASTE-SCHEDULE-001",
+        "wasteCategory": "RESTMUELL",
+        "weekday": "TUESDAY",
+        "time": "07:00",
+        "reminderEnabled": true,
+        "reminderHoursBefore": 12
+      },
+      {
+        "id": "WASTE-SCHEDULE-002",
+        "wasteCategory": "PAPIER",
+        "weekday": "FRIDAY",
+        "time": "07:00",
+        "reminderEnabled": true,
+        "reminderHoursBefore": 12
+      },
+      {
+        "id": "WASTE-SCHEDULE-003",
+        "wasteCategory": "VERPACKUNG",
+        "weekday": "WEDNESDAY",
+        "time": "07:00",
+        "reminderEnabled": false,
+        "reminderHoursBefore": 0
+      }
+    ],
+
+    "checkoutRules": {
+      "wasteConfirmationRequired": true,
+      "allBinsCheckedRequired": true,
+      "wasteRemovedRequired": true,
+      "containerClosedRequired": true,
+      "specialWasteConfirmationRequired": false,
+      "photoRequired": false,
+      "notesRequiredOnIssue": true
+    },
+
+    "incidentRules": {
+      "containerFull": {
+        "createTicket": true,
+        "priority": "MEDIUM",
+        "notifyObjectLeader": true,
+        "photoRequired": false
+      },
+      "containerLocked": {
+        "createTicket": true,
+        "priority": "LOW",
+        "notifyObjectLeader": true,
+        "photoRequired": false
+      },
+      "unknownWaste": {
+        "doNotDispose": true,
+        "createTicket": true,
+        "priority": "HIGH",
+        "notifyObjectLeader": true,
+        "photoRequired": true
+      },
+      "hazardousMaterial": {
+        "doNotTouch": true,
+        "secureAreaIfPossible": true,
+        "createTicket": true,
+        "priority": "CRITICAL",
+        "notifyObjectLeader": true,
+        "photoRequired": false
+      }
+    },
+
+    "responsibleUserIds": [
+      "USR-001",
+      "USR-002"
+    ],
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  },
+  {
+    "id": "WASTE-002",
+    "objectId": "OBJ-002",
+    "active": true,
+
+    "wasteTypes": [
+      {
+        "id": "WASTE-TYPE-005",
+        "name": "Normaler Restmüll",
+        "category": "RESTMUELL",
+        "allowed": true,
+        "employeeMayDispose": true,
+        "containerLocation": "Abfallbereich im Innenhof",
+        "containerColor": "GRAU",
+        "specialInstructions": [
+          "Nur normale Praxis- und Haushaltsabfälle entsorgen.",
+          "Müllbeutel vollständig verschließen."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-006",
+        "name": "Papier",
+        "category": "PAPIER",
+        "allowed": true,
+        "employeeMayDispose": true,
+        "containerLocation": "Papiercontainer im Innenhof",
+        "containerColor": "BLAU",
+        "specialInstructions": [
+          "Keine Patientenunterlagen entsorgen.",
+          "Vertrauliche Dokumente nicht berühren."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-007",
+        "name": "Medizinische Abfälle",
+        "category": "MEDIZINISCHER_ABFALL",
+        "allowed": false,
+        "employeeMayDispose": false,
+        "containerLocation": "Gesicherter interner Praxisbereich",
+        "containerColor": "GEKENNZEICHNET",
+        "specialInstructions": [
+          "Nicht anfassen.",
+          "Nicht öffnen.",
+          "Nicht transportieren.",
+          "Bei Auffälligkeiten Praxispersonal oder Objektleitung informieren."
+        ]
+      },
+      {
+        "id": "WASTE-TYPE-008",
+        "name": "Kanülen und scharfe Gegenstände",
+        "category": "SHARPS",
+        "allowed": false,
+        "employeeMayDispose": false,
+        "containerLocation": "Spezialbehälter der Praxis",
+        "containerColor": "GELB",
+        "specialInstructions": [
+          "Nicht anfassen.",
+          "Fundstelle absichern.",
+          "Sofort Praxispersonal oder Objektleitung informieren."
+        ]
+      }
+    ],
+
+    "collectionSchedule": [
+      {
+        "id": "WASTE-SCHEDULE-004",
+        "wasteCategory": "RESTMUELL",
+        "weekday": "MONDAY",
+        "time": "06:30",
+        "reminderEnabled": true,
+        "reminderHoursBefore": 12
+      },
+      {
+        "id": "WASTE-SCHEDULE-005",
+        "wasteCategory": "PAPIER",
+        "weekday": "THURSDAY",
+        "time": "06:30",
+        "reminderEnabled": true,
+        "reminderHoursBefore": 12
+      }
+    ],
+
+    "checkoutRules": {
+      "wasteConfirmationRequired": true,
+      "allBinsCheckedRequired": true,
+      "wasteRemovedRequired": true,
+      "containerClosedRequired": true,
+      "specialWasteConfirmationRequired": true,
+      "photoRequired": false,
+      "notesRequiredOnIssue": true
+    },
+
+    "incidentRules": {
+      "containerFull": {
+        "createTicket": true,
+        "priority": "MEDIUM",
+        "notifyObjectLeader": true,
+        "photoRequired": false
+      },
+      "containerLocked": {
+        "createTicket": true,
+        "priority": "LOW",
+        "notifyObjectLeader": true,
+        "photoRequired": false
+      },
+      "unknownWaste": {
+        "doNotDispose": true,
+        "createTicket": true,
+        "priority": "HIGH",
+        "notifyObjectLeader": true,
+        "photoRequired": true
+      },
+      "medicalWasteFound": {
+        "doNotTouch": true,
+        "secureAreaIfPossible": true,
+        "createTicket": true,
+        "priority": "CRITICAL",
+        "notifyObjectLeader": true,
+        "notifyCustomerContact": true,
+        "photoRequired": false
+      },
+      "sharpObjectFound": {
+        "doNotTouch": true,
+        "secureAreaIfPossible": true,
+        "createTicket": true,
+        "priority": "CRITICAL",
+        "notifyObjectLeader": true,
+        "notifyCustomerContact": true,
+        "photoRequired": false
+      }
+    },
+
+    "responsibleUserIds": [
+      "USR-001",
+      "USR-003"
+    ],
+
+    "createdAt": "2026-07-01T08:00:00.000Z",
+    "updatedAt": "2026-07-15T08:00:00.000Z"
+  }
+]
