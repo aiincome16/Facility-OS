@@ -2,17 +2,24 @@
  * Facility OS
  * renderApp.js
  *
- * Zentrale UI-Ausgabe
- * - rollenbasierte Dashboards
- * - Objektübersicht
- * - vollständige Objektdetailseite
- * - zentrale Event-Verarbeitung
+ * Neue reduzierte Benutzeroberfläche
+ * - maximal fünf Hauptbereiche
+ * - höchstens vier Kennzahlen pro Übersicht
+ * - klare farbliche Bereichstrennung
+ * - keine mehrfachen Funktionszugänge
+ * - kompakte Unterseiten
  ************************************************/
 
 import {
     APP_CONFIG,
     USER_ROLES
 } from "../config/appConfig.js";
+
+import {
+    ROUTES,
+    getMainNavigationForRole,
+    getActiveMainRoute
+} from "../router.js";
 
 import {
     renderObjectsPage
@@ -47,12 +54,29 @@ function asArray(value) {
         : [];
 }
 
+function asNumber(value) {
+
+    const number =
+        Number(value);
+
+    return Number.isFinite(number)
+        ? number
+        : 0;
+}
+
+function normalizeStatus(value) {
+
+    return String(value ?? "")
+        .trim()
+        .toUpperCase();
+}
+
 function getRoleLabel(role) {
 
     const labels = {
 
         [USER_ROLES.SUPER_ADMIN]:
-            "Super-Admin",
+            "Super-Administration",
 
         [USER_ROLES.ADMIN]:
             "Administration",
@@ -67,15 +91,27 @@ function getRoleLabel(role) {
             "Buchhaltung",
 
         [USER_ROLES.KUNDE]:
-            "Kunde"
+            "Kundenportal"
     };
 
     return (
         labels[role] ??
-        role ??
-        "Unbekannte Rolle"
+        "Facility OS"
     );
 }
+
+function getUserName(state) {
+
+    return (
+        state.currentUser?.name ??
+        state.currentUser?.fullName ??
+        "Benutzer"
+    );
+}
+
+/************************************************
+ * DATENFILTER
+ ************************************************/
 
 function getOpenTickets(state) {
 
@@ -89,9 +125,27 @@ function getOpenTickets(state) {
         .filter(
             (ticket) =>
                 !closedStatuses.includes(
-                    String(
-                        ticket.status ?? ""
-                    ).toUpperCase()
+                    normalizeStatus(
+                        ticket.status
+                    )
+                )
+        );
+}
+
+function getCriticalTickets(state) {
+
+    return getOpenTickets(state)
+        .filter(
+            (ticket) =>
+                [
+                    "CRITICAL",
+                    "URGENT",
+                    "HIGH"
+                ].includes(
+                    normalizeStatus(
+                        ticket.priority ??
+                        ticket.severity
+                    )
                 )
         );
 }
@@ -103,9 +157,9 @@ function getMaterialWarnings(state) {
             (stock) => {
 
                 const status =
-                    String(
-                        stock.status ?? ""
-                    ).toUpperCase();
+                    normalizeStatus(
+                        stock.status
+                    );
 
                 if (
                     [
@@ -118,86 +172,224 @@ function getMaterialWarnings(state) {
                 }
 
                 const currentAmount =
-                    Number(
+                    asNumber(
                         stock.currentAmount ??
                         stock.quantity ??
-                        stock.stock ??
-                        0
+                        stock.stock
                     );
 
                 const minimumAmount =
-                    Number(
+                    asNumber(
                         stock.minimumAmount ??
                         stock.minimumStock ??
-                        stock.minStock ??
-                        0
+                        stock.minStock
                     );
 
                 return (
-                    Number.isFinite(currentAmount) &&
-                    Number.isFinite(minimumAmount) &&
-                    currentAmount <= minimumAmount
+                    minimumAmount > 0 &&
+                    currentAmount <=
+                        minimumAmount
                 );
             }
         );
 }
 
-/************************************************
- * HEADER
- ************************************************/
+function getRunningShifts(state) {
 
-function renderHeader(state) {
+    return asArray(state.shifts)
+        .filter(
+            (shift) => {
+
+                const status =
+                    normalizeStatus(
+                        shift.status
+                    );
+
+                return (
+                    status === "RUNNING" ||
+                    (
+                        shift.startTime &&
+                        !shift.endTime &&
+                        ![
+                            "FINISHED",
+                            "COMPLETED",
+                            "CANCELLED"
+                        ].includes(status)
+                    )
+                );
+            }
+        );
+}
+
+function getOpenTimeDeviations(state) {
+
+    return asArray(state.timeDeviations)
+        .filter(
+            (deviation) =>
+                ![
+                    "RESOLVED",
+                    "CLOSED",
+                    "COMPLETED"
+                ].includes(
+                    normalizeStatus(
+                        deviation.status
+                    )
+                )
+        );
+}
+
+function getActiveUsers(state) {
+
+    return asArray(state.users)
+        .filter(
+            (user) =>
+                user.active !== false
+        );
+}
+
+function getVisibleObjects(state) {
 
     const currentUser =
         state.currentUser;
 
+    const objects =
+        asArray(state.objects);
+
     if (!currentUser) {
-        return "";
+        return [];
     }
 
-    const currentObject =
-        state.currentObject;
+    switch (currentUser.role) {
+
+        case USER_ROLES.SUPER_ADMIN:
+        case USER_ROLES.ADMIN:
+        case USER_ROLES.BUCHHALTUNG:
+
+            return objects;
+
+        case USER_ROLES.OBJEKTLEITER: {
+
+            const managedObjects =
+                objects.filter(
+                    (object) =>
+                        object.objectLeaderId ===
+                            currentUser.id ||
+                        object.managerId ===
+                            currentUser.id
+                );
+
+            return managedObjects.length > 0
+                ? managedObjects
+                : objects;
+        }
+
+        case USER_ROLES.MITARBEITER: {
+
+            const assignedObjectIds =
+                asArray(
+                    currentUser.assignedObjectIds ??
+                    currentUser.objectIds
+                );
+
+            const assignedObjects =
+                objects.filter(
+                    (object) =>
+                        assignedObjectIds.includes(
+                            object.id
+                        ) ||
+                        asArray(
+                            object.assignedEmployeeIds
+                        ).includes(
+                            currentUser.id
+                        )
+                );
+
+            return assignedObjects.length > 0
+                ? assignedObjects
+                : objects;
+        }
+
+        case USER_ROLES.KUNDE: {
+
+            const allowedObjectIds =
+                asArray(state.customerAccess)
+                    .filter(
+                        (access) =>
+                            access.active !== false &&
+                            access.customerUserId ===
+                                currentUser.id
+                    )
+                    .map(
+                        (access) =>
+                            access.objectId
+                    );
+
+            return objects.filter(
+                (object) =>
+                    allowedObjectIds.includes(
+                        object.id
+                    ) ||
+                    object.customerUserId ===
+                        currentUser.id
+            );
+        }
+
+        default:
+
+            return [];
+    }
+}
+
+/************************************************
+ * KOPFBEREICH
+ ************************************************/
+
+function renderHeader(state) {
+
+    if (!state.currentUser) {
+        return "";
+    }
 
     return `
         <header class="app-header">
 
-            <div class="app-brand">
+            <div class="app-header-brand">
 
-                <div>
+                <strong>
+                    ${escapeHtml(
+                        APP_CONFIG.APP_NAME ??
+                        "Facility OS"
+                    )}
+                </strong>
 
-                    <div class="app-title">
-                        ${escapeHtml(
-                            APP_CONFIG.APP_NAME ??
-                            "Facility OS"
-                        )}
-                    </div>
+                <span>
+                    ${escapeHtml(
+                        getRoleLabel(
+                            state.currentUser.role
+                        )
+                    )}
+                </span>
 
-                    <div class="app-version">
-                        Version
-                        ${escapeHtml(
-                            APP_CONFIG.APP_VERSION ??
-                            "2.0.0"
-                        )}
-                    </div>
+            </div>
 
-                </div>
+            <div class="app-header-actions">
 
                 ${
-                    currentObject
+                    state.currentObject
                         ? `
                             <button
                                 type="button"
-                                class="current-object-button"
-                                data-route="/object-detail"
+                                class="header-object-button"
+                                data-route="${ROUTES.OBJECT_DETAIL}"
                             >
                                 <span>
-                                    Aktuelles Objekt
+                                    Objekt
                                 </span>
 
                                 <strong>
                                     ${escapeHtml(
-                                        currentObject.name ??
-                                        currentObject.id
+                                        state.currentObject.name ??
+                                        state.currentObject.id
                                     )}
                                 </strong>
                             </button>
@@ -205,36 +397,17 @@ function renderHeader(state) {
                         : ""
                 }
 
-            </div>
-
-            <div class="header-user">
-
-                <div>
-
-                    <strong>
-                        ${escapeHtml(
-                            currentUser.name ??
-                            currentUser.fullName ??
-                            "Benutzer"
-                        )}
-                    </strong>
-
-                    <span>
-                        ${escapeHtml(
-                            getRoleLabel(
-                                currentUser.role
-                            )
-                        )}
-                    </span>
-
-                </div>
-
                 <button
                     type="button"
-                    class="button button-secondary button-small"
-                    data-action="logout"
+                    class="header-profile-button"
+                    data-route="${ROUTES.MORE}"
+                    aria-label="Profil und weitere Funktionen"
                 >
-                    Abmelden
+                    ${escapeHtml(
+                        getUserName(state)
+                            .charAt(0)
+                            .toUpperCase()
+                    )}
                 </button>
 
             </div>
@@ -244,203 +417,47 @@ function renderHeader(state) {
 }
 
 /************************************************
- * NAVIGATION
+ * UNTERE NAVIGATION
  ************************************************/
 
-function getNavigationItems(role) {
+function getNavigationIcon(itemId) {
 
-    const navigationByRole = {
+    const icons = {
 
-        [USER_ROLES.SUPER_ADMIN]: [
-            {
-                label:
-                    "Start",
+        overview:
+            "⌂",
 
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Benutzer",
+        objects:
+            "▦",
 
-                route:
-                    "/employees"
-            },
-            {
-                label:
-                    "Objekte",
+        object:
+            "▦",
 
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "System",
+        personnel:
+            "♙",
 
-                route:
-                    "/settings"
-            }
-        ],
+        communication:
+            "✉",
 
-        [USER_ROLES.ADMIN]: [
-            {
-                label:
-                    "Start",
+        tasks:
+            "✓",
 
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Mitarbeiter",
+        times:
+            "◷",
 
-                route:
-                    "/employees"
-            },
-            {
-                label:
-                    "Objekte",
+        analysis:
+            "▥",
 
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "Berichte",
+        reports:
+            "▥",
 
-                route:
-                    "/reports"
-            }
-        ],
-
-        [USER_ROLES.OBJEKTLEITER]: [
-            {
-                label:
-                    "Start",
-
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Mitarbeiter",
-
-                route:
-                    "/employees"
-            },
-            {
-                label:
-                    "Objekte",
-
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "Tickets",
-
-                route:
-                    "/tickets"
-            }
-        ],
-
-        [USER_ROLES.MITARBEITER]: [
-            {
-                label:
-                    "Start",
-
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Objekt",
-
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "Aufgaben",
-
-                route:
-                    "/tasks"
-            },
-            {
-                label:
-                    "Meldungen",
-
-                route:
-                    "/tickets"
-            }
-        ],
-
-        [USER_ROLES.BUCHHALTUNG]: [
-            {
-                label:
-                    "Start",
-
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Berichte",
-
-                route:
-                    "/reports"
-            },
-            {
-                label:
-                    "Objekte",
-
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "Zeiten",
-
-                route:
-                    "/tasks"
-            }
-        ],
-
-        [USER_ROLES.KUNDE]: [
-            {
-                label:
-                    "Start",
-
-                route:
-                    "/dashboard"
-            },
-            {
-                label:
-                    "Objekte",
-
-                route:
-                    "/objects"
-            },
-            {
-                label:
-                    "Meldung",
-
-                route:
-                    "/tickets"
-            },
-            {
-                label:
-                    "Berichte",
-
-                route:
-                    "/reports"
-            }
-        ]
+        more:
+            "•••"
     };
 
     return (
-        navigationByRole[role] ??
-        []
+        icons[itemId] ??
+        "•"
     );
 }
 
@@ -457,7 +474,15 @@ function renderNavigation(
     }
 
     const navigationItems =
-        getNavigationItems(role);
+        getMainNavigationForRole(
+            role
+        );
+
+    const activeMainRoute =
+        getActiveMainRoute(
+            route,
+            role
+        );
 
     return `
         <nav class="bottom-navigation">
@@ -466,20 +491,17 @@ function renderNavigation(
                 .map(
                     (item) => {
 
-                        const isActive =
-                            route === item.route ||
-                            (
-                                route ===
-                                    "/object-detail" &&
-                                item.route ===
-                                    "/objects"
-                            );
+                        const active =
+                            activeMainRoute ===
+                            item.route;
 
                         return `
                             <button
                                 type="button"
-                                class="${
-                                    isActive
+                                class="navigation-item navigation-${escapeHtml(
+                                    item.color
+                                )} ${
+                                    active
                                         ? "active"
                                         : ""
                                 }"
@@ -487,9 +509,19 @@ function renderNavigation(
                                     item.route
                                 )}"
                             >
-                                ${escapeHtml(
-                                    item.label
-                                )}
+                                <span class="navigation-icon">
+                                    ${escapeHtml(
+                                        getNavigationIcon(
+                                            item.id
+                                        )
+                                    )}
+                                </span>
+
+                                <span class="navigation-label">
+                                    ${escapeHtml(
+                                        item.label
+                                    )}
+                                </span>
                             </button>
                         `;
                     }
@@ -518,10 +550,7 @@ function renderLogin() {
                     </div>
 
                     <h1>
-                        ${escapeHtml(
-                            APP_CONFIG.APP_NAME ??
-                            "Facility OS"
-                        )}
+                        Facility OS
                     </h1>
 
                     <p>
@@ -543,8 +572,8 @@ function renderLogin() {
                             id="login-name"
                             name="name"
                             type="text"
-                            autocomplete="name"
                             value="Test Benutzer"
+                            autocomplete="name"
                             required
                         >
 
@@ -553,7 +582,7 @@ function renderLogin() {
                     <div class="form-group">
 
                         <label for="login-role">
-                            Testrolle
+                            Rolle
                         </label>
 
                         <select
@@ -594,14 +623,13 @@ function renderLogin() {
                         type="submit"
                         class="button button-primary button-full"
                     >
-                        Test-Login
+                        Anmelden
                     </button>
 
                 </form>
 
                 <p class="login-note">
-                    Der Test-Login wird später durch
-                    die produktive Anmeldung ersetzt.
+                    Testmodus mit lokalen Daten
                 </p>
 
             </section>
@@ -611,63 +639,137 @@ function renderLogin() {
 }
 
 /************************************************
- * WIEDERVERWENDBARE ELEMENTE
+ * SEITENKOPF
  ************************************************/
 
-function renderDashboardCard(
+function renderPageHeader({
+    area,
     title,
-    value,
-    description
-) {
+    description = "",
+    color = "overview"
+}) {
 
     return `
-        <article class="dashboard-card">
+        <header class="page-intro page-intro-${escapeHtml(
+            color
+        )}">
 
-            <span class="dashboard-card-label">
-                ${escapeHtml(title)}
+            <span class="page-area-label">
+                ${escapeHtml(area)}
             </span>
 
-            <strong class="dashboard-card-value">
-                ${escapeHtml(value)}
-            </strong>
+            <h1>
+                ${escapeHtml(title)}
+            </h1>
 
-            <p>
-                ${escapeHtml(description)}
-            </p>
+            ${
+                description
+                    ? `
+                        <p>
+                            ${escapeHtml(
+                                description
+                            )}
+                        </p>
+                    `
+                    : ""
+            }
 
-        </article>
+        </header>
     `;
 }
 
-function renderActionCard({
-    title,
-    description,
-    route = null,
-    action = null
+/************************************************
+ * KENNZAHLEN
+ ************************************************/
+
+function renderMetric({
+    label,
+    value,
+    status = "neutral",
+    route = null
 }) {
 
     const routeAttribute =
         route
-            ? `
-                data-route="${escapeHtml(
-                    route
-                )}"
-            `
+            ? `data-route="${escapeHtml(
+                route
+            )}"`
+            : "";
+
+    const tag =
+        route
+            ? "button"
+            : "article";
+
+    return `
+        <${tag}
+            class="summary-metric summary-metric-${escapeHtml(
+                status
+            )}"
+            ${routeAttribute}
+            ${route ? 'type="button"' : ""}
+        >
+
+            <span>
+                ${escapeHtml(label)}
+            </span>
+
+            <strong>
+                ${escapeHtml(value)}
+            </strong>
+
+        </${tag}>
+    `;
+}
+
+function renderMetrics(metrics) {
+
+    return `
+        <section class="summary-grid">
+
+            ${metrics
+                .slice(0, 4)
+                .map(
+                    renderMetric
+                )
+                .join("")}
+
+        </section>
+    `;
+}
+
+/************************************************
+ * KOMPAKTE HAUPTAKTIONEN
+ ************************************************/
+
+function renderPrimaryAction({
+    title,
+    description,
+    route = null,
+    action = null,
+    color = "overview"
+}) {
+
+    const routeAttribute =
+        route
+            ? `data-route="${escapeHtml(
+                route
+            )}"`
             : "";
 
     const actionAttribute =
         action
-            ? `
-                data-action="${escapeHtml(
-                    action
-                )}"
-            `
+            ? `data-action="${escapeHtml(
+                action
+            )}"`
             : "";
 
     return `
         <button
             type="button"
-            class="action-card"
+            class="primary-action primary-action-${escapeHtml(
+                color
+            )}"
             ${routeAttribute}
             ${actionAttribute}
         >
@@ -680,1317 +782,2240 @@ function renderActionCard({
                 ${escapeHtml(description)}
             </span>
 
+            <span class="primary-action-arrow">
+                ›
+            </span>
+
         </button>
     `;
 }
 
-function renderActionGroup({
+function renderActionList(actions) {
+
+    return `
+        <section class="primary-action-list">
+
+            ${actions
+                .map(
+                    renderPrimaryAction
+                )
+                .join("")}
+
+        </section>
+    `;
+}
+
+/************************************************
+ * WARNUNGEN
+ ************************************************/
+
+function renderNotice({
     title,
-    description = "",
-    items = [],
-    open = false
+    text,
+    level = "info",
+    route = null
 }) {
 
+    const tag =
+        route
+            ? "button"
+            : "article";
+
+    const routeAttribute =
+        route
+            ? `data-route="${escapeHtml(
+                route
+            )}"`
+            : "";
+
     return `
-        <details
-            class="dashboard-action-group"
-            ${open ? "open" : ""}
+        <${tag}
+            class="notice-card notice-${escapeHtml(
+                level
+            )}"
+            ${routeAttribute}
+            ${route ? 'type="button"' : ""}
         >
 
-            <summary>
+            <strong>
+                ${escapeHtml(title)}
+            </strong>
 
-                <div>
+            <span>
+                ${escapeHtml(text)}
+            </span>
 
-                    <strong>
-                        ${escapeHtml(title)}
-                    </strong>
+        </${tag}>
+    `;
+}
 
-                    ${
-                        description
-                            ? `
-                                <span>
-                                    ${escapeHtml(
-                                        description
-                                    )}
-                                </span>
-                            `
-                            : ""
+function renderNoticeList(notices) {
+
+    if (
+        notices.length === 0
+    ) {
+
+        return "";
+    }
+
+    return `
+        <section class="notice-list">
+
+            ${notices
+                .slice(0, 3)
+                .map(
+                    renderNotice
+                )
+                .join("")}
+
+        </section>
+    `;
+}
+
+/************************************************
+ * OBJEKTLEITER-ÜBERSICHT
+ ************************************************/
+
+function renderManagerOverview(state) {
+
+    const visibleObjects =
+        getVisibleObjects(state);
+
+    const runningShifts =
+        getRunningShifts(state);
+
+    const criticalTickets =
+        getCriticalTickets(state);
+
+    const openTickets =
+        getOpenTickets(state);
+
+    const materialWarnings =
+        getMaterialWarnings(state);
+
+    const deviations =
+        getOpenTimeDeviations(state);
+
+    const notices = [];
+
+    if (
+        criticalTickets.length > 0
+    ) {
+
+        notices.push({
+            title:
+                "Kritische Meldungen",
+
+            text:
+                `${criticalTickets.length} Vorgänge benötigen eine schnelle Prüfung.`,
+
+            level:
+                "critical",
+
+            route:
+                ROUTES.COMMUNICATION
+        });
+    }
+
+    if (
+        materialWarnings.length > 0
+    ) {
+
+        notices.push({
+            title:
+                "Material prüfen",
+
+            text:
+                `${materialWarnings.length} Bestände sind niedrig oder kritisch.`,
+
+            level:
+                "warning",
+
+            route:
+                ROUTES.OBJECTS
+        });
+    }
+
+    if (
+        deviations.length > 0
+    ) {
+
+        notices.push({
+            title:
+                "Zeitabweichungen",
+
+            text:
+                `${deviations.length} Abweichungen sind noch ungeklärt.`,
+
+            level:
+                "warning",
+
+            route:
+                ROUTES.MORE
+        });
+    }
+
+    return `
+        <section class="page-section">
+
+            ${renderPageHeader({
+                area:
+                    "Übersicht",
+
+                title:
+                    `Guten Tag, ${getUserName(
+                        state
+                    )}`,
+
+                description:
+                    "Das Wichtigste für den heutigen Betrieb.",
+
+                color:
+                    "overview"
+            })}
+
+            ${renderMetrics([
+                {
+                    label:
+                        "Aktive Schichten",
+
+                    value:
+                        runningShifts.length,
+
+                    status:
+                        runningShifts.length > 0
+                            ? "success"
+                            : "neutral"
+                },
+                {
+                    label:
+                        "Offene Tickets",
+
+                    value:
+                        openTickets.length,
+
+                    status:
+                        openTickets.length > 0
+                            ? "warning"
+                            : "success",
+
+                    route:
+                        ROUTES.COMMUNICATION
+                },
+                {
+                    label:
+                        "Materialwarnungen",
+
+                    value:
+                        materialWarnings.length,
+
+                    status:
+                        materialWarnings.length > 0
+                            ? "warning"
+                            : "success",
+
+                    route:
+                        ROUTES.OBJECTS
+                },
+                {
+                    label:
+                        "Objekte",
+
+                    value:
+                        visibleObjects.length,
+
+                    status:
+                        "info",
+
+                    route:
+                        ROUTES.OBJECTS
+                }
+            ])}
+
+            ${renderNoticeList(
+                notices
+            )}
+
+            ${renderActionList([
+                {
+                    title:
+                        "Objekte öffnen",
+
+                    description:
+                        "Räume, Aufgaben und Objektstatus",
+
+                    route:
+                        ROUTES.OBJECTS,
+
+                    color:
+                        "objects"
+                },
+                {
+                    title:
+                        "Personal steuern",
+
+                    description:
+                        "Mitarbeiter, Abwesenheit und Vertretung",
+
+                    route:
+                        ROUTES.PERSONNEL,
+
+                    color:
+                        "personnel"
+                },
+                {
+                    title:
+                        "Meldungen bearbeiten",
+
+                    description:
+                        "Tickets, Nachrichten und Kundenanfragen",
+
+                    route:
+                        ROUTES.COMMUNICATION,
+
+                    color:
+                        "communication"
+                }
+            ])}
+
+        </section>
+    `;
+}
+
+/************************************************
+ * MITARBEITER-ÜBERSICHT
+ ************************************************/
+
+function renderEmployeeOverview(state) {
+
+    const currentObject =
+        state.currentObject;
+
+    const objectTasks =
+        currentObject
+            ? asArray(state.tasks)
+                .filter(
+                    (task) =>
+                        task.objectId ===
+                            currentObject.id &&
+                        task.active !== false
+                )
+            : [];
+
+    const ownOpenTickets =
+        getOpenTickets(state)
+            .filter(
+                (ticket) =>
+                    ticket.createdByUserId ===
+                        state.currentUser?.id ||
+                    ticket.userId ===
+                        state.currentUser?.id
+            );
+
+    const shiftStarted =
+        state.shiftStarted === true;
+
+    const notices = [];
+
+    if (!currentObject) {
+
+        notices.push({
+            title:
+                "Kein Objekt ausgewählt",
+
+            text:
+                "Wähle dein Objekt, bevor du mit der Arbeit beginnst.",
+
+            level:
+                "warning",
+
+            route:
+                ROUTES.OBJECTS
+        });
+    }
+
+    return `
+        <section class="page-section">
+
+            ${renderPageHeader({
+                area:
+                    "Übersicht",
+
+                title:
+                    `Hallo, ${getUserName(
+                        state
+                    )}`,
+
+                description:
+                    currentObject
+                        ? `Heute im Objekt: ${
+                            currentObject.name ??
+                            currentObject.id
+                        }`
+                        : "Bereit für deinen nächsten Einsatz.",
+
+                color:
+                    "overview"
+            })}
+
+            ${renderMetrics([
+                {
+                    label:
+                        "Schicht",
+
+                    value:
+                        shiftStarted
+                            ? "Läuft"
+                            : "Offen",
+
+                    status:
+                        shiftStarted
+                            ? "success"
+                            : "warning"
+                },
+                {
+                    label:
+                        "Aufgaben",
+
+                    value:
+                        objectTasks.length,
+
+                    status:
+                        "info",
+
+                    route:
+                        ROUTES.TASKS
+                },
+                {
+                    label:
+                        "Eigene Meldungen",
+
+                    value:
+                        ownOpenTickets.length,
+
+                    status:
+                        ownOpenTickets.length > 0
+                            ? "warning"
+                            : "success",
+
+                    route:
+                        ROUTES.COMMUNICATION
+                },
+                {
+                    label:
+                        "Objekt",
+
+                    value:
+                        currentObject
+                            ? "Gewählt"
+                            : "Fehlt",
+
+                    status:
+                        currentObject
+                            ? "success"
+                            : "warning",
+
+                    route:
+                        ROUTES.OBJECTS
+                }
+            ])}
+
+            ${renderNoticeList(
+                notices
+            )}
+
+            ${renderActionList([
+                shiftStarted
+                    ? {
+                        title:
+                            "Schicht beenden",
+
+                        description:
+                            "Abschlussprüfung durchführen",
+
+                        action:
+                            "checkout",
+
+                        color:
+                            "overview"
                     }
+                    : {
+                        title:
+                            "Einchecken",
 
-                </div>
+                        description:
+                            currentObject
+                                ? "Schicht im aktuellen Objekt starten"
+                                : "Zuerst ein Objekt auswählen",
 
-                <span class="section-count">
-                    ${items.length}
-                </span>
+                        action:
+                            currentObject
+                                ? "checkin"
+                                : null,
 
-            </summary>
+                        route:
+                            currentObject
+                                ? null
+                                : ROUTES.OBJECTS,
 
-            <div class="dashboard-action-group-content">
-
-                ${items
-                    .map(
-                        (item) =>
-                            renderActionCard(
-                                item
-                            )
-                    )
-                    .join("")}
-
-            </div>
-
-        </details>
-    `;
-}
-
-/************************************************
- * SUPER-ADMIN-DASHBOARD
- ************************************************/
-
-function renderSuperAdminDashboard(state) {
-
-    const openTickets =
-        getOpenTickets(state);
-
-    return `
-        <section class="page-section">
-
-            <div class="page-heading">
-
-                <div>
-
-                    <span class="eyebrow">
-                        Super-Administration
-                    </span>
-
-                    <h1>
-                        Systemübersicht
-                    </h1>
-
-                </div>
-
-            </div>
-
-            <div class="dashboard-grid">
-
-                ${renderDashboardCard(
-                    "Benutzer",
-                    asArray(state.users).length,
-                    "Alle Benutzer und Rollen"
-                )}
-
-                ${renderDashboardCard(
-                    "Objekte",
-                    asArray(state.objects).length,
-                    "Alle Kunden- und Reinigungsobjekte"
-                )}
-
-                ${renderDashboardCard(
-                    "Offene Tickets",
-                    openTickets.length,
-                    "Systemweite Probleme und Meldungen"
-                )}
-
-                ${renderDashboardCard(
-                    "Version",
-                    APP_CONFIG.APP_VERSION ??
-                    "2.0.0",
-                    "Aktuell installierte Version"
-                )}
-
-            </div>
-
-            <div class="dashboard-action-groups">
-
-                ${renderActionGroup({
+                        color:
+                            "overview"
+                    },
+                {
                     title:
-                        "Benutzer und Berechtigungen",
+                        "Aufgaben öffnen",
 
                     description:
-                        "Rollen, Zugänge und Zuständigkeiten",
+                        "Räume und Arbeitsschritte anzeigen",
 
-                    open:
-                        true,
+                    route:
+                        ROUTES.TASKS,
 
-                    items: [
-                        {
-                            title:
-                                "Benutzer verwalten",
-
-                            description:
-                                "Benutzer, Rollen und Aktivierung bearbeiten",
-
-                            route:
-                                "/employees"
-                        },
-                        {
-                            title:
-                                "Rollen und Rechte",
-
-                            description:
-                                "Zugriffsrechte aller Rollen verwalten",
-
-                            route:
-                                "/settings"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "tasks"
+                },
+                {
                     title:
-                        "Objekte und Betrieb",
+                        "Problem melden",
 
                     description:
-                        "Objekte, Aufgaben und Betriebsdaten",
+                        "Schaden, Materialmangel oder Hinweis",
 
-                    items: [
-                        {
-                            title:
-                                "Alle Objekte",
+                    route:
+                        ROUTES.COMMUNICATION,
 
-                            description:
-                                "Kundenobjekte und Objektzuweisungen",
-
-                            route:
-                                "/objects"
-                        },
-                        {
-                            title:
-                                "Systemberichte",
-
-                            description:
-                                "Nutzung, Leistung und Auffälligkeiten",
-
-                            route:
-                                "/reports"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "communication"
+                },
+                {
                     title:
-                        "System und Tarife",
+                        "Objektinformationen",
 
                     description:
-                        "Module, Versionen und rechtliche Inhalte",
+                        "Anleitung, Sicherheit und Materialstandorte",
 
-                    items: [
-                        {
-                            title:
-                                "Systemeinstellungen",
+                    route:
+                        currentObject
+                            ? ROUTES.OBJECT_DETAIL
+                            : ROUTES.OBJECTS,
 
-                            description:
-                                "App-Konfiguration und Module",
-
-                            route:
-                                "/settings"
-                        },
-                        {
-                            title:
-                                "Tarife und Funktionen",
-
-                            description:
-                                "Free, Pro und Pro Plus verwalten",
-
-                            route:
-                                "/settings"
-                        },
-                        {
-                            title:
-                                "Audit-Protokoll",
-
-                            description:
-                                "Systemänderungen und sicherheitsrelevante Vorgänge",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Datenschutz und Impressum",
-
-                            description:
-                                "Rechtliche Inhalte verwalten",
-
-                            route:
-                                "/settings"
-                        }
-                    ]
-                })}
-
-            </div>
+                    color:
+                        "objects"
+                }
+            ])}
 
         </section>
     `;
 }
 
 /************************************************
- * ADMIN-DASHBOARD
+ * ADMIN-ÜBERSICHT
  ************************************************/
 
-function renderAdminDashboard(state) {
+function renderAdminOverview(state) {
+
+    const activeUsers =
+        getActiveUsers(state);
 
     const openTickets =
         getOpenTickets(state);
 
-    return `
-        <section class="page-section">
-
-            <div class="page-heading">
-
-                <div>
-
-                    <span class="eyebrow">
-                        Administration
-                    </span>
-
-                    <h1>
-                        Verwaltungsübersicht
-                    </h1>
-
-                </div>
-
-            </div>
-
-            <div class="dashboard-grid">
-
-                ${renderDashboardCard(
-                    "Mitarbeiter",
-                    asArray(state.users).length,
-                    "Mitarbeiter und Benutzer"
-                )}
-
-                ${renderDashboardCard(
-                    "Objekte",
-                    asArray(state.objects).length,
-                    "Objekte, Räume und Einstellungen"
-                )}
-
-                ${renderDashboardCard(
-                    "Aufgaben",
-                    asArray(state.tasks).length,
-                    "Reinigungspläne und Tätigkeiten"
-                )}
-
-                ${renderDashboardCard(
-                    "Offene Tickets",
-                    openTickets.length,
-                    "Probleme und Meldungen"
-                )}
-
-            </div>
-
-            <div class="dashboard-action-groups">
-
-                ${renderActionGroup({
-                    title:
-                        "Personal",
-
-                    description:
-                        "Mitarbeiter, Schichten und Vertretungen",
-
-                    open:
-                        true,
-
-                    items: [
-                        {
-                            title:
-                                "Mitarbeiterverwaltung",
-
-                            description:
-                                "Benutzer, Rollen und Objektzuweisungen",
-
-                            route:
-                                "/employees"
-                        },
-                        {
-                            title:
-                                "Schichtplanung",
-
-                            description:
-                                "Einsätze, Arbeitszeiten und Vertretungen",
-
-                            route:
-                                "/tasks"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
-                    title:
-                        "Objekte und Leistungen",
-
-                    description:
-                        "Objekte, Räume und Reinigungspläne",
-
-                    items: [
-                        {
-                            title:
-                                "Objektverwaltung",
-
-                            description:
-                                "Objekte, Räume und Anleitungen",
-
-                            route:
-                                "/objects"
-                        },
-                        {
-                            title:
-                                "Aufgabenverwaltung",
-
-                            description:
-                                "Reinigungspläne und wiederkehrende Aufgaben",
-
-                            route:
-                                "/tasks"
-                        },
-                        {
-                            title:
-                                "Materialverwaltung",
-
-                            description:
-                                "Bestände, Mindestmengen und Bestellungen",
-
-                            route:
-                                "/materials"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
-                    title:
-                        "Kommunikation und Auswertung",
-
-                    description:
-                        "Tickets, Berichte und Einstellungen",
-
-                    items: [
-                        {
-                            title:
-                                "Tickets und Nachrichten",
-
-                            description:
-                                "Probleme, Schäden und Kommunikation",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Berichte",
-
-                            description:
-                                "Zeiten, Leistungen und Abweichungen",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Einstellungen",
-
-                            description:
-                                "Unternehmens- und App-Einstellungen",
-
-                            route:
-                                "/settings"
-                        }
-                    ]
-                })}
-
-            </div>
-
-        </section>
-    `;
-}
-
-/************************************************
- * OBJEKTLEITER-DASHBOARD
- ************************************************/
-
-function renderManagerDashboard(state) {
-
-    const openTickets =
-        getOpenTickets(state);
-
-    const warnings =
+    const materialWarnings =
         getMaterialWarnings(state);
 
     return `
         <section class="page-section">
 
-            <div class="page-heading">
+            ${renderPageHeader({
+                area:
+                    "Übersicht",
 
-                <div>
+                title:
+                    "Unternehmensübersicht",
 
-                    <span class="eyebrow">
-                        Objektleitung
-                    </span>
+                description:
+                    "Benutzer, Objekte und offene Vorgänge.",
 
-                    <h1>
-                        Guten Tag,
-                        ${escapeHtml(
-                            state.currentUser?.name ??
-                            "Objektleitung"
-                        )}
-                    </h1>
+                color:
+                    "overview"
+            })}
 
-                </div>
+            ${renderMetrics([
+                {
+                    label:
+                        "Benutzer",
 
-            </div>
+                    value:
+                        activeUsers.length,
 
-            <div class="dashboard-grid">
+                    status:
+                        "info",
 
-                ${renderDashboardCard(
-                    "Mitarbeiter",
-                    asArray(state.users).length,
-                    "Aktive und zugeordnete Mitarbeiter"
-                )}
+                    route:
+                        ROUTES.PERSONNEL
+                },
+                {
+                    label:
+                        "Objekte",
 
-                ${renderDashboardCard(
-                    "Objekte",
-                    asArray(state.objects).length,
-                    "Verantwortete Reinigungsobjekte"
-                )}
+                    value:
+                        asArray(
+                            state.objects
+                        ).length,
 
-                ${renderDashboardCard(
-                    "Offene Tickets",
-                    openTickets.length,
-                    "Probleme, Schäden und Meldungen"
-                )}
+                    status:
+                        "info",
 
-                ${renderDashboardCard(
-                    "Materialwarnungen",
-                    warnings.length,
-                    "Niedrige und kritische Bestände"
-                )}
+                    route:
+                        ROUTES.OBJECTS
+                },
+                {
+                    label:
+                        "Offene Tickets",
 
-            </div>
+                    value:
+                        openTickets.length,
 
-            <div class="dashboard-action-groups">
+                    status:
+                        openTickets.length > 0
+                            ? "warning"
+                            : "success",
 
-                ${renderActionGroup({
+                    route:
+                        ROUTES.COMMUNICATION
+                },
+                {
+                    label:
+                        "Bestandswarnungen",
+
+                    value:
+                        materialWarnings.length,
+
+                    status:
+                        materialWarnings.length > 0
+                            ? "warning"
+                            : "success",
+
+                    route:
+                        ROUTES.OBJECTS
+                }
+            ])}
+
+            ${renderActionList([
+                {
                     title:
-                        "Tagessteuerung",
+                        "Objekte verwalten",
 
                     description:
-                        "Aktuelle Einsätze und Abweichungen",
+                        "Objekte, Räume und Leistungen",
 
-                    open:
-                        true,
+                    route:
+                        ROUTES.OBJECTS,
 
-                    items: [
-                        {
-                            title:
-                                "Laufende Schichten",
-
-                            description:
-                                "Check-ins, Check-outs und Anwesenheiten",
-
-                            route:
-                                "/tasks"
-                        },
-                        {
-                            title:
-                                "Vertretung suchen",
-
-                            description:
-                                "Passende Vertretung bei Ausfall finden",
-
-                            route:
-                                "/employees"
-                        },
-                        {
-                            title:
-                                "Offene Tickets",
-
-                            description:
-                                "Probleme und Reklamationen bearbeiten",
-
-                            route:
-                                "/tickets"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "objects"
+                },
+                {
                     title:
-                        "Objekte und Personal",
+                        "Personal verwalten",
 
                     description:
-                        "Mitarbeiter, Räume und Objektinformationen",
+                        "Benutzer, Rollen und Zuweisungen",
 
-                    items: [
-                        {
-                            title:
-                                "Mitarbeiter",
+                    route:
+                        ROUTES.PERSONNEL,
 
-                            description:
-                                "Einsätze und Zuständigkeiten",
-
-                            route:
-                                "/employees"
-                        },
-                        {
-                            title:
-                                "Objekte",
-
-                            description:
-                                "Räume, Aufgaben und Objektinformationen",
-
-                            route:
-                                "/objects"
-                        },
-                        {
-                            title:
-                                "Material",
-
-                            description:
-                                "Bestände und Nachbestellungen",
-
-                            route:
-                                "/materials"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "personnel"
+                },
+                {
                     title:
-                        "Auswertung und Einstellungen",
+                        "Kommunikation",
 
                     description:
-                        "Leistung, Zeiten und Objektvorgaben",
+                        "Tickets, Nachrichten und Kundenanfragen",
 
-                    items: [
-                        {
-                            title:
-                                "Berichte",
+                    route:
+                        ROUTES.COMMUNICATION,
 
-                            description:
-                                "Leistung, Zeiten und Abweichungen",
+                    color:
+                        "communication"
+                },
+                {
+                    title:
+                        "System und Berichte",
 
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Objekteinstellungen",
+                    description:
+                        "Einstellungen, Auswertung und Verwaltung",
 
-                            description:
-                                "Pflichtfragen, Sicherheit und Kundenansicht",
+                    route:
+                        ROUTES.MORE,
 
-                            route:
-                                "/settings"
-                        }
-                    ]
-                })}
-
-            </div>
+                    color:
+                        "more"
+                }
+            ])}
 
         </section>
     `;
 }
 
 /************************************************
- * MITARBEITER-DASHBOARD
+ * BUCHHALTUNGS-ÜBERSICHT
  ************************************************/
 
-function renderEmployeeDashboard(state) {
+function renderAccountingOverview(state) {
 
-    const shiftStarted =
-        state.shiftStarted === true;
+    const shifts =
+        asArray(state.shifts);
+
+    const deviations =
+        getOpenTimeDeviations(state);
+
+    const incompleteShifts =
+        shifts.filter(
+            (shift) =>
+                shift.startTime &&
+                !shift.endTime &&
+                ![
+                    "RUNNING",
+                    "PLANNED"
+                ].includes(
+                    normalizeStatus(
+                        shift.status
+                    )
+                )
+        );
 
     return `
         <section class="page-section">
 
-            <div class="page-heading">
+            ${renderPageHeader({
+                area:
+                    "Übersicht",
 
-                <div>
+                title:
+                    "Abrechnung und Zeiten",
 
-                    <span class="eyebrow">
-                        Mitarbeiter
-                    </span>
+                description:
+                    "Aktueller Stand der Zeiterfassung.",
 
-                    <h1>
-                        Hallo,
-                        ${escapeHtml(
-                            state.currentUser?.name ??
-                            "Mitarbeiter"
-                        )}
-                    </h1>
+                color:
+                    "overview"
+            })}
 
-                </div>
+            ${renderMetrics([
+                {
+                    label:
+                        "Schichten",
 
-            </div>
+                    value:
+                        shifts.length,
 
-            <section class="content-card status-card">
+                    status:
+                        "info",
 
-                <span class="status-label">
-                    Aktueller Status
-                </span>
+                    route:
+                        ROUTES.TIMES
+                },
+                {
+                    label:
+                        "Abweichungen",
 
-                <strong>
-                    ${
-                        shiftStarted
-                            ? "Schicht läuft"
-                            : "Noch nicht eingecheckt"
-                    }
-                </strong>
+                    value:
+                        deviations.length,
 
-                <p>
-                    ${
-                        state.currentObject
-                            ? `
-                                Aktuelles Objekt:
-                                ${escapeHtml(
-                                    state.currentObject.name ??
-                                    state.currentObject.id
-                                )}
-                            `
-                            : `
-                                Wähle zuerst dein Objekt aus.
-                            `
-                    }
-                </p>
+                    status:
+                        deviations.length > 0
+                            ? "warning"
+                            : "success",
 
-            </section>
+                    route:
+                        ROUTES.TIMES
+                },
+                {
+                    label:
+                        "Unvollständig",
 
-            <div class="dashboard-action-groups">
+                    value:
+                        incompleteShifts.length,
 
-                ${renderActionGroup({
+                    status:
+                        incompleteShifts.length > 0
+                            ? "critical"
+                            : "success",
+
+                    route:
+                        ROUTES.TIMES
+                },
+                {
+                    label:
+                        "Objekte",
+
+                    value:
+                        asArray(
+                            state.objects
+                        ).length,
+
+                    status:
+                        "info",
+
+                    route:
+                        ROUTES.OBJECTS
+                }
+            ])}
+
+            ${renderActionList([
+                {
                     title:
-                        "Aktuelle Schicht",
+                        "Zeiten prüfen",
 
                     description:
-                        "Check-in, Aufgaben und Abschluss",
+                        "Schichten, Check-ins und Abweichungen",
 
-                    open:
-                        true,
+                    route:
+                        ROUTES.TIMES,
 
-                    items: [
-                        shiftStarted
-                            ? {
-                                title:
-                                    "Auschecken",
-
-                                description:
-                                    "Abschlussprüfung durchführen und Schicht beenden",
-
-                                action:
-                                    "checkout"
-                            }
-                            : {
-                                title:
-                                    "Einchecken",
-
-                                description:
-                                    "QR-Code scannen oder Testmodus verwenden",
-
-                                action:
-                                    "checkin"
-                            },
-                        {
-                            title:
-                                "Mein Objekt",
-
-                            description:
-                                "Objektinformationen und Besonderheiten",
-
-                            route:
-                                state.currentObject
-                                    ? "/object-detail"
-                                    : "/objects"
-                        },
-                        {
-                            title:
-                                "Meine Aufgaben",
-
-                            description:
-                                "Räume, Reihenfolge und Reinigungsschritte",
-
-                            route:
-                                "/tasks"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "times"
+                },
+                {
                     title:
-                        "Meldungen und Material",
+                        "Objektstunden",
 
                     description:
-                        "Probleme, Bestände und Abwesenheiten",
+                        "Zeiten nach Objekt und Kostenstelle",
 
-                    items: [
-                        {
-                            title:
-                                "Problem melden",
+                    route:
+                        ROUTES.OBJECTS,
 
-                            description:
-                                "Schaden, Materialmangel oder Hindernis",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Material",
-
-                            description:
-                                "Bestand prüfen oder Nachbestellung melden",
-
-                            route:
-                                "/materials"
-                        },
-                        {
-                            title:
-                                "Krank oder abwesend",
-
-                            description:
-                                "Abwesenheit an die Objektleitung melden",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Urlaub",
-
-                            description:
-                                "Urlaub beantragen und Resturlaub prüfen",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Sofort-Notiz",
-
-                            description:
-                                "Schnelle Dokumentation mit Foto, Text oder Audio",
-
-                            route:
-                                "/tickets"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "objects"
+                },
+                {
                     title:
-                        "Anleitungen und Kommunikation",
+                        "Auswertung öffnen",
 
                     description:
-                        "Objektwissen, Schlüssel und Hilfe",
+                        "Monatsabrechnung und Export",
 
-                    items: [
-                        {
-                            title:
-                                "Objektanleitung",
+                    route:
+                        ROUTES.ANALYSIS,
 
-                            description:
-                                "Zugang, Dosierung und Sicherheitsregeln",
-
-                            route:
-                                state.currentObject
-                                    ? "/object-detail"
-                                    : "/objects"
-                        },
-                        {
-                            title:
-                                "Schlüsselbuch",
-
-                            description:
-                                "Schlüsselübernahme und Rückgabe",
-
-                            route:
-                                state.currentObject
-                                    ? "/object-detail"
-                                    : "/objects"
-                        },
-                        {
-                            title:
-                                "Nachrichten",
-
-                            description:
-                                "Nachrichten der Objektleitung",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Hilfe",
-
-                            description:
-                                "Anleitungen und Unterstützung",
-
-                            route:
-                                "/settings"
-                        }
-                    ]
-                })}
-
-            </div>
+                    color:
+                        "analysis"
+                }
+            ])}
 
         </section>
     `;
 }
 
 /************************************************
- * BUCHHALTUNG
+ * KUNDEN-ÜBERSICHT
  ************************************************/
 
-function renderAccountingDashboard(state) {
+function renderCustomerOverview(state) {
+
+    const visibleObjects =
+        getVisibleObjects(state);
+
+    const ownTickets =
+        getOpenTickets(state)
+            .filter(
+                (ticket) =>
+                    ticket.customerUserId ===
+                        state.currentUser?.id ||
+                    ticket.createdByUserId ===
+                        state.currentUser?.id
+            );
 
     return `
         <section class="page-section">
 
-            <div class="page-heading">
+            ${renderPageHeader({
+                area:
+                    "Übersicht",
 
-                <div>
+                title:
+                    "Kundenportal",
 
-                    <span class="eyebrow">
-                        Buchhaltung
-                    </span>
+                description:
+                    "Objektstatus und aktuelle Meldungen.",
 
-                    <h1>
-                        Abrechnung und Zeiten
-                    </h1>
+                color:
+                    "overview"
+            })}
 
-                </div>
+            ${renderMetrics([
+                {
+                    label:
+                        "Objekte",
 
-            </div>
+                    value:
+                        visibleObjects.length,
 
-            <div class="dashboard-grid">
+                    status:
+                        "info",
 
-                ${renderDashboardCard(
-                    "Mitarbeiter",
-                    asArray(state.users).length,
-                    "Abrechnungsrelevante Mitarbeiter"
-                )}
+                    route:
+                        ROUTES.OBJECTS
+                },
+                {
+                    label:
+                        "Offene Meldungen",
 
-                ${renderDashboardCard(
-                    "Schichten",
-                    asArray(state.shifts).length,
-                    "Erfasste Arbeitszeiten"
-                )}
+                    value:
+                        ownTickets.length,
 
-                ${renderDashboardCard(
-                    "Objekte",
-                    asArray(state.objects).length,
-                    "Kostenstellen und Kundenobjekte"
-                )}
+                    status:
+                        ownTickets.length > 0
+                            ? "warning"
+                            : "success",
 
-                ${renderDashboardCard(
-                    "Abweichungen",
-                    asArray(state.timeDeviations).length,
-                    "Erfasste Zeitabweichungen"
-                )}
+                    route:
+                        ROUTES.COMMUNICATION
+                },
+                {
+                    label:
+                        "Berichte",
 
-            </div>
+                    value:
+                        asArray(
+                            state.taskLogs
+                        ).length,
 
-            <div class="dashboard-action-groups">
+                    status:
+                        "info",
 
-                ${renderActionGroup({
+                    route:
+                        ROUTES.REPORTS
+                },
+                {
+                    label:
+                        "Status",
+
+                    value:
+                        "Aktiv",
+
+                    status:
+                        "success"
+                }
+            ])}
+
+            ${renderActionList([
+                {
                     title:
-                        "Arbeitszeiten",
+                        "Objekte ansehen",
 
                     description:
-                        "Zeiten, Fehlzeiten und Abweichungen",
+                        "Status und freigegebene Leistungen",
 
-                    open:
-                        true,
+                    route:
+                        ROUTES.OBJECTS,
 
-                    items: [
-                        {
-                            title:
-                                "Arbeitszeitberichte",
-
-                            description:
-                                "Check-ins, Check-outs und Gesamtstunden",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Monatsabrechnung",
-
-                            description:
-                                "Arbeitszeiten nach Mitarbeiter und Monat",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Zeitabweichungen",
-
-                            description:
-                                "Abweichende Einsatzzeiten prüfen",
-
-                            route:
-                                "/tasks"
-                        },
-                        {
-                            title:
-                                "Fehlzeiten",
-
-                            description:
-                                "Krankheit, Urlaub und Abwesenheiten",
-
-                            route:
-                                "/reports"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
+                    color:
+                        "objects"
+                },
+                {
                     title:
-                        "Objekte und Export",
+                        "Meldung erstellen",
 
                     description:
-                        "Kostenstellen, Fahrten und Abrechnungsdaten",
+                        "Anfrage, Wunsch oder Reklamation",
 
-                    items: [
-                        {
-                            title:
-                                "Objektabrechnung",
+                    route:
+                        ROUTES.COMMUNICATION,
 
-                            description:
-                                "Kundenobjekte und Kostenstellen",
+                    color:
+                        "communication"
+                },
+                {
+                    title:
+                        "Berichte öffnen",
 
-                            route:
-                                "/objects"
-                        },
-                        {
-                            title:
-                                "Kilometer und Fahrten",
+                    description:
+                        "Freigegebene Leistungsnachweise",
 
-                            description:
-                                "Fahrten zwischen Objekten und Vergütung",
+                    route:
+                        ROUTES.REPORTS,
 
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Export",
-
-                            description:
-                                "Monatsauswertung für Lohn und Abrechnung",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Prüfung",
-
-                            description:
-                                "Unvollständige oder auffällige Zeiterfassungen",
-
-                            route:
-                                "/reports"
-                        }
-                    ]
-                })}
-
-            </div>
+                    color:
+                        "reports"
+                }
+            ])}
 
         </section>
     `;
 }
 
 /************************************************
- * KUNDEN-DASHBOARD
+ * ÜBERSICHT AUSWÄHLEN
  ************************************************/
 
-function renderCustomerDashboard(state) {
-
-    const openTickets =
-        getOpenTickets(state);
-
-    return `
-        <section class="page-section">
-
-            <div class="page-heading">
-
-                <div>
-
-                    <span class="eyebrow">
-                        Kundenportal
-                    </span>
-
-                    <h1>
-                        Objektübersicht
-                    </h1>
-
-                </div>
-
-            </div>
-
-            <div class="dashboard-grid">
-
-                ${renderDashboardCard(
-                    "Objekte",
-                    asArray(state.objects).length,
-                    "Freigegebene Kundenobjekte"
-                )}
-
-                ${renderDashboardCard(
-                    "Offene Meldungen",
-                    openTickets.length,
-                    "Probleme und Kundenanfragen"
-                )}
-
-                ${renderDashboardCard(
-                    "Aufgaben",
-                    asArray(state.tasks).length,
-                    "Freigegebene Reinigungsleistungen"
-                )}
-
-                ${renderDashboardCard(
-                    "Status",
-                    "Aktiv",
-                    "Aktueller Objektstatus"
-                )}
-
-            </div>
-
-            <div class="dashboard-action-groups">
-
-                ${renderActionGroup({
-                    title:
-                        "Objekte und Leistungen",
-
-                    description:
-                        "Status, Reinigungsplan und Nachweise",
-
-                    open:
-                        true,
-
-                    items: [
-                        {
-                            title:
-                                "Meine Objekte",
-
-                            description:
-                                "Objektstatus und freigegebene Informationen",
-
-                            route:
-                                "/objects"
-                        },
-                        {
-                            title:
-                                "Reinigungsplan",
-
-                            description:
-                                "Freigegebene Räume und Leistungen",
-
-                            route:
-                                "/tasks"
-                        },
-                        {
-                            title:
-                                "Leistungsnachweise",
-
-                            description:
-                                "Freigegebene Berichte und Dokumentationen",
-
-                            route:
-                                "/reports"
-                        },
-                        {
-                            title:
-                                "Dokumente",
-
-                            description:
-                                "Verträge und freigegebene Dateien",
-
-                            route:
-                                "/reports"
-                        }
-                    ]
-                })}
-
-                ${renderActionGroup({
-                    title:
-                        "Meldungen und Kontakt",
-
-                    description:
-                        "Anfragen, Status und Kommunikation",
-
-                    items: [
-                        {
-                            title:
-                                "Anfrage erstellen",
-
-                            description:
-                                "Problem, Wunsch oder Reklamation melden",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Meldungsstatus",
-
-                            description:
-                                "Bearbeitungsstand eigener Meldungen",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Nachrichten",
-
-                            description:
-                                "Kommunikation mit der Objektleitung",
-
-                            route:
-                                "/tickets"
-                        },
-                        {
-                            title:
-                                "Kontakt",
-
-                            description:
-                                "Zuständige Objektleitung kontaktieren",
-
-                            route:
-                                "/tickets"
-                        }
-                    ]
-                })}
-
-            </div>
-
-        </section>
-    `;
-}
-
-/************************************************
- * DASHBOARD-AUSWAHL
- ************************************************/
-
-function renderDashboard(state) {
+function renderOverview(state) {
 
     switch (
         state.currentUser?.role
     ) {
 
         case USER_ROLES.SUPER_ADMIN:
-
-            return renderSuperAdminDashboard(
-                state
-            );
-
         case USER_ROLES.ADMIN:
 
-            return renderAdminDashboard(
+            return renderAdminOverview(
                 state
             );
 
         case USER_ROLES.OBJEKTLEITER:
 
-            return renderManagerDashboard(
+            return renderManagerOverview(
                 state
             );
 
         case USER_ROLES.MITARBEITER:
 
-            return renderEmployeeDashboard(
+            return renderEmployeeOverview(
                 state
             );
 
         case USER_ROLES.BUCHHALTUNG:
 
-            return renderAccountingDashboard(
+            return renderAccountingOverview(
                 state
             );
 
         case USER_ROLES.KUNDE:
 
-            return renderCustomerDashboard(
+            return renderCustomerOverview(
                 state
             );
 
         default:
 
-            return `
-                <section class="page-section">
-
-                    <section class="content-card">
-
-                        <h1>
-                            Dashboard
-                        </h1>
-
-                        <p>
-                            Für diese Rolle ist noch
-                            kein Dashboard verfügbar.
-                        </p>
-
-                    </section>
-
-                </section>
-            `;
+            return renderAdminOverview(
+                state
+            );
     }
 }
 
 /************************************************
- * PLATZHALTERSEITEN
+ * KOMPAKTE BEREICHSSEITEN
  ************************************************/
 
-function renderPlaceholderPage({
+function renderCompactSectionPage({
+    area,
     title,
     description,
+    color,
+    metrics = [],
     groups = []
 }) {
 
     return `
         <section class="page-section">
 
-            <div class="page-heading">
+            ${renderPageHeader({
+                area,
+                title,
+                description,
+                color
+            })}
 
-                <div>
+            ${
+                metrics.length > 0
+                    ? renderMetrics(
+                        metrics
+                    )
+                    : ""
+            }
 
-                    <span class="eyebrow">
-                        Facility OS
-                    </span>
+            <section class="section-group-list">
 
-                    <h1>
-                        ${escapeHtml(title)}
-                    </h1>
+                ${groups
+                    .map(
+                        (group) => `
+                            <details
+                                class="compact-section-group compact-section-${escapeHtml(
+                                    group.color ??
+                                    color
+                                )}"
+                                ${group.open ? "open" : ""}
+                            >
 
-                </div>
+                                <summary>
 
-            </div>
+                                    <div>
 
-            <section class="content-card">
+                                        <strong>
+                                            ${escapeHtml(
+                                                group.title
+                                            )}
+                                        </strong>
 
-                <p>
-                    ${escapeHtml(description)}
-                </p>
+                                        ${
+                                            group.description
+                                                ? `
+                                                    <span>
+                                                        ${escapeHtml(
+                                                            group.description
+                                                        )}
+                                                    </span>
+                                                `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                    <span class="section-count">
+                                        ${group.items.length}
+                                    </span>
+
+                                </summary>
+
+                                <div class="compact-section-content">
+
+                                    ${group.items
+                                        .map(
+                                            (item) =>
+                                                renderPrimaryAction({
+                                                    ...item,
+
+                                                    color:
+                                                        item.color ??
+                                                        group.color ??
+                                                        color
+                                                })
+                                        )
+                                        .join("")}
+
+                                </div>
+
+                            </details>
+                        `
+                    )
+                    .join("")}
 
             </section>
 
-            ${
-                groups.length > 0
-                    ? `
-                        <div class="dashboard-action-groups">
+        </section>
+    `;
+}
 
-                            ${groups
-                                .map(
-                                    renderActionGroup
+/************************************************
+ * PERSONAL
+ ************************************************/
+
+function renderPersonnelPage(state) {
+
+    const activeUsers =
+        getActiveUsers(state);
+
+    return renderCompactSectionPage({
+        area:
+            "Personal",
+
+        title:
+            "Mitarbeiter und Einsatzplanung",
+
+        description:
+            "Zuständigkeiten, Abwesenheiten und Vertretungen.",
+
+        color:
+            "personnel",
+
+        metrics: [
+            {
+                label:
+                    "Aktive Mitarbeiter",
+
+                value:
+                    activeUsers.length,
+
+                status:
+                    "info"
+            },
+            {
+                label:
+                    "Laufende Schichten",
+
+                value:
+                    getRunningShifts(
+                        state
+                    ).length,
+
+                status:
+                    "success"
+            },
+            {
+                label:
+                    "Abwesenheiten",
+
+                value:
+                    asArray(
+                        state.customerRequests
+                    ).filter(
+                        (request) =>
+                            [
+                                "SICK",
+                                "ABSENCE",
+                                "VACATION"
+                            ].includes(
+                                normalizeStatus(
+                                    request.type
                                 )
-                                .join("")}
+                            )
+                    ).length,
 
-                        </div>
-                    `
-                    : ""
+                status:
+                    "warning"
+            },
+            {
+                label:
+                    "Objekte",
+
+                value:
+                    getVisibleObjects(
+                        state
+                    ).length,
+
+                status:
+                    "info"
             }
+        ],
+
+        groups: [
+            {
+                title:
+                    "Mitarbeiter",
+
+                description:
+                    "Personen und Objektzuweisungen",
+
+                color:
+                    "personnel",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Mitarbeiterübersicht",
+
+                        description:
+                            "Aktive Personen und Zuständigkeiten"
+                    },
+                    {
+                        title:
+                            "Objektzuweisungen",
+
+                        description:
+                            "Mitarbeiter auf Objekte verteilen"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Abwesenheit und Vertretung",
+
+                description:
+                    "Krankheit, Urlaub und Ausfälle",
+
+                color:
+                    "personnel",
+
+                items: [
+                    {
+                        title:
+                            "Abwesenheiten",
+
+                        description:
+                            "Krankmeldungen und Urlaub prüfen"
+                    },
+                    {
+                        title:
+                            "Vertretungen",
+
+                        description:
+                            "Passende Vertretung suchen und zuweisen"
+                    },
+                    {
+                        title:
+                            "Schichtplanung",
+
+                        description:
+                            "Einsätze und Arbeitszeiten planen",
+
+                        route:
+                            ROUTES.TIMES
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+/************************************************
+ * KOMMUNIKATION
+ ************************************************/
+
+function renderCommunicationPage(state) {
+
+    const openTickets =
+        getOpenTickets(state);
+
+    const criticalTickets =
+        getCriticalTickets(state);
+
+    return renderCompactSectionPage({
+        area:
+            "Kommunikation",
+
+        title:
+            state.currentUser?.role ===
+            USER_ROLES.MITARBEITER
+                ? "Meldungen"
+                : "Tickets und Nachrichten",
+
+        description:
+            "Alle Probleme, Anfragen und Nachrichten an einem Ort.",
+
+        color:
+            "communication",
+
+        metrics: [
+            {
+                label:
+                    "Offen",
+
+                value:
+                    openTickets.length,
+
+                status:
+                    openTickets.length > 0
+                        ? "warning"
+                        : "success"
+            },
+            {
+                label:
+                    "Kritisch",
+
+                value:
+                    criticalTickets.length,
+
+                status:
+                    criticalTickets.length > 0
+                        ? "critical"
+                        : "success"
+            },
+            {
+                label:
+                    "Nachrichten",
+
+                value:
+                    asArray(
+                        state.messages
+                    ).length,
+
+                status:
+                    "info"
+            },
+            {
+                label:
+                    "Kundenanfragen",
+
+                value:
+                    asArray(
+                        state.customerRequests
+                    ).length,
+
+                status:
+                    "info"
+            }
+        ],
+
+        groups: [
+            {
+                title:
+                    "Neue Meldung",
+
+                description:
+                    "Problem oder Hinweis erfassen",
+
+                color:
+                    "communication",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Problem melden",
+
+                        description:
+                            "Schaden, Hindernis oder Reklamation"
+                    },
+                    {
+                        title:
+                            "Materialmangel melden",
+
+                        description:
+                            "Fehlendes oder knappes Material"
+                    },
+                    {
+                        title:
+                            "Sofort-Notiz",
+
+                        description:
+                            "Kurzer Hinweis mit Text, Foto oder Audio"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Bearbeitung",
+
+                description:
+                    "Offene Vorgänge und Nachrichten",
+
+                color:
+                    "communication",
+
+                items: [
+                    {
+                        title:
+                            "Offene Tickets",
+
+                        description:
+                            "Aktuelle Meldungen bearbeiten"
+                    },
+                    {
+                        title:
+                            "Nachrichten",
+
+                        description:
+                            "Interne und externe Kommunikation"
+                    },
+                    {
+                        title:
+                            "Archiv",
+
+                        description:
+                            "Abgeschlossene Vorgänge"
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+/************************************************
+ * AUFGABEN
+ ************************************************/
+
+function renderTasksPage(state) {
+
+    const currentObject =
+        state.currentObject;
+
+    const tasks =
+        currentObject
+            ? asArray(state.tasks)
+                .filter(
+                    (task) =>
+                        task.objectId ===
+                            currentObject.id &&
+                        task.active !== false
+                )
+            : [];
+
+    const totalMinutes =
+        tasks.reduce(
+            (total, task) =>
+                total +
+                asNumber(
+                    task.estimatedMinutes
+                ),
+            0
+        );
+
+    return renderCompactSectionPage({
+        area:
+            "Aufgaben",
+
+        title:
+            currentObject
+                ? currentObject.name
+                : "Kein Objekt ausgewählt",
+
+        description:
+            currentObject
+                ? "Räume, Reihenfolge und Arbeitsschritte."
+                : "Wähle zuerst ein Objekt aus.",
+
+        color:
+            "tasks",
+
+        metrics: [
+            {
+                label:
+                    "Aufgaben",
+
+                value:
+                    tasks.length,
+
+                status:
+                    "info"
+            },
+            {
+                label:
+                    "Sollzeit",
+
+                value:
+                    `${totalMinutes} Min.`,
+
+                status:
+                    "neutral"
+            },
+            {
+                label:
+                    "Nachweispflicht",
+
+                value:
+                    tasks.filter(
+                        (task) =>
+                            task.documentationRequired ===
+                            true
+                    ).length,
+
+                status:
+                    "warning"
+            },
+            {
+                label:
+                    "Räume",
+
+                value:
+                    currentObject
+                        ? asArray(state.rooms)
+                            .filter(
+                                (room) =>
+                                    room.objectId ===
+                                    currentObject.id
+                            ).length
+                        : 0,
+
+                status:
+                    "info"
+            }
+        ],
+
+        groups: [
+            {
+                title:
+                    "Heutige Arbeit",
+
+                description:
+                    "Aufgaben nach Raum und Reihenfolge",
+
+                color:
+                    "tasks",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            currentObject
+                                ? "Objektdetails öffnen"
+                                : "Objekt auswählen",
+
+                        description:
+                            currentObject
+                                ? "Räume und Aufgaben vollständig anzeigen"
+                                : "Zuerst ein Arbeitsobjekt wählen",
+
+                        route:
+                            currentObject
+                                ? ROUTES.OBJECT_DETAIL
+                                : ROUTES.OBJECTS
+                    }
+                ]
+            },
+            {
+                title:
+                    "Dokumentation",
+
+                description:
+                    "Nachweise und Abweichungen",
+
+                color:
+                    "tasks",
+
+                items: [
+                    {
+                        title:
+                            "Aufgabenstatus",
+
+                        description:
+                            "Offen, begonnen und erledigt"
+                    },
+                    {
+                        title:
+                            "Zeitabweichung",
+
+                        description:
+                            "Begründung mit Text, Foto oder Audio"
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+/************************************************
+ * ZEITEN
+ ************************************************/
+
+function renderTimesPage(state) {
+
+    return renderCompactSectionPage({
+        area:
+            "Zeiten",
+
+        title:
+            "Arbeitszeit und Schichten",
+
+        description:
+            "Check-ins, Check-outs und Abweichungen.",
+
+        color:
+            "times",
+
+        metrics: [
+            {
+                label:
+                    "Schichten",
+
+                value:
+                    asArray(
+                        state.shifts
+                    ).length,
+
+                status:
+                    "info"
+            },
+            {
+                label:
+                    "Check-ins",
+
+                value:
+                    asArray(
+                        state.checkins
+                    ).length,
+
+                status:
+                    "success"
+            },
+            {
+                label:
+                    "Check-outs",
+
+                value:
+                    asArray(
+                        state.checkouts
+                    ).length,
+
+                status:
+                    "success"
+            },
+            {
+                label:
+                    "Abweichungen",
+
+                value:
+                    getOpenTimeDeviations(
+                        state
+                    ).length,
+
+                status:
+                    "warning"
+            }
+        ],
+
+        groups: [
+            {
+                title:
+                    "Zeiterfassung",
+
+                description:
+                    "Schichten und Buchungen",
+
+                color:
+                    "times",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Schichten",
+
+                        description:
+                            "Geplante und geleistete Einsätze"
+                    },
+                    {
+                        title:
+                            "Check-ins und Check-outs",
+
+                        description:
+                            "Zeitbuchungen prüfen"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Prüfung",
+
+                description:
+                    "Fehler und Korrekturen",
+
+                color:
+                    "times",
+
+                items: [
+                    {
+                        title:
+                            "Zeitabweichungen",
+
+                        description:
+                            "Auffällige Einsatzzeiten"
+                    },
+                    {
+                        title:
+                            "Unvollständige Buchungen",
+
+                        description:
+                            "Fehlende oder offene Abschlüsse"
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+/************************************************
+ * AUSWERTUNG UND BERICHTE
+ ************************************************/
+
+function renderAnalysisPage(state) {
+
+    return renderCompactSectionPage({
+        area:
+            "Auswertung",
+
+        title:
+            "Abrechnung und Berichte",
+
+        description:
+            "Arbeitszeiten nach Mitarbeiter, Objekt und Monat.",
+
+        color:
+            "analysis",
+
+        groups: [
+            {
+                title:
+                    "Abrechnung",
+
+                description:
+                    "Monatliche Auswertungen",
+
+                color:
+                    "analysis",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Monatsabrechnung",
+
+                        description:
+                            "Stunden nach Mitarbeiter und Monat"
+                    },
+                    {
+                        title:
+                            "Objektabrechnung",
+
+                        description:
+                            "Stunden nach Objekt und Kostenstelle"
+                    },
+                    {
+                        title:
+                            "Fahrten und Kilometer",
+
+                        description:
+                            "Vergütungsrelevante Wege"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Export",
+
+                description:
+                    "Daten ausgeben und übergeben",
+
+                color:
+                    "analysis",
+
+                items: [
+                    {
+                        title:
+                            "Lohnexport",
+
+                        description:
+                            "Daten für die Abrechnung vorbereiten"
+                    },
+                    {
+                        title:
+                            "Berichtsexport",
+
+                        description:
+                            "Monats- und Objektberichte"
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+function renderReportsPage(state) {
+
+    return renderCompactSectionPage({
+        area:
+            "Berichte",
+
+        title:
+            "Leistungsnachweise",
+
+        description:
+            "Freigegebene Berichte und Dokumente.",
+
+        color:
+            "reports",
+
+        groups: [
+            {
+                title:
+                    "Objektberichte",
+
+                description:
+                    "Leistung und Reinigungsstatus",
+
+                color:
+                    "reports",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Leistungsnachweise",
+
+                        description:
+                            "Freigegebene Reinigungsnachweise"
+                    },
+                    {
+                        title:
+                            "Objektstatus",
+
+                        description:
+                            "Aktuelle und vergangene Leistungen"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Dokumente",
+
+                description:
+                    "Freigegebene Unterlagen",
+
+                color:
+                    "reports",
+
+                items: [
+                    {
+                        title:
+                            "Dokumentenübersicht",
+
+                        description:
+                            "Verträge und Nachweise"
+                    }
+                ]
+            }
+        ]
+    });
+}
+
+/************************************************
+ * MEHR
+ ************************************************/
+
+function getMoreGroups(state) {
+
+    const role =
+        state.currentUser?.role;
+
+    if (
+        role ===
+        USER_ROLES.MITARBEITER
+    ) {
+
+        return [
+            {
+                title:
+                    "Persönlich",
+
+                description:
+                    "Zeiten, Urlaub und Profil",
+
+                color:
+                    "more",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Meine Arbeitszeiten",
+
+                        description:
+                            "Persönliche Schichten und Stunden",
+
+                        route:
+                            ROUTES.TIMES
+                    },
+                    {
+                        title:
+                            "Krankheit und Urlaub",
+
+                        description:
+                            "Abwesenheit melden oder Urlaub beantragen",
+
+                        route:
+                            ROUTES.COMMUNICATION
+                    },
+                    {
+                        title:
+                            "Profil",
+
+                        description:
+                            "Persönliche Angaben"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Hilfe und App",
+
+                description:
+                    "Unterstützung und rechtliche Hinweise",
+
+                color:
+                    "more",
+
+                items: [
+                    {
+                        title:
+                            "Hilfe",
+
+                        description:
+                            "Anleitungen und häufige Fragen",
+
+                        route:
+                            ROUTES.HELP
+                    },
+                    {
+                        title:
+                            "Datenschutz",
+
+                        description:
+                            "Datenschutzinformationen",
+
+                        route:
+                            ROUTES.PRIVACY
+                    }
+                ]
+            }
+        ];
+    }
+
+    if (
+        role ===
+        USER_ROLES.KUNDE
+    ) {
+
+        return [
+            {
+                title:
+                    "Kontakt und Profil",
+
+                description:
+                    "Ansprechpartner und persönliche Angaben",
+
+                color:
+                    "more",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Ansprechpartner",
+
+                        description:
+                            "Zuständige Objektleitung"
+                    },
+                    {
+                        title:
+                            "Profil",
+
+                        description:
+                            "Kundendaten und Kontakt"
+                    },
+                    {
+                        title:
+                            "Hilfe",
+
+                        description:
+                            "Unterstützung und häufige Fragen",
+
+                        route:
+                            ROUTES.HELP
+                    }
+                ]
+            },
+            {
+                title:
+                    "Rechtliches",
+
+                description:
+                    "Datenschutz und Impressum",
+
+                color:
+                    "more",
+
+                items: [
+                    {
+                        title:
+                            "Datenschutz",
+
+                        description:
+                            "Hinweise zur Datenverarbeitung",
+
+                        route:
+                            ROUTES.PRIVACY
+                    },
+                    {
+                        title:
+                            "Impressum",
+
+                        description:
+                            "Anbieterinformationen",
+
+                        route:
+                            ROUTES.IMPRINT
+                    }
+                ]
+            }
+        ];
+    }
+
+    return [
+        {
+            title:
+                "Auswertung",
+
+            description:
+                "Berichte und Zeiterfassung",
+
+            color:
+                "more",
+
+            open:
+                true,
+
+            items: [
+                {
+                    title:
+                        "Berichte",
+
+                    description:
+                        "Zeiten, Leistung und Abweichungen",
+
+                    route:
+                        ROUTES.REPORTS
+                },
+                {
+                    title:
+                        "Zeiterfassung",
+
+                    description:
+                        "Schichten und Zeitbuchungen",
+
+                    route:
+                        ROUTES.TIMES
+                }
+            ]
+        },
+        {
+            title:
+                "Administration",
+
+            description:
+                "System, Rollen und Einstellungen",
+
+            color:
+                "more",
+
+            items: [
+                {
+                    title:
+                        "Einstellungen",
+
+                    description:
+                        "Unternehmen, Objekte und Prozesse",
+
+                    route:
+                        ROUTES.SETTINGS
+                },
+                {
+                    title:
+                        "Rollen und Rechte",
+
+                    description:
+                        "Zugriffssteuerung"
+                },
+                {
+                    title:
+                        "Tarife und Module",
+
+                    description:
+                        "Free, Pro und Pro Plus"
+                }
+            ]
+        },
+        {
+            title:
+                "Hilfe und Rechtliches",
+
+            description:
+                "Support und Pflichtinformationen",
+
+            color:
+                "more",
+
+            items: [
+                {
+                    title:
+                        "Hilfe",
+
+                    description:
+                        "Anleitungen und häufige Fragen",
+
+                    route:
+                        ROUTES.HELP
+                },
+                {
+                    title:
+                        "Datenschutz",
+
+                    description:
+                        "Datenschutzinformationen",
+
+                    route:
+                        ROUTES.PRIVACY
+                },
+                {
+                    title:
+                        "Impressum",
+
+                    description:
+                        "Anbieterinformationen",
+
+                    route:
+                        ROUTES.IMPRINT
+                }
+            ]
+        }
+    ];
+}
+
+function renderMorePage(state) {
+
+    return renderCompactSectionPage({
+        area:
+            "Mehr",
+
+        title:
+            "Weitere Funktionen",
+
+        description:
+            "Nur Funktionen, die nicht täglich benötigt werden.",
+
+        color:
+            "more",
+
+        groups:
+            getMoreGroups(
+                state
+            )
+    });
+}
+
+/************************************************
+ * EINFACHE INFORMATIONSSEITEN
+ ************************************************/
+
+function renderInformationPage({
+    title,
+    description
+}) {
+
+    return `
+        <section class="page-section">
+
+            ${renderPageHeader({
+                area:
+                    "Facility OS",
+
+                title,
+
+                description,
+
+                color:
+                    "more"
+            })}
+
+            <section class="information-card">
+
+                <p>
+                    ${escapeHtml(
+                        description
+                    )}
+                </p>
+
+            </section>
 
         </section>
     `;
@@ -2006,407 +3031,97 @@ function renderRoute(
 ) {
 
     if (!state.currentUser) {
+
         return renderLogin();
     }
 
     switch (route) {
 
-        case "/dashboard":
+        case ROUTES.OVERVIEW:
 
-            return renderDashboard(
+            return renderOverview(
                 state
             );
 
-        case "/objects":
+        case ROUTES.OBJECTS:
 
             return renderObjectsPage(
                 state
             );
 
-        case "/object-detail":
+        case ROUTES.OBJECT_DETAIL:
 
             return renderObjectDetailPage(
                 state
             );
 
-        case "/employees":
+        case ROUTES.TASKS:
 
-            return renderPlaceholderPage({
-                title:
-                    "Mitarbeiter",
+            return renderTasksPage(
+                state
+            );
 
-                description:
-                    "Mitarbeiter, Rollen, Abwesenheiten und Objektzuweisungen.",
+        case ROUTES.PERSONNEL:
 
-                groups: [
-                    {
-                        title:
-                            "Personalübersicht",
+            return renderPersonnelPage(
+                state
+            );
 
-                        description:
-                            "Mitarbeiter und Zuständigkeiten",
+        case ROUTES.COMMUNICATION:
 
-                        open:
-                            true,
+            return renderCommunicationPage(
+                state
+            );
 
-                        items: [
-                            {
-                                title:
-                                    "Mitarbeiterübersicht",
+        case ROUTES.TIMES:
 
-                                description:
-                                    "Aktive und zugewiesene Mitarbeiter"
-                            },
-                            {
-                                title:
-                                    "Objektzuweisungen",
+            return renderTimesPage(
+                state
+            );
 
-                                description:
-                                    "Mitarbeiter auf Objekte verteilen"
-                            },
-                            {
-                                title:
-                                    "Leistungsdaten",
+        case ROUTES.ANALYSIS:
 
-                                description:
-                                    "Bewertungen und Leistungsentwicklung"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Abwesenheit und Vertretung",
+            return renderAnalysisPage(
+                state
+            );
 
-                        description:
-                            "Krankheit, Urlaub und Ausfälle",
+        case ROUTES.REPORTS:
 
-                        items: [
-                            {
-                                title:
-                                    "Abwesenheiten",
+            return renderReportsPage(
+                state
+            );
 
-                                description:
-                                    "Krankheit und Urlaub verwalten"
-                            },
-                            {
-                                title:
-                                    "Vertretungen",
+        case ROUTES.MORE:
 
-                                description:
-                                    "Passende Vertretungen suchen"
-                            }
-                        ]
-                    }
-                ]
-            });
+            return renderMorePage(
+                state
+            );
 
-        case "/tasks":
+        case ROUTES.SETTINGS:
 
-            return renderPlaceholderPage({
-                title:
-                    "Aufgaben",
-
-                description:
-                    "Reinigungsaufgaben, Räume, Reihenfolge und Dokumentationspflichten.",
-
-                groups: [
-                    {
-                        title:
-                            "Tagesaufgaben",
-
-                        description:
-                            "Aktuelle Aufgaben und Räume",
-
-                        open:
-                            true,
-
-                        items: [
-                            {
-                                title:
-                                    "Heutige Aufgaben",
-
-                                description:
-                                    "Aktuelle Räume und Arbeitsschritte"
-                            },
-                            {
-                                title:
-                                    "Aufgabenstatus",
-
-                                description:
-                                    "Offene und erledigte Aufgaben"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Planung und Abweichungen",
-
-                        description:
-                            "Reinigungspläne und Sollzeiten",
-
-                        items: [
-                            {
-                                title:
-                                    "Reinigungspläne",
-
-                                description:
-                                    "Wiederkehrende Aufgaben verwalten"
-                            },
-                            {
-                                title:
-                                    "Zeiten",
-
-                                description:
-                                    "Soll- und Istzeiten vergleichen"
-                            },
-                            {
-                                title:
-                                    "Abweichungen",
-
-                                description:
-                                    "Begründungen und Nachweise prüfen"
-                            }
-                        ]
-                    }
-                ]
-            });
-
-        case "/materials":
-
-            return renderPlaceholderPage({
-                title:
-                    "Material",
-
-                description:
-                    "Materialbestände, Mindestbestände und Nachbestellungen.",
-
-                groups: [
-                    {
-                        title:
-                            "Bestand",
-
-                        description:
-                            "Aktuelle Mengen und Warnungen",
-
-                        open:
-                            true,
-
-                        items: [
-                            {
-                                title:
-                                    "Bestände",
-
-                                description:
-                                    "Aktuelle Materialbestände"
-                            },
-                            {
-                                title:
-                                    "Mindestbestand",
-
-                                description:
-                                    "Warnwerte pro Objekt"
-                            },
-                            {
-                                title:
-                                    "Materialschrank",
-
-                                description:
-                                    "QR-Zugriff und Schrankinhalt"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Bestellung",
-
-                        description:
-                            "Fehlmengen und Nachbestellungen",
-
-                        items: [
-                            {
-                                title:
-                                    "Nachbestellung",
-
-                                description:
-                                    "Fehlendes Material melden"
-                            },
-                            {
-                                title:
-                                    "Bestellstatus",
-
-                                description:
-                                    "Offene Bestellungen verfolgen"
-                            }
-                        ]
-                    }
-                ]
-            });
-
-        case "/tickets":
-
-            return renderPlaceholderPage({
-                title:
-                    "Tickets und Meldungen",
-
-                description:
-                    "Probleme, Schäden, Kundenmeldungen und interne Nachrichten.",
-
-                groups: [
-                    {
-                        title:
-                            "Meldungen",
-
-                        description:
-                            "Neue und offene Vorgänge",
-
-                        open:
-                            true,
-
-                        items: [
-                            {
-                                title:
-                                    "Neue Meldung",
-
-                                description:
-                                    "Problem, Schaden oder Anfrage erfassen"
-                            },
-                            {
-                                title:
-                                    "Offene Tickets",
-
-                                description:
-                                    "Noch nicht abgeschlossene Vorgänge"
-                            },
-                            {
-                                title:
-                                    "Sofort-Notiz",
-
-                                description:
-                                    "Foto, Text oder Audio dokumentieren"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Kommunikation",
-
-                        description:
-                            "Nachrichten und Bearbeitung",
-
-                        items: [
-                            {
-                                title:
-                                    "Nachrichten",
-
-                                description:
-                                    "Kommunikation zwischen den Rollen"
-                            },
-                            {
-                                title:
-                                    "Verlauf",
-
-                                description:
-                                    "Abgeschlossene Meldungen anzeigen"
-                            }
-                        ]
-                    }
-                ]
-            });
-
-        case "/reports":
-
-            return renderPlaceholderPage({
-                title:
-                    "Berichte",
-
-                description:
-                    "Zeiten, Leistungen, Abweichungen und Kennzahlen.",
-
-                groups: [
-                    {
-                        title:
-                            "Arbeitszeit und Leistung",
-
-                        description:
-                            "Zeiten, Aufgaben und Qualität",
-
-                        open:
-                            true,
-
-                        items: [
-                            {
-                                title:
-                                    "Arbeitszeiten",
-
-                                description:
-                                    "Check-ins, Check-outs und Stunden"
-                            },
-                            {
-                                title:
-                                    "Leistung",
-
-                                description:
-                                    "Aufgabenstatus und Objektleistung"
-                            },
-                            {
-                                title:
-                                    "Abweichungen",
-
-                                description:
-                                    "Auffällige Zeiten und Nachweise"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Ausgabe und Export",
-
-                        description:
-                            "Berichte für interne und externe Nutzung",
-
-                        items: [
-                            {
-                                title:
-                                    "Kundenberichte",
-
-                                description:
-                                    "Freigegebene Leistungsnachweise"
-                            },
-                            {
-                                title:
-                                    "Lohnexport",
-
-                                description:
-                                    "Abrechnungsdaten vorbereiten"
-                            },
-                            {
-                                title:
-                                    "Datenexport",
-
-                                description:
-                                    "Berichte herunterladen oder übertragen"
-                            }
-                        ]
-                    }
-                ]
-            });
-
-        case "/settings":
-
-            return renderPlaceholderPage({
-                title:
+            return renderCompactSectionPage({
+                area:
                     "Einstellungen",
 
+                title:
+                    "System und Prozesse",
+
                 description:
-                    "App-, Objekt-, Benutzer- und Unternehmensoptionen.",
+                    "Unternehmen, Objekte, Rollen und Darstellung.",
+
+                color:
+                    "more",
 
                 groups: [
                     {
                         title:
-                            "Unternehmen und Design",
+                            "Unternehmen",
 
                         description:
-                            "Darstellung und Stammdaten",
+                            "Stammdaten und Design",
+
+                        color:
+                            "more",
 
                         open:
                             true,
@@ -2417,23 +3132,26 @@ function renderRoute(
                                     "Unternehmensdaten",
 
                                 description:
-                                    "Name, Kontakt und rechtliche Angaben"
+                                    "Name, Kontakt und Anbieterinformationen"
                             },
                             {
                                 title:
                                     "Design",
 
                                 description:
-                                    "Farben und Unternehmensdarstellung"
+                                    "Farben und Darstellung"
                             }
                         ]
                     },
                     {
                         title:
-                            "Objekte und Prozesse",
+                            "Prozesse",
 
                         description:
-                            "Pflichtprüfungen und Betriebsregeln",
+                            "Check-in, Check-out und Benachrichtigungen",
+
+                        color:
+                            "more",
 
                         items: [
                             {
@@ -2441,97 +3159,74 @@ function renderRoute(
                                     "Objekteinstellungen",
 
                                 description:
-                                    "Check-in, Check-out und Sicherheit"
+                                    "Pflichtprüfungen und Sicherheitsvorgaben"
                             },
                             {
                                 title:
                                     "Benachrichtigungen",
 
                                 description:
-                                    "Meldungen und Erinnerungen"
-                            },
-                            {
-                                title:
-                                    "Offline-Modus",
-
-                                description:
-                                    "Lokale Zwischenspeicherung"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Zugriff und System",
-
-                        description:
-                            "Rollen, Tarife und Datenschutz",
-
-                        items: [
-                            {
-                                title:
-                                    "Rollen und Rechte",
-
-                                description:
-                                    "Zugriffe und Freigaben"
-                            },
-                            {
-                                title:
-                                    "Tarif und Module",
-
-                                description:
-                                    "Free, Pro und Pro Plus"
-                            },
-                            {
-                                title:
-                                    "Datenschutz",
-
-                                description:
-                                    "Datenschutz und Impressum",
-
-                                route:
-                                    "/datenschutz"
+                                    "Hinweise, Warnungen und Erinnerungen"
                             }
                         ]
                     }
                 ]
             });
 
-        case "/datenschutz":
+        case ROUTES.HELP:
 
-            return renderPlaceholderPage({
+            return renderInformationPage({
+                title:
+                    "Hilfe",
+
+                description:
+                    "Hier werden Anleitungen, häufige Fragen und Kontaktmöglichkeiten bereitgestellt."
+            });
+
+        case ROUTES.PRIVACY:
+
+            return renderInformationPage({
                 title:
                     "Datenschutz",
 
                 description:
-                    "Datenschutzinformationen und Verarbeitungshinweise."
+                    "Hier werden die Datenschutzinformationen von Facility OS angezeigt."
             });
 
-        case "/impressum":
+        case ROUTES.IMPRINT:
 
-            return renderPlaceholderPage({
+            return renderInformationPage({
                 title:
                     "Impressum",
 
                 description:
-                    "Anbieter-, Unternehmens- und Kontaktinformationen."
+                    "Hier werden Anbieter-, Unternehmens- und Kontaktinformationen angezeigt."
             });
 
         default:
 
-            return renderDashboard(
+            return renderOverview(
                 state
             );
     }
 }
 
 /************************************************
- * EVENT-HELFER
+ * EVENTS
  ************************************************/
 
 function bindRouteEvents(
     appElement,
     onNavigate
 ) {
+
+    if (
+        typeof onNavigate !==
+        "function"
+    ) {
+
+        return;
+    }
 
     appElement
         .querySelectorAll(
@@ -2544,17 +3239,13 @@ function bindRouteEvents(
                     "click",
                     () => {
 
-                        const targetRoute =
+                        const route =
                             element.dataset.route;
 
-                        if (
-                            targetRoute &&
-                            typeof onNavigate ===
-                                "function"
-                        ) {
+                        if (route) {
 
                             onNavigate(
-                                targetRoute
+                                route
                             );
                         }
                     }
@@ -2563,11 +3254,11 @@ function bindRouteEvents(
         );
 }
 
-function bindActionEvents({
+function bindActionEvents(
     appElement,
     action,
     handler
-}) {
+) {
 
     if (
         typeof handler !==
@@ -2631,37 +3322,35 @@ function bindObjectSelection(
         );
 }
 
-function bindLoginForm(
-    onLogin
-) {
-
-    const loginForm =
-        document.getElementById(
-            "test-login-form"
-        );
+function bindLoginForm(onLogin) {
 
     if (
-        !loginForm ||
         typeof onLogin !==
-            "function"
+        "function"
     ) {
 
         return;
     }
 
-    loginForm.addEventListener(
+    const form =
+        document.getElementById(
+            "test-login-form"
+        );
+
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener(
         "submit",
         (event) => {
 
             event.preventDefault();
 
             const formData =
-                new FormData(
-                    loginForm
-                );
+                new FormData(form);
 
-            const loginData = {
-
+            onLogin({
                 name:
                     String(
                         formData.get(
@@ -2675,17 +3364,13 @@ function bindLoginForm(
                             "role"
                         ) ?? ""
                     ).trim()
-            };
-
-            onLogin(
-                loginData
-            );
+            });
         }
     );
 }
 
 /************************************************
- * HAUPT-RENDERFUNKTION
+ * HAUPTFUNKTION
  ************************************************/
 
 export function renderApp({
@@ -2711,30 +3396,37 @@ export function renderApp({
         );
     }
 
-    appElement.innerHTML = `
+    const loggedIn =
+        Boolean(
+            state.currentUser
+        );
 
-        <div class="app-shell">
+    appElement.innerHTML =
+        loggedIn
+            ? `
+                <div class="app-shell">
 
-            ${renderHeader(
-                state
-            )}
+                    ${renderHeader(
+                        state
+                    )}
 
-            <main class="app-content">
+                    <main class="app-content">
 
-                ${renderRoute(
-                    route,
-                    state
-                )}
+                        ${renderRoute(
+                            route,
+                            state
+                        )}
 
-            </main>
+                    </main>
 
-            ${renderNavigation(
-                state,
-                route
-            )}
+                    ${renderNavigation(
+                        state,
+                        route
+                    )}
 
-        </div>
-    `;
+                </div>
+            `
+            : renderLogin();
 
     bindRouteEvents(
         appElement,
@@ -2750,27 +3442,21 @@ export function renderApp({
         onLogin
     );
 
-    bindActionEvents({
+    bindActionEvents(
         appElement,
-        action:
-            "logout",
-        handler:
-            onLogout
-    });
+        "logout",
+        onLogout
+    );
 
-    bindActionEvents({
+    bindActionEvents(
         appElement,
-        action:
-            "checkin",
-        handler:
-            onCheckin
-    });
+        "checkin",
+        onCheckin
+    );
 
-    bindActionEvents({
+    bindActionEvents(
         appElement,
-        action:
-            "checkout",
-        handler:
-            onCheckout
-    });
+        "checkout",
+        onCheckout
+    );
 }
