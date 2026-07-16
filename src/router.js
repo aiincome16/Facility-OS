@@ -2,12 +2,12 @@
  * Facility OS
  * router.js
  *
- * Zentrale Navigation
- * - öffentliche und geschützte Routen
- * - rollenbasierte Zugriffsprüfung
- * - Browser-Historie
- * - direkte Seitenaufrufe
- * - Fallback auf sichere Standardrouten
+ * Neue Informationsarchitektur
+ * - maximal fünf Hauptbereiche je Rolle
+ * - rollenbasierte Zugriffe
+ * - Unterstützung für GitHub Pages
+ * - Browser-Navigation
+ * - automatische Weiterleitung alter Routen
  ************************************************/
 
 import {
@@ -15,7 +15,7 @@ import {
 } from "./config/appConfig.js";
 
 /************************************************
- * ROUTENDEFINITIONEN
+ * ROUTEN
  ************************************************/
 
 export const ROUTES = Object.freeze({
@@ -23,8 +23,8 @@ export const ROUTES = Object.freeze({
     LOGIN:
         "/login",
 
-    DASHBOARD:
-        "/dashboard",
+    OVERVIEW:
+        "/overview",
 
     OBJECTS:
         "/objects",
@@ -32,29 +32,63 @@ export const ROUTES = Object.freeze({
     OBJECT_DETAIL:
         "/object-detail",
 
-    EMPLOYEES:
-        "/employees",
-
     TASKS:
         "/tasks",
 
-    MATERIALS:
-        "/materials",
+    PERSONNEL:
+        "/personnel",
 
-    TICKETS:
-        "/tickets",
+    COMMUNICATION:
+        "/communication",
+
+    TIMES:
+        "/times",
+
+    ANALYSIS:
+        "/analysis",
 
     REPORTS:
         "/reports",
 
+    MORE:
+        "/more",
+
     SETTINGS:
         "/settings",
 
+    HELP:
+        "/help",
+
     PRIVACY:
-        "/datenschutz",
+        "/privacy",
 
     IMPRINT:
-        "/impressum"
+        "/imprint"
+});
+
+/************************************************
+ * ALTE ROUTEN WEITERLEITEN
+ ************************************************/
+
+const LEGACY_ROUTE_REDIRECTS = Object.freeze({
+
+    "/dashboard":
+        ROUTES.OVERVIEW,
+
+    "/employees":
+        ROUTES.PERSONNEL,
+
+    "/tickets":
+        ROUTES.COMMUNICATION,
+
+    "/materials":
+        ROUTES.OBJECTS,
+
+    "/datenschutz":
+        ROUTES.PRIVACY,
+
+    "/impressum":
+        ROUTES.IMPRINT
 });
 
 /************************************************
@@ -72,15 +106,18 @@ const PUBLIC_ROUTES = Object.freeze([
  ************************************************/
 
 const PROTECTED_ROUTES = Object.freeze([
-    ROUTES.DASHBOARD,
+    ROUTES.OVERVIEW,
     ROUTES.OBJECTS,
     ROUTES.OBJECT_DETAIL,
-    ROUTES.EMPLOYEES,
     ROUTES.TASKS,
-    ROUTES.MATERIALS,
-    ROUTES.TICKETS,
+    ROUTES.PERSONNEL,
+    ROUTES.COMMUNICATION,
+    ROUTES.TIMES,
+    ROUTES.ANALYSIS,
     ROUTES.REPORTS,
-    ROUTES.SETTINGS
+    ROUTES.MORE,
+    ROUTES.SETTINGS,
+    ROUTES.HELP
 ]);
 
 /************************************************
@@ -89,7 +126,7 @@ const PROTECTED_ROUTES = Object.freeze([
 
 const ROUTE_PERMISSIONS = Object.freeze({
 
-    [ROUTES.DASHBOARD]: [
+    [ROUTES.OVERVIEW]: [
         USER_ROLES.SUPER_ADMIN,
         USER_ROLES.ADMIN,
         USER_ROLES.OBJEKTLEITER,
@@ -116,34 +153,41 @@ const ROUTE_PERMISSIONS = Object.freeze({
         USER_ROLES.KUNDE
     ],
 
-    [ROUTES.EMPLOYEES]: [
-        USER_ROLES.SUPER_ADMIN,
-        USER_ROLES.ADMIN,
-        USER_ROLES.OBJEKTLEITER
-    ],
-
     [ROUTES.TASKS]: [
         USER_ROLES.SUPER_ADMIN,
         USER_ROLES.ADMIN,
         USER_ROLES.OBJEKTLEITER,
         USER_ROLES.MITARBEITER,
-        USER_ROLES.BUCHHALTUNG,
         USER_ROLES.KUNDE
     ],
 
-    [ROUTES.MATERIALS]: [
+    [ROUTES.PERSONNEL]: [
         USER_ROLES.SUPER_ADMIN,
         USER_ROLES.ADMIN,
-        USER_ROLES.OBJEKTLEITER,
-        USER_ROLES.MITARBEITER
+        USER_ROLES.OBJEKTLEITER
     ],
 
-    [ROUTES.TICKETS]: [
+    [ROUTES.COMMUNICATION]: [
         USER_ROLES.SUPER_ADMIN,
         USER_ROLES.ADMIN,
         USER_ROLES.OBJEKTLEITER,
         USER_ROLES.MITARBEITER,
         USER_ROLES.KUNDE
+    ],
+
+    [ROUTES.TIMES]: [
+        USER_ROLES.SUPER_ADMIN,
+        USER_ROLES.ADMIN,
+        USER_ROLES.OBJEKTLEITER,
+        USER_ROLES.MITARBEITER,
+        USER_ROLES.BUCHHALTUNG
+    ],
+
+    [ROUTES.ANALYSIS]: [
+        USER_ROLES.SUPER_ADMIN,
+        USER_ROLES.ADMIN,
+        USER_ROLES.OBJEKTLEITER,
+        USER_ROLES.BUCHHALTUNG
     ],
 
     [ROUTES.REPORTS]: [
@@ -154,37 +198,94 @@ const ROUTE_PERMISSIONS = Object.freeze({
         USER_ROLES.KUNDE
     ],
 
+    [ROUTES.MORE]: [
+        USER_ROLES.SUPER_ADMIN,
+        USER_ROLES.ADMIN,
+        USER_ROLES.OBJEKTLEITER,
+        USER_ROLES.MITARBEITER,
+        USER_ROLES.BUCHHALTUNG,
+        USER_ROLES.KUNDE
+    ],
+
     [ROUTES.SETTINGS]: [
         USER_ROLES.SUPER_ADMIN,
         USER_ROLES.ADMIN,
         USER_ROLES.OBJEKTLEITER
+    ],
+
+    [ROUTES.HELP]: [
+        USER_ROLES.SUPER_ADMIN,
+        USER_ROLES.ADMIN,
+        USER_ROLES.OBJEKTLEITER,
+        USER_ROLES.MITARBEITER,
+        USER_ROLES.BUCHHALTUNG,
+        USER_ROLES.KUNDE
     ]
 });
 
 /************************************************
- * ROUTENNORMALISIERUNG
+ * ROUTER-STATUS
  ************************************************/
 
-function normalizeRoute(route) {
+let currentRoute =
+    ROUTES.OVERVIEW;
 
-    const rawRoute =
-        String(route ?? "")
-            .trim();
+let routeChangeHandler =
+    null;
 
-    if (!rawRoute) {
-        return ROUTES.DASHBOARD;
-    }
+let routerStarted =
+    false;
+
+let routerContext = {
+
+    currentUser:
+        null,
+
+    currentObject:
+        null
+};
+
+/************************************************
+ * BASISHELFER
+ ************************************************/
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .trim();
+}
+
+function getRole(user) {
+
+    return normalizeText(
+        user?.role
+    ).toUpperCase();
+}
+
+/************************************************
+ * ROUTE NORMALISIEREN
+ ************************************************/
+
+export function normalizeRoute(route) {
 
     let normalizedRoute =
-        rawRoute;
+        normalizeText(route);
 
-    if (
-        normalizedRoute.startsWith(
-            window.location.origin
-        )
-    ) {
+    if (!normalizedRoute) {
 
-        try {
+        return ROUTES.OVERVIEW;
+    }
+
+    try {
+
+        if (
+            normalizedRoute.startsWith(
+                "http://"
+            ) ||
+            normalizedRoute.startsWith(
+                "https://"
+            )
+        ) {
 
             const url =
                 new URL(
@@ -192,19 +293,27 @@ function normalizeRoute(route) {
                 );
 
             normalizedRoute =
+                url.searchParams.get(
+                    "route"
+                ) ??
+                url.hash.replace(
+                    /^#/,
+                    ""
+                ) ??
                 url.pathname;
         }
-        catch {
+    }
+    catch {
 
-            normalizedRoute =
-                ROUTES.DASHBOARD;
-        }
+        normalizedRoute =
+            ROUTES.OVERVIEW;
     }
 
     normalizedRoute =
         normalizedRoute
             .split("?")[0]
-            .split("#")[0];
+            .split("#")[0]
+            .trim();
 
     if (
         !normalizedRoute.startsWith("/")
@@ -232,7 +341,12 @@ function normalizeRoute(route) {
             );
     }
 
-    return normalizedRoute;
+    return (
+        LEGACY_ROUTE_REDIRECTS[
+            normalizedRoute
+        ] ??
+        normalizedRoute
+    );
 }
 
 /************************************************
@@ -266,6 +380,10 @@ export function isProtectedRoute(route) {
     );
 }
 
+/************************************************
+ * ZUGRIFFSPRÜFUNG
+ ************************************************/
+
 export function canAccessRoute(
     route,
     currentUser
@@ -284,8 +402,7 @@ export function canAccessRoute(
     }
 
     if (
-        !currentUser ||
-        !currentUser.role
+        !currentUser
     ) {
 
         return false;
@@ -306,12 +423,14 @@ export function canAccessRoute(
     }
 
     return allowedRoles.includes(
-        currentUser.role
+        getRole(
+            currentUser
+        )
     );
 }
 
 /************************************************
- * STANDARDROUTE PRO ROLLE
+ * STANDARDROUTE
  ************************************************/
 
 export function getDefaultRouteForUser(
@@ -319,160 +438,493 @@ export function getDefaultRouteForUser(
 ) {
 
     if (!currentUser) {
+
         return ROUTES.LOGIN;
     }
 
-    switch (
-        currentUser.role
-    ) {
-
-        case USER_ROLES.SUPER_ADMIN:
-        case USER_ROLES.ADMIN:
-        case USER_ROLES.OBJEKTLEITER:
-        case USER_ROLES.MITARBEITER:
-        case USER_ROLES.BUCHHALTUNG:
-        case USER_ROLES.KUNDE:
-
-            return ROUTES.DASHBOARD;
-
-        default:
-
-            return ROUTES.LOGIN;
-    }
+    return ROUTES.OVERVIEW;
 }
 
 /************************************************
- * ROUTE AUS URL LESEN
+ * HAUPTNAVIGATION PRO ROLLE
  ************************************************/
 
-export function getRouteFromLocation() {
+export function getMainNavigationForRole(role) {
 
-    const url =
-        new URL(
-            window.location.href
-        );
+    const normalizedRole =
+        normalizeText(role)
+            .toUpperCase();
 
-    const routeParameter =
-        url.searchParams.get(
-            "route"
-        );
+    const navigationByRole = {
 
-    if (routeParameter) {
+        [USER_ROLES.SUPER_ADMIN]: [
+            {
+                id:
+                    "overview",
 
-        return normalizeRoute(
-            routeParameter
-        );
-    }
+                label:
+                    "Übersicht",
 
-    const hash =
-        String(
-            window.location.hash ?? ""
-        ).trim();
+                route:
+                    ROUTES.OVERVIEW,
 
-    if (
-        hash.startsWith("#/")
-    ) {
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "objects",
 
-        return normalizeRoute(
-            hash.slice(1)
-        );
-    }
+                label:
+                    "Objekte",
 
-    const pathname =
-        normalizeRoute(
-            window.location.pathname
-        );
+                route:
+                    ROUTES.OBJECTS,
 
-    const repositoryBasePath =
-        getRepositoryBasePath();
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "personnel",
 
-    if (
-        repositoryBasePath !== "/" &&
-        pathname.startsWith(
-            repositoryBasePath
-        )
-    ) {
+                label:
+                    "Personal",
 
-        const relativePath =
-            pathname.slice(
-                repositoryBasePath.length
-            );
+                route:
+                    ROUTES.PERSONNEL,
 
-        if (
-            relativePath &&
-            relativePath !== "/"
-        ) {
+                color:
+                    "personnel"
+            },
+            {
+                id:
+                    "communication",
 
-            return normalizeRoute(
-                relativePath
-            );
-        }
-    }
+                label:
+                    "Kommunikation",
 
-    return ROUTES.DASHBOARD;
+                route:
+                    ROUTES.COMMUNICATION,
+
+                color:
+                    "communication"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ],
+
+        [USER_ROLES.ADMIN]: [
+            {
+                id:
+                    "overview",
+
+                label:
+                    "Übersicht",
+
+                route:
+                    ROUTES.OVERVIEW,
+
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "objects",
+
+                label:
+                    "Objekte",
+
+                route:
+                    ROUTES.OBJECTS,
+
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "personnel",
+
+                label:
+                    "Personal",
+
+                route:
+                    ROUTES.PERSONNEL,
+
+                color:
+                    "personnel"
+            },
+            {
+                id:
+                    "communication",
+
+                label:
+                    "Kommunikation",
+
+                route:
+                    ROUTES.COMMUNICATION,
+
+                color:
+                    "communication"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ],
+
+        [USER_ROLES.OBJEKTLEITER]: [
+            {
+                id:
+                    "overview",
+
+                label:
+                    "Übersicht",
+
+                route:
+                    ROUTES.OVERVIEW,
+
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "objects",
+
+                label:
+                    "Objekte",
+
+                route:
+                    ROUTES.OBJECTS,
+
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "personnel",
+
+                label:
+                    "Personal",
+
+                route:
+                    ROUTES.PERSONNEL,
+
+                color:
+                    "personnel"
+            },
+            {
+                id:
+                    "communication",
+
+                label:
+                    "Kommunikation",
+
+                route:
+                    ROUTES.COMMUNICATION,
+
+                color:
+                    "communication"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ],
+
+        [USER_ROLES.MITARBEITER]: [
+            {
+                id:
+                    "overview",
+
+                label:
+                    "Übersicht",
+
+                route:
+                    ROUTES.OVERVIEW,
+
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "object",
+
+                label:
+                    "Objekt",
+
+                route:
+                    ROUTES.OBJECTS,
+
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "tasks",
+
+                label:
+                    "Aufgaben",
+
+                route:
+                    ROUTES.TASKS,
+
+                color:
+                    "tasks"
+            },
+            {
+                id:
+                    "communication",
+
+                label:
+                    "Meldungen",
+
+                route:
+                    ROUTES.COMMUNICATION,
+
+                color:
+                    "communication"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ],
+
+        [USER_ROLES.BUCHHALTUNG]: [
+            {
+                id:
+                    "overview",
+
+                label:
+                    "Übersicht",
+
+                route:
+                    ROUTES.OVERVIEW,
+
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "times",
+
+                label:
+                    "Zeiten",
+
+                route:
+                    ROUTES.TIMES,
+
+                color:
+                    "times"
+            },
+            {
+                id:
+                    "objects",
+
+                label:
+                    "Objekte",
+
+                route:
+                    ROUTES.OBJECTS,
+
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "analysis",
+
+                label:
+                    "Auswertung",
+
+                route:
+                    ROUTES.ANALYSIS,
+
+                color:
+                    "analysis"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ],
+
+        [USER_ROLES.KUNDE]: [
+            {
+                id:
+                    "overview",
+
+                label:
+                    "Übersicht",
+
+                route:
+                    ROUTES.OVERVIEW,
+
+                color:
+                    "overview"
+            },
+            {
+                id:
+                    "objects",
+
+                label:
+                    "Objekte",
+
+                route:
+                    ROUTES.OBJECTS,
+
+                color:
+                    "objects"
+            },
+            {
+                id:
+                    "communication",
+
+                label:
+                    "Meldungen",
+
+                route:
+                    ROUTES.COMMUNICATION,
+
+                color:
+                    "communication"
+            },
+            {
+                id:
+                    "reports",
+
+                label:
+                    "Berichte",
+
+                route:
+                    ROUTES.REPORTS,
+
+                color:
+                    "reports"
+            },
+            {
+                id:
+                    "more",
+
+                label:
+                    "Mehr",
+
+                route:
+                    ROUTES.MORE,
+
+                color:
+                    "more"
+            }
+        ]
+    };
+
+    return (
+        navigationByRole[
+            normalizedRole
+        ] ??
+        []
+    );
 }
 
 /************************************************
- * GITHUB-PAGES-BASISPFAD
+ * AKTIVEN HAUPTBEREICH ERMITTELN
  ************************************************/
 
-function getRepositoryBasePath() {
-
-    const pathname =
-        window.location.pathname;
-
-    const segments =
-        pathname
-            .split("/")
-            .filter(Boolean);
-
-    if (
-        window.location.hostname.endsWith(
-            "github.io"
-        ) &&
-        segments.length > 0
-    ) {
-
-        return `/${segments[0]}/`;
-    }
-
-    return "/";
-}
-
-/************************************************
- * URL ERZEUGEN
- ************************************************/
-
-function createRouteUrl(route) {
+export function getActiveMainRoute(
+    route,
+    role
+) {
 
     const normalizedRoute =
         normalizeRoute(route);
 
-    const url =
-        new URL(
-            window.location.href
+    if (
+        normalizedRoute ===
+        ROUTES.OBJECT_DETAIL
+    ) {
+
+        return ROUTES.OBJECTS;
+    }
+
+    if (
+        normalizedRoute ===
+        ROUTES.SETTINGS ||
+        normalizedRoute ===
+        ROUTES.HELP ||
+        normalizedRoute ===
+        ROUTES.PRIVACY ||
+        normalizedRoute ===
+        ROUTES.IMPRINT
+    ) {
+
+        return ROUTES.MORE;
+    }
+
+    const navigationItems =
+        getMainNavigationForRole(
+            role
         );
 
-    url.searchParams.set(
-        "route",
+    const directMatch =
+        navigationItems.find(
+            (item) =>
+                item.route ===
+                normalizedRoute
+        );
+
+    return (
+        directMatch?.route ??
         normalizedRoute
     );
-
-    url.hash =
-        normalizedRoute;
-
-    return url;
 }
-
-/************************************************
- * ROUTER-STATUS
- ************************************************/
-
-let currentRoute =
-    ROUTES.DASHBOARD;
-
-let routeChangeHandler =
-    null;
 
 /************************************************
  * ROUTE AUFLÖSEN
@@ -549,17 +1001,178 @@ export function resolveRoute({
 }
 
 /************************************************
- * NAVIGATION
+ * GITHUB-PAGES-BASISPFAD
+ ************************************************/
+
+function getRepositoryBasePath() {
+
+    const pathname =
+        window.location.pathname;
+
+    const segments =
+        pathname
+            .split("/")
+            .filter(Boolean);
+
+    if (
+        window.location.hostname.endsWith(
+            "github.io"
+        ) &&
+        segments.length > 0
+    ) {
+
+        return `/${segments[0]}/`;
+    }
+
+    return "/";
+}
+
+/************************************************
+ * ROUTE AUS URL
+ ************************************************/
+
+export function getRouteFromLocation() {
+
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    const routeParameter =
+        url.searchParams.get(
+            "route"
+        );
+
+    if (routeParameter) {
+
+        return normalizeRoute(
+            routeParameter
+        );
+    }
+
+    const hash =
+        normalizeText(
+            window.location.hash
+        );
+
+    if (
+        hash.startsWith("#/")
+    ) {
+
+        return normalizeRoute(
+            hash.slice(1)
+        );
+    }
+
+    const repositoryBasePath =
+        getRepositoryBasePath();
+
+    const pathname =
+        window.location.pathname;
+
+    if (
+        repositoryBasePath !== "/" &&
+        pathname.startsWith(
+            repositoryBasePath
+        )
+    ) {
+
+        const relativePath =
+            pathname.slice(
+                repositoryBasePath.length
+            );
+
+        if (
+            relativePath
+        ) {
+
+            return normalizeRoute(
+                relativePath
+            );
+        }
+    }
+
+    return ROUTES.OVERVIEW;
+}
+
+/************************************************
+ * ROUTEN-URL ERZEUGEN
+ ************************************************/
+
+function createRouteUrl(route) {
+
+    const normalizedRoute =
+        normalizeRoute(route);
+
+    const url =
+        new URL(
+            window.location.href
+        );
+
+    url.searchParams.set(
+        "route",
+        normalizedRoute
+    );
+
+    url.hash =
+        normalizedRoute;
+
+    return url;
+}
+
+/************************************************
+ * ROUTER-KONTEXT
+ ************************************************/
+
+function setRouterContext({
+    currentUser = null,
+    currentObject = null
+} = {}) {
+
+    routerContext = {
+
+        currentUser,
+
+        currentObject
+    };
+}
+
+/************************************************
+ * ROUTENWECHSEL MELDEN
+ ************************************************/
+
+function emitRouteChange(route) {
+
+    if (
+        typeof routeChangeHandler ===
+        "function"
+    ) {
+
+        routeChangeHandler(
+            route
+        );
+    }
+}
+
+/************************************************
+ * NAVIGIEREN
  ************************************************/
 
 export function navigateTo(
     route,
     {
         replace = false,
-        currentUser = null,
-        currentObject = null
+        currentUser =
+            routerContext.currentUser,
+        currentObject =
+            routerContext.currentObject
     } = {}
 ) {
+
+    setRouterContext({
+        currentUser,
+        currentObject
+    });
 
     const resolvedRoute =
         resolveRoute({
@@ -574,12 +1187,13 @@ export function navigateTo(
     currentRoute =
         resolvedRoute;
 
-    const targetUrl =
+    const url =
         createRouteUrl(
             resolvedRoute
         );
 
-    const state = {
+    const historyState = {
+
         route:
             resolvedRoute
     };
@@ -587,42 +1201,41 @@ export function navigateTo(
     if (replace) {
 
         window.history.replaceState(
-            state,
+            historyState,
             "",
-            targetUrl
+            url
         );
     }
     else {
 
         window.history.pushState(
-            state,
+            historyState,
             "",
-            targetUrl
+            url
         );
     }
 
-    if (
-        typeof routeChangeHandler ===
-            "function"
-    ) {
-
-        routeChangeHandler(
-            resolvedRoute
-        );
-    }
+    emitRouteChange(
+        resolvedRoute
+    );
 
     return resolvedRoute;
 }
 
 /************************************************
- * ROUTER STARTEN
+ * ROUTER INITIALISIEREN
  ************************************************/
 
 export function initializeRouter({
     currentUser = null,
     currentObject = null,
-    onRouteChange
+    onRouteChange = null
 } = {}) {
+
+    setRouterContext({
+        currentUser,
+        currentObject
+    });
 
     routeChangeHandler =
         typeof onRouteChange ===
@@ -643,63 +1256,67 @@ export function initializeRouter({
     currentRoute =
         initialRoute;
 
-    const initialUrl =
-        createRouteUrl(
-            initialRoute
-        );
-
     window.history.replaceState(
         {
             route:
                 initialRoute
         },
         "",
-        initialUrl
+        createRouteUrl(
+            initialRoute
+        )
     );
 
-    window.addEventListener(
-        "popstate",
-        (event) => {
+    if (!routerStarted) {
 
-            const requestedRoute =
-                event.state?.route ??
-                getRouteFromLocation();
+        window.addEventListener(
+            "popstate",
+            (event) => {
 
-            const resolvedRoute =
-                resolveRoute({
-                    requestedRoute,
+                const requestedRoute =
+                    event.state?.route ??
+                    getRouteFromLocation();
 
-                    currentUser,
+                const resolvedRoute =
+                    resolveRoute({
+                        requestedRoute,
 
-                    currentObject
-                });
+                        currentUser:
+                            routerContext.currentUser,
 
-            currentRoute =
-                resolvedRoute;
+                        currentObject:
+                            routerContext.currentObject
+                    });
 
-            if (
-                typeof routeChangeHandler ===
-                    "function"
-            ) {
+                currentRoute =
+                    resolvedRoute;
 
-                routeChangeHandler(
+                emitRouteChange(
                     resolvedRoute
                 );
             }
-        }
-    );
+        );
+
+        routerStarted =
+            true;
+    }
 
     return initialRoute;
 }
 
 /************************************************
- * ROUTER AKTUALISIEREN
+ * ROUTER-KONTEXT AKTUALISIEREN
  ************************************************/
 
 export function updateRouterContext({
     currentUser = null,
     currentObject = null
 } = {}) {
+
+    setRouterContext({
+        currentUser,
+        currentObject
+    });
 
     const resolvedRoute =
         resolveRoute({
@@ -719,36 +1336,27 @@ export function updateRouterContext({
         currentRoute =
             resolvedRoute;
 
-        const targetUrl =
-            createRouteUrl(
-                resolvedRoute
-            );
-
         window.history.replaceState(
             {
                 route:
                     resolvedRoute
             },
             "",
-            targetUrl
+            createRouteUrl(
+                resolvedRoute
+            )
         );
 
-        if (
-            typeof routeChangeHandler ===
-                "function"
-        ) {
-
-            routeChangeHandler(
-                resolvedRoute
-            );
-        }
+        emitRouteChange(
+            resolvedRoute
+        );
     }
 
     return currentRoute;
 }
 
 /************************************************
- * ROUTER AUSLESEN
+ * AKTUELLE ROUTE
  ************************************************/
 
 export function getCurrentRoute() {
@@ -763,8 +1371,17 @@ export function getCurrentRoute() {
 export function resetRouter() {
 
     currentRoute =
-        ROUTES.DASHBOARD;
+        ROUTES.OVERVIEW;
 
     routeChangeHandler =
         null;
+
+    routerContext = {
+
+        currentUser:
+            null,
+
+        currentObject:
+            null
+    };
 }
