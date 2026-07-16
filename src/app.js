@@ -3,14 +3,13 @@
  * app.js
  *
  * Zentrale Anwendungssteuerung
- * - lokale JSON-Daten laden
+ * - lokale Daten laden
  * - App-State initialisieren
- * - Sitzung wiederherstellen
  * - Router steuern
  * - Login und Logout
  * - Objektauswahl
  * - Check-in und Check-out
- * - Lade- und Fehleranzeige
+ * - Fehleranzeige
  * - vorbereitet für spätere API-/Sheets-Anbindung
  ************************************************/
 
@@ -46,236 +45,10 @@ let routerInitialized =
     false;
 
 let currentRoute =
-    ROUTES.DASHBOARD;
+    ROUTES.OVERVIEW;
 
 /************************************************
- * BASISHELFER
- ************************************************/
-
-function asArray(value) {
-
-    return Array.isArray(value)
-        ? value
-        : [];
-}
-
-function asObject(value) {
-
-    return (
-        value &&
-        typeof value === "object" &&
-        !Array.isArray(value)
-    )
-        ? value
-        : {};
-}
-
-function normalizeRole(value) {
-
-    return String(value ?? "")
-        .trim()
-        .toUpperCase();
-}
-
-function normalizeText(value) {
-
-    return String(value ?? "")
-        .trim();
-}
-
-function getState() {
-
-    if (
-        typeof AppState.getAppState !==
-        "function"
-    ) {
-
-        throw new Error(
-            "getAppState() wurde in appState.js nicht gefunden."
-        );
-    }
-
-    return AppState.getAppState();
-}
-
-function getAppElement() {
-
-    return document.getElementById(
-        "app"
-    );
-}
-
-/************************************************
- * SICHERE STATE-AKTUALISIERUNG
- ************************************************/
-
-function updateState(partialState) {
-
-    const stateUpdate =
-        asObject(partialState);
-
-    if (
-        typeof AppState.updateAppState ===
-        "function"
-    ) {
-
-        AppState.updateAppState(
-            stateUpdate
-        );
-
-        return;
-    }
-
-    const currentState =
-        getState();
-
-    Object.assign(
-        currentState,
-        stateUpdate
-    );
-}
-
-function setLoadingState(value) {
-
-    if (
-        typeof AppState.setLoading ===
-        "function"
-    ) {
-
-        AppState.setLoading(
-            value === true
-        );
-
-        return;
-    }
-
-    updateState({
-        loading:
-            value === true
-    });
-}
-
-function setErrorState(error) {
-
-    const normalizedError =
-        error
-            ? (
-                error instanceof Error
-                    ? error.message
-                    : String(error)
-            )
-            : null;
-
-    if (
-        typeof AppState.setError ===
-        "function"
-    ) {
-
-        AppState.setError(
-            normalizedError
-        );
-
-        return;
-    }
-
-    updateState({
-        error:
-            normalizedError
-    });
-}
-
-function setRouteState(route) {
-
-    currentRoute =
-        route;
-
-    if (
-        typeof AppState.setCurrentRoute ===
-        "function"
-    ) {
-
-        AppState.setCurrentRoute(
-            route
-        );
-
-        return;
-    }
-
-    updateState({
-        currentRoute:
-            route
-    });
-}
-
-function setUserState(user) {
-
-    if (
-        typeof AppState.setCurrentUser ===
-        "function"
-    ) {
-
-        AppState.setCurrentUser(
-            user
-        );
-
-        return;
-    }
-
-    updateState({
-        currentUser:
-            user
-    });
-}
-
-function setObjectState(object) {
-
-    if (
-        typeof AppState.setCurrentObject ===
-        "function"
-    ) {
-
-        AppState.setCurrentObject(
-            object
-        );
-
-        return;
-    }
-
-    updateState({
-        currentObject:
-            object
-    });
-}
-
-function clearUserState() {
-
-    if (
-        typeof AppState.logoutCurrentUser ===
-        "function"
-    ) {
-
-        AppState.logoutCurrentUser();
-
-        return;
-    }
-
-    updateState({
-        currentUser:
-            null,
-
-        currentObject:
-            null,
-
-        currentShift:
-            null,
-
-        shiftStarted:
-            false
-    });
-}
-
-/************************************************
- * DATENSTRUKTUR
+ * DATENSAMMLUNGEN
  ************************************************/
 
 const DATA_COLLECTION_NAMES =
@@ -306,12 +79,314 @@ const DATA_COLLECTION_NAMES =
         "workOrders"
     ]);
 
+const REQUIRED_COLLECTION_NAMES =
+    Object.freeze([
+        "users",
+        "objects",
+        "rooms",
+        "tasks",
+        "materials",
+        "shifts",
+        "tickets"
+    ]);
+
+/************************************************
+ * BASISHELFER
+ ************************************************/
+
+function asArray(value) {
+
+    return Array.isArray(value)
+        ? value
+        : [];
+}
+
+function asObject(value) {
+
+    return (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    )
+        ? value
+        : {};
+}
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .trim();
+}
+
+function normalizeRole(value) {
+
+    return normalizeText(value)
+        .toUpperCase();
+}
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function createLocalId(prefix) {
+
+    const normalizedPrefix =
+        normalizeText(prefix)
+            .toUpperCase() ||
+        "ENTRY";
+
+    const randomPart =
+        Math.random()
+            .toString(36)
+            .slice(2, 8)
+            .toUpperCase();
+
+    return `${normalizedPrefix}-${Date.now()}-${randomPart}`;
+}
+
+/************************************************
+ * APP-ELEMENT
+ ************************************************/
+
+function getAppElement() {
+
+    return document.getElementById(
+        "app"
+    );
+}
+
+/************************************************
+ * STATE AUSLESEN
+ ************************************************/
+
+function getState() {
+
+    if (
+        typeof AppState.getAppState !==
+        "function"
+    ) {
+
+        throw new Error(
+            "getAppState() wurde in appState.js nicht gefunden."
+        );
+    }
+
+    return AppState.getAppState();
+}
+
+/************************************************
+ * STATE AKTUALISIEREN
+ ************************************************/
+
+function updateState(
+    partialState,
+    options = {}
+) {
+
+    const update =
+        asObject(
+            partialState
+        );
+
+    if (
+        typeof AppState.updateAppState ===
+        "function"
+    ) {
+
+        AppState.updateAppState(
+            update,
+            options
+        );
+
+        return;
+    }
+
+    Object.assign(
+        getState(),
+        update
+    );
+}
+
+function setLoadingState(value) {
+
+    if (
+        typeof AppState.setLoading ===
+        "function"
+    ) {
+
+        AppState.setLoading(
+            value === true
+        );
+
+        return;
+    }
+
+    updateState({
+        loading:
+            value === true
+    });
+}
+
+function setErrorState(error) {
+
+    const message =
+        error
+            ? (
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            )
+            : null;
+
+    if (
+        typeof AppState.setError ===
+        "function"
+    ) {
+
+        AppState.setError(
+            message
+        );
+
+        return;
+    }
+
+    updateState({
+        error:
+            message
+    });
+}
+
+function setRouteState(route) {
+
+    const normalizedRoute =
+        normalizeText(route) ||
+        ROUTES.OVERVIEW;
+
+    currentRoute =
+        normalizedRoute;
+
+    if (
+        typeof AppState.setCurrentRoute ===
+        "function"
+    ) {
+
+        AppState.setCurrentRoute(
+            normalizedRoute
+        );
+
+        return;
+    }
+
+    updateState({
+        currentRoute:
+            normalizedRoute
+    });
+}
+
+function setUserState(user) {
+
+    if (
+        typeof AppState.setCurrentUser ===
+        "function"
+    ) {
+
+        AppState.setCurrentUser(
+            user
+        );
+
+        return;
+    }
+
+    updateState(
+        {
+            currentUser:
+                user
+        },
+        {
+            persist:
+                true
+        }
+    );
+}
+
+function setObjectState(object) {
+
+    if (
+        typeof AppState.setCurrentObject ===
+        "function"
+    ) {
+
+        AppState.setCurrentObject(
+            object
+        );
+
+        return;
+    }
+
+    updateState(
+        {
+            currentObject:
+                object
+        },
+        {
+            persist:
+                true
+        }
+    );
+}
+
+function clearSessionState() {
+
+    if (
+        typeof AppState.logoutCurrentUser ===
+        "function"
+    ) {
+
+        AppState.logoutCurrentUser();
+
+        return;
+    }
+
+    updateState(
+        {
+            currentUser:
+                null,
+
+            currentObject:
+                null,
+
+            currentShift:
+                null,
+
+            shiftStarted:
+                false,
+
+            currentRoute:
+                ROUTES.LOGIN
+        },
+        {
+            persist:
+                true
+        }
+    );
+}
+
+/************************************************
+ * DATEN NORMALISIEREN
+ ************************************************/
+
 function normalizeLoadedData(result) {
 
     const resultObject =
         asObject(result);
 
-    const possibleDataObject =
+    const source =
         asObject(
             resultObject.data ??
             resultObject.collections ??
@@ -328,7 +403,7 @@ function normalizeLoadedData(result) {
                 collectionName
             ] =
                 asArray(
-                    possibleDataObject[
+                    source[
                         collectionName
                     ]
                 );
@@ -338,48 +413,14 @@ function normalizeLoadedData(result) {
     return normalizedData;
 }
 
-function applyLoadedData(data) {
-
-    const normalizedData =
-        normalizeLoadedData(data);
-
-    if (
-        typeof AppState.setDataCollections ===
-        "function"
-    ) {
-
-        AppState.setDataCollections(
-            normalizedData
-        );
-
-        return normalizedData;
-    }
-
-    updateState(
-        normalizedData
-    );
-
-    return normalizedData;
-}
-
 /************************************************
- * DATENVALIDIERUNG
+ * DATEN PRÜFEN
  ************************************************/
 
 function validateRequiredData(data) {
 
-    const requiredCollections = [
-        "users",
-        "objects",
-        "rooms",
-        "tasks",
-        "materials",
-        "shifts",
-        "tickets"
-    ];
-
     const missingCollections =
-        requiredCollections.filter(
+        REQUIRED_COLLECTION_NAMES.filter(
             (collectionName) =>
                 !Array.isArray(
                     data[
@@ -430,13 +471,10 @@ function validateDataRelations(data) {
 
     try {
 
-        const validationResult =
+        return asArray(
             DataService.validateDataRelations(
                 data
-            );
-
-        return asArray(
-            validationResult
+            )
         );
     }
     catch (error) {
@@ -448,6 +486,37 @@ function validateDataRelations(data) {
 
         return [];
     }
+}
+
+/************************************************
+ * DATEN IN STATE ÜBERNEHMEN
+ ************************************************/
+
+function applyLoadedData(data) {
+
+    if (
+        typeof AppState.setDataCollections ===
+        "function"
+    ) {
+
+        AppState.setDataCollections(
+            data,
+            {
+                notify:
+                    false
+            }
+        );
+
+        return;
+    }
+
+    updateState(
+        data,
+        {
+            notify:
+                false
+        }
+    );
 }
 
 /************************************************
@@ -556,7 +625,7 @@ function renderFatalError(error) {
         return;
     }
 
-    const errorMessage =
+    const message =
         error instanceof Error
             ? error.message
             : String(
@@ -574,11 +643,11 @@ function renderFatalError(error) {
                 </span>
 
                 <h1>
-                    Daten konnten nicht geladen werden
+                    Facility OS konnte nicht gestartet werden
                 </h1>
 
                 <p>
-                    ${escapeHtml(errorMessage)}
+                    ${escapeHtml(message)}
                 </p>
 
                 <button
@@ -589,41 +658,64 @@ function renderFatalError(error) {
                     Erneut laden
                 </button>
 
+                <button
+                    type="button"
+                    class="button button-secondary button-full"
+                    id="reset-application"
+                >
+                    Sitzung zurücksetzen
+                </button>
+
             </section>
 
         </main>
     `;
 
-    const reloadButton =
-        document.getElementById(
+    document
+        .getElementById(
             "reload-application"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+
+                window.location.reload();
+            }
         );
 
-    reloadButton?.addEventListener(
-        "click",
-        () => {
+    document
+        .getElementById(
+            "reset-application"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
 
-            window.location.reload();
-        }
-    );
+                try {
+
+                    if (
+                        typeof AppState.resetApp ===
+                        "function"
+                    ) {
+
+                        AppState.resetApp();
+                    }
+                    else {
+
+                        window.localStorage.clear();
+                    }
+                }
+                finally {
+
+                    window.location.href =
+                        window.location.pathname;
+                }
+            }
+        );
 }
 
 /************************************************
- * HTML-SICHERHEIT FÜR SYSTEMANSICHTEN
- ************************************************/
-
-function escapeHtml(value) {
-
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-/************************************************
- * BENUTZER SUCHEN
+ * BENUTZER FÜR TEST-LOGIN FINDEN
  ************************************************/
 
 function findUserForLogin({
@@ -634,32 +726,23 @@ function findUserForLogin({
     const state =
         getState();
 
-    const users =
-        asArray(
-            state.users
-        );
-
-    const normalizedRole =
-        normalizeRole(role);
-
     const normalizedName =
         normalizeText(name)
             .toLowerCase();
 
-    const activeUsers =
-        users.filter(
-            (user) =>
-                user.active !== false
-        );
+    const normalizedRole =
+        normalizeRole(role);
 
-    const exactNameAndRoleMatch =
+    const activeUsers =
+        asArray(state.users)
+            .filter(
+                (user) =>
+                    user.active !== false
+            );
+
+    const exactMatch =
         activeUsers.find(
             (user) => {
-
-                const userRole =
-                    normalizeRole(
-                        user.role
-                    );
 
                 const userName =
                     normalizeText(
@@ -668,7 +751,9 @@ function findUserForLogin({
                     ).toLowerCase();
 
                 return (
-                    userRole ===
+                    normalizeRole(
+                        user.role
+                    ) ===
                         normalizedRole &&
                     userName ===
                         normalizedName
@@ -676,26 +761,20 @@ function findUserForLogin({
             }
         );
 
-    if (exactNameAndRoleMatch) {
-
-        return exactNameAndRoleMatch;
+    if (exactMatch) {
+        return exactMatch;
     }
 
-    const roleMatch =
+    return (
         activeUsers.find(
             (user) =>
                 normalizeRole(
                     user.role
                 ) ===
                 normalizedRole
-        );
-
-    if (roleMatch) {
-
-        return roleMatch;
-    }
-
-    return null;
+        ) ??
+        null
+    );
 }
 
 function createFallbackTestUser({
@@ -712,7 +791,10 @@ function createFallbackTestUser({
 
     return {
         id:
-            `TEST-${normalizedRole || "USER"}`,
+            createLocalId(
+                normalizedRole ||
+                "USER"
+            ),
 
         name:
             normalizedName,
@@ -727,7 +809,10 @@ function createFallbackTestUser({
             true,
 
         assignedObjectIds:
-            []
+            [],
+
+        source:
+            "LOCAL_TEST"
     };
 }
 
@@ -743,6 +828,9 @@ function getObjectsForUser(user) {
     const objects =
         asArray(
             state.objects
+        ).filter(
+            (object) =>
+                object.active !== false
         );
 
     if (!user) {
@@ -837,24 +925,21 @@ function getObjectsForUser(user) {
                         access.objectId
                 );
 
-        const customerObjects =
-            objects.filter(
-                (object) =>
-                    allowedObjectIds.includes(
-                        object.id
-                    ) ||
-                    object.customerUserId ===
-                        user.id
-            );
-
-        return customerObjects;
+        return objects.filter(
+            (object) =>
+                allowedObjectIds.includes(
+                    object.id
+                ) ||
+                object.customerUserId ===
+                    user.id
+        );
     }
 
     return [];
 }
 
 /************************************************
- * AKTUELLES OBJEKT PRÜFEN
+ * AKTUELLES OBJEKT ABGLEICHEN
  ************************************************/
 
 function validateCurrentObject() {
@@ -862,30 +947,21 @@ function validateCurrentObject() {
     const state =
         getState();
 
-    const currentUser =
-        state.currentUser;
-
-    const currentObject =
-        state.currentObject;
-
     if (
-        !currentUser ||
-        !currentObject
+        !state.currentUser ||
+        !state.currentObject
     ) {
 
         return null;
     }
 
-    const visibleObjects =
-        getObjectsForUser(
-            currentUser
-        );
-
     const validObject =
-        visibleObjects.find(
+        getObjectsForUser(
+            state.currentUser
+        ).find(
             (object) =>
                 object.id ===
-                currentObject.id
+                state.currentObject.id
         );
 
     if (!validObject) {
@@ -899,7 +975,7 @@ function validateCurrentObject() {
 
     if (
         validObject !==
-        currentObject
+        state.currentObject
     ) {
 
         setObjectState(
@@ -917,7 +993,7 @@ function validateCurrentObject() {
 function synchronizeRouterContext() {
 
     if (!routerInitialized) {
-        return;
+        return currentRoute;
     }
 
     const state =
@@ -938,6 +1014,8 @@ function synchronizeRouterContext() {
             resolvedRoute
         );
     }
+
+    return resolvedRoute;
 }
 
 /************************************************
@@ -964,8 +1042,6 @@ function handleNavigate(route) {
     setRouteState(
         resolvedRoute
     );
-
-    renderCurrentApp();
 }
 
 /************************************************
@@ -1041,7 +1117,7 @@ function handleLogin(loginData) {
     synchronizeRouterContext();
 
     handleNavigate(
-        ROUTES.DASHBOARD
+        ROUTES.OVERVIEW
     );
 }
 
@@ -1051,7 +1127,7 @@ function handleLogin(loginData) {
 
 function handleLogout() {
 
-    clearUserState();
+    clearSessionState();
 
     synchronizeRouterContext();
 
@@ -1073,8 +1149,6 @@ function handleLogout() {
     setRouteState(
         resolvedRoute
     );
-
-    renderCurrentApp();
 }
 
 /************************************************
@@ -1100,16 +1174,10 @@ function handleSelectObject(objectId) {
     const state =
         getState();
 
-    const currentUser =
-        state.currentUser;
-
-    const visibleObjects =
-        getObjectsForUser(
-            currentUser
-        );
-
     const selectedObject =
-        visibleObjects.find(
+        getObjectsForUser(
+            state.currentUser
+        ).find(
             (object) =>
                 object.id ===
                 normalizedObjectId
@@ -1118,7 +1186,7 @@ function handleSelectObject(objectId) {
     if (!selectedObject) {
 
         window.alert(
-            "Das ausgewählte Objekt wurde nicht gefunden oder ist für diesen Benutzer nicht freigegeben."
+            "Das Objekt wurde nicht gefunden oder ist nicht freigegeben."
         );
 
         return;
@@ -1133,6 +1201,56 @@ function handleSelectObject(objectId) {
     handleNavigate(
         ROUTES.OBJECT_DETAIL
     );
+}
+
+/************************************************
+ * LOKALE CHECK-IN-DATEN
+ ************************************************/
+
+function createCheckinEntry(
+    state,
+    shift
+) {
+
+    return {
+        id:
+            createLocalId(
+                "CHECKIN"
+            ),
+
+        shiftId:
+            shift.id,
+
+        userId:
+            state.currentUser.id,
+
+        employeeId:
+            state.currentUser.id,
+
+        objectId:
+            state.currentObject.id,
+
+        checkinAt:
+            shift.startTime,
+
+        timestamp:
+            shift.startTime,
+
+        method:
+            "LOCAL_TEST",
+
+        qrVerified:
+            false,
+
+        gpsVerified:
+            false,
+
+        status:
+            "COMPLETED",
+
+        source:
+            "LOCAL_TEST"
+    };
 }
 
 /************************************************
@@ -1177,9 +1295,14 @@ function handleCheckin() {
         return;
     }
 
+    const startTime =
+        new Date().toISOString();
+
     const currentShift = {
         id:
-            `SHIFT-LOCAL-${Date.now()}`,
+            createLocalId(
+                "SHIFT"
+            ),
 
         userId:
             state.currentUser.id,
@@ -1187,11 +1310,17 @@ function handleCheckin() {
         employeeId:
             state.currentUser.id,
 
+        employeeName:
+            state.currentUser.name ??
+            state.currentUser.fullName,
+
         objectId:
             state.currentObject.id,
 
-        startTime:
-            new Date().toISOString(),
+        objectName:
+            state.currentObject.name,
+
+        startTime,
 
         endTime:
             null,
@@ -1202,6 +1331,36 @@ function handleCheckin() {
         source:
             "LOCAL_TEST"
     };
+
+    const checkinEntry =
+        createCheckinEntry(
+            state,
+            currentShift
+        );
+
+    updateState(
+        {
+            shifts: [
+                ...asArray(
+                    state.shifts
+                ),
+
+                currentShift
+            ],
+
+            checkins: [
+                ...asArray(
+                    state.checkins
+                ),
+
+                checkinEntry
+            ]
+        },
+        {
+            notify:
+                false
+        }
+    );
 
     if (
         typeof AppState.startShift ===
@@ -1214,15 +1373,75 @@ function handleCheckin() {
     }
     else {
 
-        updateState({
-            currentShift,
+        updateState(
+            {
+                currentShift,
 
-            shiftStarted:
-                true
-        });
+                shiftStarted:
+                    true
+            },
+            {
+                persist:
+                    true
+            }
+        );
     }
+}
 
-    renderCurrentApp();
+/************************************************
+ * CHECK-OUT-DATEN
+ ************************************************/
+
+function createCheckoutEntry(
+    state,
+    completedShift
+) {
+
+    return {
+        id:
+            createLocalId(
+                "CHECKOUT"
+            ),
+
+        shiftId:
+            completedShift.id,
+
+        userId:
+            state.currentUser?.id ??
+            completedShift.userId,
+
+        employeeId:
+            state.currentUser?.id ??
+            completedShift.employeeId,
+
+        objectId:
+            state.currentObject?.id ??
+            completedShift.objectId,
+
+        checkoutAt:
+            completedShift.endTime,
+
+        timestamp:
+            completedShift.endTime,
+
+        materialAvailable:
+            null,
+
+        problemVisible:
+            null,
+
+        wasteRemoved:
+            null,
+
+        objectSecured:
+            null,
+
+        status:
+            "COMPLETED",
+
+        source:
+            "LOCAL_TEST"
+    };
 }
 
 /************************************************
@@ -1235,7 +1454,8 @@ function handleCheckout() {
         getState();
 
     if (
-        state.shiftStarted !== true
+        state.shiftStarted !== true ||
+        !state.currentShift
     ) {
 
         window.alert(
@@ -1245,28 +1465,55 @@ function handleCheckout() {
         return;
     }
 
-    const currentShift =
-        asObject(
-            state.currentShift
-        );
+    const endTime =
+        new Date().toISOString();
 
     const completedShift = {
-        ...currentShift,
+        ...asObject(
+            state.currentShift
+        ),
 
-        endTime:
-            new Date().toISOString(),
+        endTime,
 
         status:
             "FINISHED"
     };
 
-    const updatedShifts = [
-        ...asArray(
+    const updatedShifts =
+        asArray(
             state.shifts
-        ),
+        ).map(
+            (shift) =>
+                shift.id ===
+                    completedShift.id
+                    ? completedShift
+                    : shift
+        );
 
-        completedShift
-    ];
+    const checkoutEntry =
+        createCheckoutEntry(
+            state,
+            completedShift
+        );
+
+    updateState(
+        {
+            shifts:
+                updatedShifts,
+
+            checkouts: [
+                ...asArray(
+                    state.checkouts
+                ),
+
+                checkoutEntry
+            ]
+        },
+        {
+            notify:
+                false
+        }
+    );
 
     if (
         typeof AppState.stopShift ===
@@ -1276,27 +1523,23 @@ function handleCheckout() {
         AppState.stopShift(
             completedShift
         );
-
-        updateState({
-            shifts:
-                updatedShifts
-        });
     }
     else {
 
-        updateState({
-            currentShift:
-                null,
+        updateState(
+            {
+                currentShift:
+                    null,
 
-            shiftStarted:
-                false,
-
-            shifts:
-                updatedShifts
-        });
+                shiftStarted:
+                    false
+            },
+            {
+                persist:
+                    true
+            }
+        );
     }
-
-    renderCurrentApp();
 }
 
 /************************************************
@@ -1313,25 +1556,21 @@ function renderCurrentApp() {
         return;
     }
 
-    const state =
-        getState();
-
     validateCurrentObject();
 
-    const refreshedState =
+    const state =
         getState();
 
     const route =
         currentRoute ||
-        refreshedState.currentRoute ||
+        state.currentRoute ||
         getCurrentRoute() ||
-        ROUTES.DASHBOARD;
+        ROUTES.OVERVIEW;
 
     renderApp({
         route,
 
-        state:
-            refreshedState,
+        state,
 
         onNavigate:
             handleNavigate,
@@ -1410,7 +1649,16 @@ function initializeState() {
         "function"
     ) {
 
-        AppState.resetAppState();
+        AppState.resetAppState({
+            preserveData:
+                false,
+
+            preserveSession:
+                true,
+
+            notify:
+                false
+        });
     }
 }
 
@@ -1509,7 +1757,7 @@ async function initializeApplication() {
 }
 
 /************************************************
- * UNBEHANDELTE FEHLER
+ * GLOBALE FEHLER
  ************************************************/
 
 window.addEventListener(
