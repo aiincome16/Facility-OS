@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = Object.freeze([
 
 const PROTECTED_ROUTES = Object.freeze([
     "/dashboard",
+    "/object-detail",
     "/objects",
     "/employees",
     "/tasks",
