@@ -1,331 +1,1137 @@
 /************************************************
  * Facility OS
  * app.js
+ *
+ * Zentrale Anwendungssteuerung
+ * - lokale JSON-Daten laden
+ * - App-State initialisieren
+ * - Sitzung wiederherstellen
+ * - Router steuern
+ * - Login und Logout
+ * - Objektauswahl
+ * - Check-in und Check-out
+ * - Lade- und Fehleranzeige
+ * - vorbereitet für spätere API-/Sheets-Anbindung
  ************************************************/
 
-import {
-    APP_CONFIG,
-    USER_ROLES
-} from "./config/appConfig.js";
+import * as AppState
+    from "./appState.js";
+
+import * as DataService
+    from "./services/dataService.js";
 
 import {
-    getAppState,
-    initializeAppState,
-    logoutCurrentUser,
-    setCurrentObject,
-    setCurrentUser,
-    setDataCollections,
-    setError,
-    setLoading,
-    startShift,
-    stopShift,
-    subscribeToAppState
-} from "./appState.js";
-
-import {
+    ROUTES,
     initializeRouter,
     navigateTo,
-    refreshRoute
+    getCurrentRoute,
+    updateRouterContext
 } from "./router.js";
-
-import {
-    createDataSummary,
-    loadAllData,
-    validateDataRelations
-} from "./services/dataService.js";
 
 import {
     renderApp
 } from "./ui/renderApp.js";
 
 /************************************************
- * INTERNE VARIABLEN
+ * APP-STATUS
  ************************************************/
 
-let applicationStarted = false;
+let appInitialized =
+    false;
 
-let lastRenderedSignature = "";
+let dataLoaded =
+    false;
+
+let routerInitialized =
+    false;
+
+let currentRoute =
+    ROUTES.DASHBOARD;
 
 /************************************************
- * BENUTZER
+ * BASISHELFER
  ************************************************/
 
-function createTestUser({
-    name,
-    role
-}) {
+function asArray(value) {
 
-    const normalizedName =
-        String(name ?? "").trim();
+    return Array.isArray(value)
+        ? value
+        : [];
+}
 
-    const normalizedRole =
-        String(role ?? "").trim();
+function asObject(value) {
 
-    if (!normalizedName) {
+    return (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    )
+        ? value
+        : {};
+}
+
+function normalizeRole(value) {
+
+    return String(value ?? "")
+        .trim()
+        .toUpperCase();
+}
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .trim();
+}
+
+function getState() {
+
+    if (
+        typeof AppState.getAppState !==
+        "function"
+    ) {
 
         throw new Error(
-            "Bitte einen Namen eingeben."
+            "getAppState() wurde in appState.js nicht gefunden."
+        );
+    }
+
+    return AppState.getAppState();
+}
+
+function getAppElement() {
+
+    return document.getElementById(
+        "app"
+    );
+}
+
+/************************************************
+ * SICHERE STATE-AKTUALISIERUNG
+ ************************************************/
+
+function updateState(partialState) {
+
+    const stateUpdate =
+        asObject(partialState);
+
+    if (
+        typeof AppState.updateAppState ===
+        "function"
+    ) {
+
+        AppState.updateAppState(
+            stateUpdate
+        );
+
+        return;
+    }
+
+    const currentState =
+        getState();
+
+    Object.assign(
+        currentState,
+        stateUpdate
+    );
+}
+
+function setLoadingState(value) {
+
+    if (
+        typeof AppState.setLoading ===
+        "function"
+    ) {
+
+        AppState.setLoading(
+            value === true
+        );
+
+        return;
+    }
+
+    updateState({
+        loading:
+            value === true
+    });
+}
+
+function setErrorState(error) {
+
+    const normalizedError =
+        error
+            ? (
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            )
+            : null;
+
+    if (
+        typeof AppState.setError ===
+        "function"
+    ) {
+
+        AppState.setError(
+            normalizedError
+        );
+
+        return;
+    }
+
+    updateState({
+        error:
+            normalizedError
+    });
+}
+
+function setRouteState(route) {
+
+    currentRoute =
+        route;
+
+    if (
+        typeof AppState.setCurrentRoute ===
+        "function"
+    ) {
+
+        AppState.setCurrentRoute(
+            route
+        );
+
+        return;
+    }
+
+    updateState({
+        currentRoute:
+            route
+    });
+}
+
+function setUserState(user) {
+
+    if (
+        typeof AppState.setCurrentUser ===
+        "function"
+    ) {
+
+        AppState.setCurrentUser(
+            user
+        );
+
+        return;
+    }
+
+    updateState({
+        currentUser:
+            user
+    });
+}
+
+function setObjectState(object) {
+
+    if (
+        typeof AppState.setCurrentObject ===
+        "function"
+    ) {
+
+        AppState.setCurrentObject(
+            object
+        );
+
+        return;
+    }
+
+    updateState({
+        currentObject:
+            object
+    });
+}
+
+function clearUserState() {
+
+    if (
+        typeof AppState.logoutCurrentUser ===
+        "function"
+    ) {
+
+        AppState.logoutCurrentUser();
+
+        return;
+    }
+
+    updateState({
+        currentUser:
+            null,
+
+        currentObject:
+            null,
+
+        currentShift:
+            null,
+
+        shiftStarted:
+            false
+    });
+}
+
+/************************************************
+ * DATENSTRUKTUR
+ ************************************************/
+
+const DATA_COLLECTION_NAMES =
+    Object.freeze([
+        "users",
+        "objects",
+        "rooms",
+        "tasks",
+        "materials",
+        "materialStock",
+        "shifts",
+        "tickets",
+        "notifications",
+        "messages",
+        "objectGuide",
+        "objectSettings",
+        "checkins",
+        "checkouts",
+        "taskLogs",
+        "timeDeviations",
+        "keybook",
+        "customerAccess",
+        "objectSecurity",
+        "objectWaste",
+        "userPerformance",
+        "help",
+        "customerRequests",
+        "workOrders"
+    ]);
+
+function normalizeLoadedData(result) {
+
+    const resultObject =
+        asObject(result);
+
+    const possibleDataObject =
+        asObject(
+            resultObject.data ??
+            resultObject.collections ??
+            resultObject.datasets ??
+            resultObject
+        );
+
+    const normalizedData = {};
+
+    DATA_COLLECTION_NAMES.forEach(
+        (collectionName) => {
+
+            normalizedData[
+                collectionName
+            ] =
+                asArray(
+                    possibleDataObject[
+                        collectionName
+                    ]
+                );
+        }
+    );
+
+    return normalizedData;
+}
+
+function applyLoadedData(data) {
+
+    const normalizedData =
+        normalizeLoadedData(data);
+
+    if (
+        typeof AppState.setDataCollections ===
+        "function"
+    ) {
+
+        AppState.setDataCollections(
+            normalizedData
+        );
+
+        return normalizedData;
+    }
+
+    updateState(
+        normalizedData
+    );
+
+    return normalizedData;
+}
+
+/************************************************
+ * DATENVALIDIERUNG
+ ************************************************/
+
+function validateRequiredData(data) {
+
+    const requiredCollections = [
+        "users",
+        "objects",
+        "rooms",
+        "tasks",
+        "materials",
+        "shifts",
+        "tickets"
+    ];
+
+    const missingCollections =
+        requiredCollections.filter(
+            (collectionName) =>
+                !Array.isArray(
+                    data[
+                        collectionName
+                    ]
+                )
+        );
+
+    if (
+        missingCollections.length > 0
+    ) {
+
+        throw new Error(
+            `Pflichtdaten fehlen: ${missingCollections.join(", ")}`
         );
     }
 
     if (
-        !Object.values(
-            USER_ROLES
-        ).includes(normalizedRole)
+        data.users.length === 0
     ) {
 
         throw new Error(
-            "Die ausgewählte Benutzerrolle ist ungültig."
+            "Die Benutzerdaten enthalten keine Einträge."
         );
     }
 
-    const state =
-        getAppState();
+    if (
+        data.objects.length === 0
+    ) {
 
-    /**
-     * Wenn für die Testrolle bereits ein Benutzer
-     * in users.json vorhanden ist, verwenden wir diesen.
-     */
-    const existingUser =
-        state.users.find(
-            (user) => {
-
-                return (
-                    user.role ===
-                        normalizedRole &&
-                    user.active !== false
-                );
-            }
+        throw new Error(
+            "Die Objektdaten enthalten keine Einträge."
         );
-
-    if (existingUser) {
-
-        return {
-            ...existingUser,
-
-            /**
-             * Der im Login eingegebene Name wird nur
-             * für die Testanzeige übernommen.
-             */
-            name:
-                normalizedName,
-
-            firstName:
-                normalizedName
-                    .split(" ")[0] ??
-                normalizedName,
-
-            lastName:
-                normalizedName
-                    .split(" ")
-                    .slice(1)
-                    .join(" "),
-
-            testUser: true
-        };
     }
 
-    return {
+    return true;
+}
 
-        id:
-            `USR-TEST-${Date.now()}`,
+function validateDataRelations(data) {
 
-        name:
-            normalizedName,
+    if (
+        typeof DataService.validateDataRelations !==
+        "function"
+    ) {
 
-        firstName:
-            normalizedName
-                .split(" ")[0] ??
-            normalizedName,
+        return [];
+    }
 
-        lastName:
-            normalizedName
-                .split(" ")
-                .slice(1)
-                .join(" "),
+    try {
 
-        role:
-            normalizedRole,
+        const validationResult =
+            DataService.validateDataRelations(
+                data
+            );
 
-        email: "",
+        return asArray(
+            validationResult
+        );
+    }
+    catch (error) {
 
-        phone: "",
+        console.warn(
+            "Datenbeziehungen konnten nicht vollständig geprüft werden.",
+            error
+        );
 
-        active: true,
-
-        assignedObjectIds: [],
-
-        testUser: true,
-
-        createdAt:
-            new Date().toISOString()
-    };
+        return [];
+    }
 }
 
 /************************************************
  * DATEN LADEN
  ************************************************/
 
-async function initializeData() {
+async function loadApplicationData() {
 
-    setLoading(true);
+    if (
+        typeof DataService.loadAllData !==
+        "function"
+    ) {
 
-    try {
+        throw new Error(
+            "loadAllData() wurde in dataService.js nicht gefunden."
+        );
+    }
 
-        const result =
-            await loadAllData({
-                forceReload: false,
-                useCache: true
-            });
+    const loadedResult =
+        await DataService.loadAllData();
 
-        const relationValidation =
-            validateDataRelations(
-                result.data
+    const normalizedData =
+        normalizeLoadedData(
+            loadedResult
+        );
+
+    validateRequiredData(
+        normalizedData
+    );
+
+    const relationWarnings =
+        validateDataRelations(
+            normalizedData
+        );
+
+    if (
+        relationWarnings.length > 0
+    ) {
+
+        console.warn(
+            "Hinweise zu Datenbeziehungen:",
+            relationWarnings
+        );
+    }
+
+    applyLoadedData(
+        normalizedData
+    );
+
+    dataLoaded =
+        true;
+
+    return normalizedData;
+}
+
+/************************************************
+ * LADEANSICHT
+ ************************************************/
+
+function renderLoadingScreen(
+    message =
+        "Facility OS wird geladen …"
+) {
+
+    const appElement =
+        getAppElement();
+
+    if (!appElement) {
+        return;
+    }
+
+    appElement.innerHTML = `
+        <main class="system-state-page">
+
+            <section class="system-state-card">
+
+                <div
+                    class="loading-spinner"
+                    aria-hidden="true"
+                ></div>
+
+                <h1>
+                    Facility OS
+                </h1>
+
+                <p>
+                    ${escapeHtml(message)}
+                </p>
+
+            </section>
+
+        </main>
+    `;
+}
+
+/************************************************
+ * FEHLERANSICHT
+ ************************************************/
+
+function renderFatalError(error) {
+
+    const appElement =
+        getAppElement();
+
+    if (!appElement) {
+        return;
+    }
+
+    const errorMessage =
+        error instanceof Error
+            ? error.message
+            : String(
+                error ??
+                "Unbekannter Fehler"
             );
 
-        const warnings = [
+    appElement.innerHTML = `
+        <main class="system-state-page">
 
-            ...(Array.isArray(
-                result.errors
-            )
-                ? result.errors.map(
-                    (error) =>
-                        error.message
-                )
-                : []),
+            <section class="system-state-card system-error-card">
 
-            ...relationValidation.warnings
-        ];
+                <span class="system-error-label">
+                    Startfehler
+                </span>
 
-        setDataCollections(
-            result.data,
-            {
-                source:
-                    result.source,
+                <h1>
+                    Daten konnten nicht geladen werden
+                </h1>
 
-                loadedAt:
-                    result.loadedAt,
+                <p>
+                    ${escapeHtml(errorMessage)}
+                </p>
 
-                warnings
+                <button
+                    type="button"
+                    class="button button-primary button-full"
+                    id="reload-application"
+                >
+                    Erneut laden
+                </button>
+
+            </section>
+
+        </main>
+    `;
+
+    const reloadButton =
+        document.getElementById(
+            "reload-application"
+        );
+
+    reloadButton?.addEventListener(
+        "click",
+        () => {
+
+            window.location.reload();
+        }
+    );
+}
+
+/************************************************
+ * HTML-SICHERHEIT FÜR SYSTEMANSICHTEN
+ ************************************************/
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+/************************************************
+ * BENUTZER SUCHEN
+ ************************************************/
+
+function findUserForLogin({
+    name,
+    role
+}) {
+
+    const state =
+        getState();
+
+    const users =
+        asArray(
+            state.users
+        );
+
+    const normalizedRole =
+        normalizeRole(role);
+
+    const normalizedName =
+        normalizeText(name)
+            .toLowerCase();
+
+    const activeUsers =
+        users.filter(
+            (user) =>
+                user.active !== false
+        );
+
+    const exactNameAndRoleMatch =
+        activeUsers.find(
+            (user) => {
+
+                const userRole =
+                    normalizeRole(
+                        user.role
+                    );
+
+                const userName =
+                    normalizeText(
+                        user.name ??
+                        user.fullName
+                    ).toLowerCase();
+
+                return (
+                    userRole ===
+                        normalizedRole &&
+                    userName ===
+                        normalizedName
+                );
             }
         );
 
-        const summary =
-            createDataSummary(
-                result.data
-            );
+    if (exactNameAndRoleMatch) {
 
-        console.info(
-            "Facility-OS-Daten wurden geladen:",
-            summary
+        return exactNameAndRoleMatch;
+    }
+
+    const roleMatch =
+        activeUsers.find(
+            (user) =>
+                normalizeRole(
+                    user.role
+                ) ===
+                normalizedRole
         );
 
-        if (
-            warnings.length > 0
-        ) {
+    if (roleMatch) {
 
-            console.warn(
-                "Facility-OS-Datenwarnungen:",
-                warnings
-            );
-        }
+        return roleMatch;
+    }
 
-        return true;
+    return null;
+}
 
-    } catch (error) {
+function createFallbackTestUser({
+    name,
+    role
+}) {
 
-        console.error(
-            "Facility-OS-Daten konnten nicht geladen werden:",
-            error
+    const normalizedRole =
+        normalizeRole(role);
+
+    const normalizedName =
+        normalizeText(name) ||
+        "Test Benutzer";
+
+    return {
+        id:
+            `TEST-${normalizedRole || "USER"}`,
+
+        name:
+            normalizedName,
+
+        fullName:
+            normalizedName,
+
+        role:
+            normalizedRole,
+
+        active:
+            true,
+
+        assignedObjectIds:
+            []
+    };
+}
+
+/************************************************
+ * SICHTBARE OBJEKTE
+ ************************************************/
+
+function getObjectsForUser(user) {
+
+    const state =
+        getState();
+
+    const objects =
+        asArray(
+            state.objects
         );
 
-        setError(error);
+    if (!user) {
+        return [];
+    }
 
-        return false;
+    const role =
+        normalizeRole(
+            user.role
+        );
+
+    if (
+        [
+            "SUPER_ADMIN",
+            "ADMIN",
+            "BUCHHALTUNG"
+        ].includes(role)
+    ) {
+
+        return objects;
+    }
+
+    if (
+        role ===
+        "OBJEKTLEITER"
+    ) {
+
+        const managedObjects =
+            objects.filter(
+                (object) =>
+                    object.objectLeaderId ===
+                        user.id ||
+                    object.managerId ===
+                        user.id ||
+                    object.leaderId ===
+                        user.id
+            );
+
+        return managedObjects.length > 0
+            ? managedObjects
+            : objects;
+    }
+
+    if (
+        role ===
+        "MITARBEITER"
+    ) {
+
+        const assignedObjectIds =
+            asArray(
+                user.assignedObjectIds ??
+                user.objectIds
+            );
+
+        const assignedObjects =
+            objects.filter(
+                (object) =>
+                    assignedObjectIds.includes(
+                        object.id
+                    ) ||
+                    asArray(
+                        object.assignedEmployeeIds ??
+                        object.employeeIds ??
+                        object.assignedUserIds
+                    ).includes(
+                        user.id
+                    )
+            );
+
+        return assignedObjects.length > 0
+            ? assignedObjects
+            : objects;
+    }
+
+    if (
+        role ===
+        "KUNDE"
+    ) {
+
+        const allowedObjectIds =
+            asArray(
+                state.customerAccess
+            )
+                .filter(
+                    (access) =>
+                        access.active !== false &&
+                        access.customerUserId ===
+                            user.id
+                )
+                .map(
+                    (access) =>
+                        access.objectId
+                );
+
+        const customerObjects =
+            objects.filter(
+                (object) =>
+                    allowedObjectIds.includes(
+                        object.id
+                    ) ||
+                    object.customerUserId ===
+                        user.id
+            );
+
+        return customerObjects;
+    }
+
+    return [];
+}
+
+/************************************************
+ * AKTUELLES OBJEKT PRÜFEN
+ ************************************************/
+
+function validateCurrentObject() {
+
+    const state =
+        getState();
+
+    const currentUser =
+        state.currentUser;
+
+    const currentObject =
+        state.currentObject;
+
+    if (
+        !currentUser ||
+        !currentObject
+    ) {
+
+        return null;
+    }
+
+    const visibleObjects =
+        getObjectsForUser(
+            currentUser
+        );
+
+    const validObject =
+        visibleObjects.find(
+            (object) =>
+                object.id ===
+                currentObject.id
+        );
+
+    if (!validObject) {
+
+        setObjectState(
+            null
+        );
+
+        return null;
+    }
+
+    if (
+        validObject !==
+        currentObject
+    ) {
+
+        setObjectState(
+            validObject
+        );
+    }
+
+    return validObject;
+}
+
+/************************************************
+ * ROUTER-KONTEXT
+ ************************************************/
+
+function synchronizeRouterContext() {
+
+    if (!routerInitialized) {
+        return;
+    }
+
+    const state =
+        getState();
+
+    const resolvedRoute =
+        updateRouterContext({
+            currentUser:
+                state.currentUser,
+
+            currentObject:
+                state.currentObject
+        });
+
+    if (resolvedRoute) {
+
+        setRouteState(
+            resolvedRoute
+        );
     }
 }
 
 /************************************************
- * LOGIN UND LOGOUT
+ * NAVIGATION
  ************************************************/
 
-function handleLogin(
-    loginData
-) {
+function handleNavigate(route) {
 
-    try {
+    const state =
+        getState();
 
-        const user =
-            createTestUser(
-                loginData
-            );
-
-        setCurrentUser(
-            user
-        );
-
-        const state =
-            getAppState();
-
-        const assignedObjects =
-            state.objects.filter(
-                (object) => {
-
-                    const assignedObjectIds =
-                        Array.isArray(
-                            user.assignedObjectIds
-                        )
-                            ? user.assignedObjectIds
-                            : [];
-
-                    return (
-                        assignedObjectIds.includes(
-                            object.id
-                        ) ||
-                        object.objectLeaderId ===
-                            user.id
-                    );
-                }
-            );
-
-        /**
-         * Wenn der Benutzer genau einem Objekt
-         * zugeordnet ist, wird es automatisch gesetzt.
-         */
-        if (
-            assignedObjects.length === 1
-        ) {
-
-            setCurrentObject(
-                assignedObjects[0]
-            );
-        }
-
+    const resolvedRoute =
         navigateTo(
-            APP_CONFIG
-                .AUTHENTICATED_DEFAULT_ROUTE
+            route,
+            {
+                currentUser:
+                    state.currentUser,
+
+                currentObject:
+                    state.currentObject
+            }
         );
 
-    } catch (error) {
+    setRouteState(
+        resolvedRoute
+    );
 
-        console.error(
-            "Login fehlgeschlagen:",
-            error
+    renderCurrentApp();
+}
+
+/************************************************
+ * LOGIN
+ ************************************************/
+
+function handleLogin(loginData) {
+
+    const name =
+        normalizeText(
+            loginData?.name
         );
+
+    const role =
+        normalizeRole(
+            loginData?.role
+        );
+
+    if (!role) {
 
         window.alert(
-            error.message ??
-            "Die Anmeldung ist fehlgeschlagen."
+            "Bitte wähle eine Benutzerrolle aus."
+        );
+
+        return;
+    }
+
+    const existingUser =
+        findUserForLogin({
+            name,
+            role
+        });
+
+    const selectedUser =
+        existingUser
+            ? {
+                ...existingUser,
+
+                name:
+                    name ||
+                    existingUser.name ||
+                    existingUser.fullName
+            }
+            : createFallbackTestUser({
+                name,
+                role
+            });
+
+    setUserState(
+        selectedUser
+    );
+
+    const visibleObjects =
+        getObjectsForUser(
+            selectedUser
+        );
+
+    if (
+        visibleObjects.length === 1
+    ) {
+
+        setObjectState(
+            visibleObjects[0]
         );
     }
+    else {
+
+        setObjectState(
+            null
+        );
+    }
+
+    synchronizeRouterContext();
+
+    handleNavigate(
+        ROUTES.DASHBOARD
+    );
 }
+
+/************************************************
+ * LOGOUT
+ ************************************************/
 
 function handleLogout() {
 
-    logoutCurrentUser();
+    clearUserState();
 
-    navigateTo(
-        "/login"
+    synchronizeRouterContext();
+
+    const resolvedRoute =
+        navigateTo(
+            ROUTES.LOGIN,
+            {
+                replace:
+                    true,
+
+                currentUser:
+                    null,
+
+                currentObject:
+                    null
+            }
+        );
+
+    setRouteState(
+        resolvedRoute
+    );
+
+    renderCurrentApp();
+}
+
+/************************************************
+ * OBJEKT AUSWÄHLEN
+ ************************************************/
+
+function handleSelectObject(objectId) {
+
+    const normalizedObjectId =
+        normalizeText(
+            objectId
+        );
+
+    if (!normalizedObjectId) {
+
+        window.alert(
+            "Es wurde kein Objekt ausgewählt."
+        );
+
+        return;
+    }
+
+    const state =
+        getState();
+
+    const currentUser =
+        state.currentUser;
+
+    const visibleObjects =
+        getObjectsForUser(
+            currentUser
+        );
+
+    const selectedObject =
+        visibleObjects.find(
+            (object) =>
+                object.id ===
+                normalizedObjectId
+        );
+
+    if (!selectedObject) {
+
+        window.alert(
+            "Das ausgewählte Objekt wurde nicht gefunden oder ist für diesen Benutzer nicht freigegeben."
+        );
+
+        return;
+    }
+
+    setObjectState(
+        selectedObject
+    );
+
+    synchronizeRouterContext();
+
+    handleNavigate(
+        ROUTES.OBJECT_DETAIL
     );
 }
 
@@ -333,170 +1139,90 @@ function handleLogout() {
  * CHECK-IN
  ************************************************/
 
-function findPlannedShiftForUser(
-    userId
-) {
-
-    const state =
-        getAppState();
-
-    const today =
-        new Date()
-            .toISOString()
-            .slice(0, 10);
-
-    const todaysShifts =
-        state.shifts
-            .filter(
-                (shift) => {
-
-                    return (
-                        shift.userId ===
-                            userId &&
-                        shift.date ===
-                            today &&
-                        [
-                            "PLANNED",
-                            "ACTIVE"
-                        ].includes(
-                            shift.status
-                        )
-                    );
-                }
-            )
-            .sort(
-                (
-                    firstShift,
-                    secondShift
-                ) => {
-
-                    return String(
-                        firstShift.plannedStart ??
-                        ""
-                    ).localeCompare(
-                        String(
-                            secondShift.plannedStart ??
-                            ""
-                        )
-                    );
-                }
-            );
-
-    return (
-        todaysShifts[0] ??
-        null
-    );
-}
-
 function handleCheckin() {
 
-    try {
+    const state =
+        getState();
 
-        const state =
-            getAppState();
-
-        if (!state.currentUser) {
-
-            throw new Error(
-                "Für den Check-in ist eine Anmeldung erforderlich."
-            );
-        }
-
-        if (
-            state.currentUser.role !==
-            USER_ROLES.MITARBEITER
-        ) {
-
-            throw new Error(
-                "Der Check-in ist nur für Mitarbeiter vorgesehen."
-            );
-        }
-
-        if (state.shiftStarted) {
-
-            window.alert(
-                "Du bist bereits eingecheckt."
-            );
-
-            return;
-        }
-
-        const plannedShift =
-            findPlannedShiftForUser(
-                state.currentUser.id
-            );
-
-        const currentObject =
-            plannedShift
-                ? state.objects.find(
-                    (object) =>
-                        object.id ===
-                        plannedShift.objectId
-                ) ?? null
-                : state.currentObject;
-
-        if (currentObject) {
-
-            setCurrentObject(
-                currentObject
-            );
-        }
-
-        const shift = {
-
-            ...(plannedShift ?? {}),
-
-            id:
-                plannedShift?.id ??
-                `SHIFT-TEST-${Date.now()}`,
-
-            userId:
-                state.currentUser.id,
-
-            objectId:
-                currentObject?.id ??
-                plannedShift?.objectId ??
-                null,
-
-            date:
-                plannedShift?.date ??
-                new Date()
-                    .toISOString()
-                    .slice(0, 10),
-
-            actualStart:
-                new Date()
-                    .toISOString(),
-
-            actualEnd: null,
-
-            status: "ACTIVE",
-
-            testMode: true
-        };
-
-        startShift(
-            shift
-        );
+    if (!state.currentUser) {
 
         window.alert(
-            plannedShift
-                ? "Die geplante Schicht wurde gestartet."
-                : "Test-Check-in wurde gespeichert."
+            "Für den Check-in ist eine Anmeldung erforderlich."
         );
 
-    } catch (error) {
+        return;
+    }
 
-        console.error(
-            "Check-in fehlgeschlagen:",
-            error
-        );
+    if (!state.currentObject) {
 
         window.alert(
-            error.message ??
-            "Der Check-in ist fehlgeschlagen."
+            "Bitte wähle vor dem Check-in ein Objekt aus."
+        );
+
+        handleNavigate(
+            ROUTES.OBJECTS
+        );
+
+        return;
+    }
+
+    if (
+        state.shiftStarted === true
+    ) {
+
+        window.alert(
+            "Es läuft bereits eine Schicht."
+        );
+
+        return;
+    }
+
+    const currentShift = {
+        id:
+            `SHIFT-LOCAL-${Date.now()}`,
+
+        userId:
+            state.currentUser.id,
+
+        employeeId:
+            state.currentUser.id,
+
+        objectId:
+            state.currentObject.id,
+
+        startTime:
+            new Date().toISOString(),
+
+        endTime:
+            null,
+
+        status:
+            "RUNNING",
+
+        source:
+            "LOCAL_TEST"
+    };
+
+    if (
+        typeof AppState.startShift ===
+        "function"
+    ) {
+
+        AppState.startShift(
+            currentShift
         );
     }
+    else {
+
+        updateState({
+            currentShift,
+
+            shiftStarted:
+                true
+        });
+    }
+
+    renderCurrentApp();
 }
 
 /************************************************
@@ -505,349 +1231,110 @@ function handleCheckin() {
 
 function handleCheckout() {
 
-    try {
+    const state =
+        getState();
 
-        const state =
-            getAppState();
-
-        if (!state.currentUser) {
-
-            throw new Error(
-                "Für den Check-out ist eine Anmeldung erforderlich."
-            );
-        }
-
-        if (!state.shiftStarted) {
-
-            window.alert(
-                "Es ist keine laufende Schicht vorhanden."
-            );
-
-            return;
-        }
-
-        const currentObject =
-            state.currentObject;
-
-        const objectSettings =
-            state.objectSettings.find(
-                (settings) =>
-                    settings.objectId ===
-                    currentObject?.id
-            );
-
-        const requiredChecks = [];
-
-        if (
-            objectSettings
-                ?.checkout
-                ?.materialCheckRequired
-        ) {
-
-            requiredChecks.push(
-                "Materialbestand"
-            );
-        }
-
-        if (
-            objectSettings
-                ?.checkout
-                ?.problemCheckRequired
-        ) {
-
-            requiredChecks.push(
-                "Probleme und Schäden"
-            );
-        }
-
-        if (
-            objectSettings
-                ?.checkout
-                ?.wasteCheckRequired
-        ) {
-
-            requiredChecks.push(
-                "Müllentsorgung"
-            );
-        }
-
-        if (
-            objectSettings
-                ?.checkout
-                ?.securityCheckRequired
-        ) {
-
-            requiredChecks.push(
-                "Objektsicherung"
-            );
-        }
-
-        if (
-            objectSettings
-                ?.checkout
-                ?.keyReturnRequired
-        ) {
-
-            requiredChecks.push(
-                "Schlüsselrückgabe"
-            );
-        }
-
-        const confirmationText =
-            requiredChecks.length > 0
-                ? (
-                    "Vor dem Auschecken müssen später folgende Punkte bestätigt werden:\n\n" +
-                    requiredChecks
-                        .map(
-                            (check) =>
-                                `• ${check}`
-                        )
-                        .join("\n") +
-                    "\n\nTest-Check-out jetzt durchführen?"
-                )
-                : "Test-Check-out jetzt durchführen?";
-
-        const confirmed =
-            window.confirm(
-                confirmationText
-            );
-
-        if (!confirmed) {
-            return;
-        }
-
-        stopShift();
+    if (
+        state.shiftStarted !== true
+    ) {
 
         window.alert(
-            "Test-Check-out wurde gespeichert."
+            "Es läuft derzeit keine Schicht."
         );
 
-    } catch (error) {
-
-        console.error(
-            "Check-out fehlgeschlagen:",
-            error
-        );
-
-        window.alert(
-            error.message ??
-            "Der Check-out ist fehlgeschlagen."
-        );
+        return;
     }
+
+    const currentShift =
+        asObject(
+            state.currentShift
+        );
+
+    const completedShift = {
+        ...currentShift,
+
+        endTime:
+            new Date().toISOString(),
+
+        status:
+            "FINISHED"
+    };
+
+    const updatedShifts = [
+        ...asArray(
+            state.shifts
+        ),
+
+        completedShift
+    ];
+
+    if (
+        typeof AppState.stopShift ===
+        "function"
+    ) {
+
+        AppState.stopShift(
+            completedShift
+        );
+
+        updateState({
+            shifts:
+                updatedShifts
+        });
+    }
+    else {
+
+        updateState({
+            currentShift:
+                null,
+
+            shiftStarted:
+                false,
+
+            shifts:
+                updatedShifts
+        });
+    }
+
+    renderCurrentApp();
 }
 
 /************************************************
  * DARSTELLUNG
  ************************************************/
 
-function createRenderSignature(
-    route,
-    state
-) {
-
-    return JSON.stringify({
-
-        route,
-
-        loading:
-            state.loading,
-
-        error:
-            state.error,
-
-        dataLoaded:
-            state.dataLoaded,
-
-        currentUserId:
-            state.currentUser?.id ??
-            null,
-
-        currentUserRole:
-            state.currentUser?.role ??
-            null,
-
-        currentObjectId:
-            state.currentObject?.id ??
-            null,
-
-        currentShiftId:
-            state.currentShift?.id ??
-            null,
-
-        shiftStarted:
-            state.shiftStarted,
-
-        users:
-            state.users.length,
-
-        objects:
-            state.objects.length,
-
-        rooms:
-            state.rooms.length,
-
-        tasks:
-            state.tasks.length,
-
-        materials:
-            state.materials.length,
-
-        tickets:
-            state.tickets.length,
-
-        notifications:
-            state.notifications.length
-    });
-}
-
-function renderLoadingState() {
-
-    const appElement =
-        document.getElementById(
-            "app"
-        );
-
-    if (!appElement) {
-        return;
-    }
-
-    appElement.innerHTML = `
-        <div class="loading-screen">
-            <div>
-                <strong>
-                    Facility OS wird geladen …
-                </strong>
-
-                <p>
-                    Testdaten werden vorbereitet.
-                </p>
-            </div>
-        </div>
-    `;
-}
-
-function renderFatalDataError(
-    errorMessage
-) {
-
-    const appElement =
-        document.getElementById(
-            "app"
-        );
-
-    if (!appElement) {
-        return;
-    }
-
-    appElement.innerHTML = `
-        <section class="fatal-error">
-
-            <h1>
-                Daten konnten nicht geladen werden
-            </h1>
-
-            <p>
-                ${String(
-                    errorMessage ??
-                    "Unbekannter Fehler"
-                )}
-            </p>
-
-            <button
-                type="button"
-                class="button button-primary"
-                id="retry-data-load"
-            >
-                Erneut versuchen
-            </button>
-
-        </section>
-    `;
-
-    const retryButton =
-        document.getElementById(
-            "retry-data-load"
-        );
-
-    retryButton?.addEventListener(
-        "click",
-        async () => {
-
-            renderLoadingState();
-
-            const success =
-                await initializeData();
-
-            if (success) {
-
-                refreshRoute();
-            }
-        }
-    );
-}
-
-function renderCurrentApp(
-    route = null,
-    state = null
-) {
-
-    const currentState =
-        state ??
-        getAppState();
-
-    const currentRoute =
-        route ??
-        currentState.currentRoute;
+function renderCurrentApp() {
 
     if (
-        currentState.loading &&
-        !currentState.dataLoaded
-    ) {
-
-        renderLoadingState();
-
-        return;
-    }
-
-    if (
-        currentState.error &&
-        !currentState.dataLoaded
-    ) {
-
-        renderFatalDataError(
-            currentState.error
-        );
-
-        return;
-    }
-
-    const renderSignature =
-        createRenderSignature(
-            currentRoute,
-            currentState
-        );
-
-    if (
-        renderSignature ===
-        lastRenderedSignature
+        !appInitialized ||
+        !dataLoaded
     ) {
 
         return;
     }
 
-    lastRenderedSignature =
-        renderSignature;
+    const state =
+        getState();
+
+    validateCurrentObject();
+
+    const refreshedState =
+        getState();
+
+    const route =
+        currentRoute ||
+        refreshedState.currentRoute ||
+        getCurrentRoute() ||
+        ROUTES.DASHBOARD;
 
     renderApp({
-
-        route:
-            currentRoute,
+        route,
 
         state:
-            currentState,
+            refreshedState,
 
         onNavigate:
-            navigateTo,
+            handleNavigate,
 
         onLogin:
             handleLogin,
@@ -859,80 +1346,214 @@ function renderCurrentApp(
             handleCheckin,
 
         onCheckout:
-            handleCheckout
+            handleCheckout,
+
+        onSelectObject:
+            handleSelectObject
     });
 }
 
 /************************************************
- * APP INITIALISIEREN
+ * ROUTER STARTEN
+ ************************************************/
+
+function startRouter() {
+
+    const state =
+        getState();
+
+    currentRoute =
+        initializeRouter({
+            currentUser:
+                state.currentUser,
+
+            currentObject:
+                state.currentObject,
+
+            onRouteChange:
+                (route) => {
+
+                    setRouteState(
+                        route
+                    );
+
+                    renderCurrentApp();
+                }
+        });
+
+    routerInitialized =
+        true;
+
+    setRouteState(
+        currentRoute
+    );
+}
+
+/************************************************
+ * STATE INITIALISIEREN
+ ************************************************/
+
+function initializeState() {
+
+    if (
+        typeof AppState.initializeAppState ===
+        "function"
+    ) {
+
+        AppState.initializeAppState();
+
+        return;
+    }
+
+    if (
+        typeof AppState.resetAppState ===
+        "function"
+    ) {
+
+        AppState.resetAppState();
+    }
+}
+
+/************************************************
+ * STATE-ABONNEMENT
+ ************************************************/
+
+function subscribeToState() {
+
+    if (
+        typeof AppState.subscribeToAppState !==
+        "function"
+    ) {
+
+        return;
+    }
+
+    AppState.subscribeToAppState(
+        () => {
+
+            if (
+                appInitialized &&
+                dataLoaded
+            ) {
+
+                renderCurrentApp();
+            }
+        }
+    );
+}
+
+/************************************************
+ * APP STARTEN
  ************************************************/
 
 async function initializeApplication() {
 
-    if (applicationStarted) {
-        return;
-    }
-
-    applicationStarted = true;
-
     try {
 
-        initializeAppState();
-
-        subscribeToAppState(
-            (state) => {
-
-                renderCurrentApp(
-                    state.currentRoute,
-                    state
-                );
-            }
+        renderLoadingScreen(
+            "Daten und Benutzeroberfläche werden vorbereitet …"
         );
 
-        initializeRouter(
-            (route, state) => {
+        initializeState();
 
-                renderCurrentApp(
-                    route,
-                    state
-                );
-            }
+        subscribeToState();
+
+        setLoadingState(
+            true
         );
 
-        renderLoadingState();
-
-        await initializeData();
-
-        refreshRoute();
-
-        console.info(
-            `${APP_CONFIG.APP_NAME} ${APP_CONFIG.APP_VERSION} wurde gestartet.`
+        setErrorState(
+            null
         );
 
-    } catch (error) {
+        await loadApplicationData();
+
+        validateCurrentObject();
+
+        appInitialized =
+            true;
+
+        startRouter();
+
+        setLoadingState(
+            false
+        );
+
+        renderCurrentApp();
+    }
+    catch (error) {
 
         console.error(
-            "Facility OS konnte nicht gestartet werden:",
+            "Facility OS konnte nicht gestartet werden.",
             error
         );
 
-        renderFatalDataError(
-            error.message ??
+        appInitialized =
+            false;
+
+        dataLoaded =
+            false;
+
+        setLoadingState(
+            false
+        );
+
+        setErrorState(
+            error
+        );
+
+        renderFatalError(
             error
         );
     }
 }
 
 /************************************************
- * EVENTS
+ * UNBEHANDELTE FEHLER
  ************************************************/
 
 window.addEventListener(
-    "DOMContentLoaded",
-    initializeApplication
+    "error",
+    (event) => {
+
+        console.error(
+            "Nicht behandelter JavaScript-Fehler:",
+            event.error ??
+            event.message
+        );
+    }
 );
 
 window.addEventListener(
-    "facility-os-refresh",
-    refreshRoute
+    "unhandledrejection",
+    (event) => {
+
+        console.error(
+            "Nicht behandelter Promise-Fehler:",
+            event.reason
+        );
+    }
 );
+
+/************************************************
+ * STARTPUNKT
+ ************************************************/
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeApplication,
+        {
+            once:
+                true
+        }
+    );
+}
+else {
+
+    initializeApplication();
+}
