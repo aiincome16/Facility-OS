@@ -1,207 +1,423 @@
 /************************************************
  * Facility OS
  * appState.js
+ *
+ * Zentrale Zustandsverwaltung
+ * - Benutzersitzung
+ * - aktuelles Objekt
+ * - Schichtstatus
+ * - geladene Datenbestände
+ * - lokale Persistenz
+ * - Listener für UI-Aktualisierungen
+ * - vorbereitet für spätere API-/Sheets-Anbindung
  ************************************************/
-
-import {
-    APP_CONFIG
-} from "./config/appConfig.js";
-
-import {
-    loadFromStorage,
-    saveToStorage,
-    removeFromStorage
-} from "./services/storageService.js";
 
 /************************************************
- * GRUNDZUSTAND
+ * SPEICHERSCHLÜSSEL
  ************************************************/
 
-const INITIAL_STATE = Object.freeze({
+const STORAGE_KEYS = Object.freeze({
 
-    initialized: false,
+    SESSION:
+        "facility_os_session",
 
-    dataLoaded: false,
+    CURRENT_OBJECT:
+        "facility_os_current_object",
 
-    loading: false,
+    CURRENT_SHIFT:
+        "facility_os_current_shift",
 
-    error: null,
-
-    dataSource: null,
-
-    dataLoadedAt: null,
-
-    dataWarnings: [],
-
-    currentRoute:
-        APP_CONFIG.DEFAULT_ROUTE,
-
-    currentUser: null,
-
-    currentObject: null,
-
-    currentShift: null,
-
-    shiftStarted: false,
-
-    users: [],
-
-    objects: [],
-
-    rooms: [],
-
-    tasks: [],
-
-    materials: [],
-
-    materialStock: [],
-
-    shifts: [],
-
-    checkins: [],
-
-    checkouts: [],
-
-    tickets: [],
-
-    messages: [],
-
-    notifications: [],
-
-    objectGuide: [],
-
-    objectSettings: [],
-
-    taskLogs: [],
-
-    timeDeviations: [],
-
-    keybook: [],
-
-    customerAccess: [],
-
-    customerRequests: [],
-
-    workOrders: [],
-
-    objectSecurity: [],
-
-    objectWaste: [],
-
-    userPerformance: [],
-
-    help: []
+    APP_STATE:
+        "facility_os_app_state"
 });
 
 /************************************************
- * INTERNE VARIABLEN
+ * DATENSAMMLUNGEN
  ************************************************/
 
-let appState =
-    createInitialState();
-
-const listeners =
-    new Set();
+const DATA_COLLECTION_NAMES =
+    Object.freeze([
+        "users",
+        "objects",
+        "rooms",
+        "tasks",
+        "materials",
+        "materialStock",
+        "shifts",
+        "tickets",
+        "notifications",
+        "messages",
+        "objectGuide",
+        "objectSettings",
+        "checkins",
+        "checkouts",
+        "taskLogs",
+        "timeDeviations",
+        "keybook",
+        "customerAccess",
+        "objectSecurity",
+        "objectWaste",
+        "userPerformance",
+        "help",
+        "customerRequests",
+        "workOrders"
+    ]);
 
 /************************************************
- * INTERNE HELFER
+ * INITIALER STATUS
  ************************************************/
+
+function createInitialDataCollections() {
+
+    const collections = {};
+
+    DATA_COLLECTION_NAMES.forEach(
+        (collectionName) => {
+
+            collections[
+                collectionName
+            ] = [];
+        }
+    );
+
+    return collections;
+}
 
 function createInitialState() {
 
     return {
 
-        ...INITIAL_STATE,
+        loading:
+            false,
 
-        dataWarnings: [],
+        error:
+            null,
 
-        users: [],
+        initialized:
+            false,
 
-        objects: [],
+        currentRoute:
+            "/dashboard",
 
-        rooms: [],
+        currentUser:
+            null,
 
-        tasks: [],
+        currentObject:
+            null,
 
-        materials: [],
+        currentShift:
+            null,
 
-        materialStock: [],
+        shiftStarted:
+            false,
 
-        shifts: [],
+        sessionRestored:
+            false,
 
-        checkins: [],
+        lastUpdatedAt:
+            null,
 
-        checkouts: [],
+        dataSource:
+            "LOCAL_JSON",
 
-        tickets: [],
-
-        messages: [],
-
-        notifications: [],
-
-        objectGuide: [],
-
-        objectSettings: [],
-
-        taskLogs: [],
-
-        timeDeviations: [],
-
-        keybook: [],
-
-        customerAccess: [],
-
-        customerRequests: [],
-
-        workOrders: [],
-
-        objectSecurity: [],
-
-        objectWaste: [],
-
-        userPerformance: [],
-
-        help: []
+        ...createInitialDataCollections()
     };
+}
+
+/************************************************
+ * ZENTRALER APP-STATUS
+ ************************************************/
+
+const appState =
+    createInitialState();
+
+/************************************************
+ * LISTENER
+ ************************************************/
+
+const subscribers =
+    new Set();
+
+/************************************************
+ * BASISHELFER
+ ************************************************/
+
+function asArray(value) {
+
+    return Array.isArray(value)
+        ? value
+        : [];
+}
+
+function asObject(value) {
+
+    return (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    )
+        ? value
+        : {};
 }
 
 function cloneValue(value) {
 
     if (
-        typeof structuredClone ===
-        "function"
+        value === undefined
     ) {
 
-        return structuredClone(value);
+        return undefined;
     }
 
-    return JSON.parse(
-        JSON.stringify(value)
-    );
+    try {
+
+        return structuredClone(
+            value
+        );
+    }
+    catch {
+
+        return JSON.parse(
+            JSON.stringify(
+                value
+            )
+        );
+    }
 }
 
-function normalizeArray(value) {
+function normalizeId(value) {
 
-    return Array.isArray(value)
-        ? [...value]
-        : [];
+    return String(value ?? "")
+        .trim();
 }
 
-function notifyListeners() {
+/************************************************
+ * LOCAL-STORAGE
+ ************************************************/
 
-    const stateSnapshot =
-        getAppState();
+function readStorage(key) {
 
-    listeners.forEach(
-        (listener) => {
+    try {
+
+        const rawValue =
+            window.localStorage.getItem(
+                key
+            );
+
+        if (!rawValue) {
+            return null;
+        }
+
+        return JSON.parse(
+            rawValue
+        );
+    }
+    catch (error) {
+
+        console.warn(
+            `Gespeicherte Daten konnten nicht gelesen werden: ${key}`,
+            error
+        );
+
+        return null;
+    }
+}
+
+function writeStorage(
+    key,
+    value
+) {
+
+    try {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            window.localStorage.removeItem(
+                key
+            );
+
+            return true;
+        }
+
+        window.localStorage.setItem(
+            key,
+            JSON.stringify(
+                value
+            )
+        );
+
+        return true;
+    }
+    catch (error) {
+
+        console.warn(
+            `Daten konnten nicht gespeichert werden: ${key}`,
+            error
+        );
+
+        return false;
+    }
+}
+
+function removeStorage(key) {
+
+    try {
+
+        window.localStorage.removeItem(
+            key
+        );
+    }
+    catch (error) {
+
+        console.warn(
+            `Gespeicherte Daten konnten nicht entfernt werden: ${key}`,
+            error
+        );
+    }
+}
+
+/************************************************
+ * PERSISTIERBARE SITZUNG
+ ************************************************/
+
+function persistSession() {
+
+    if (
+        appState.currentUser
+    ) {
+
+        writeStorage(
+            STORAGE_KEYS.SESSION,
+            {
+                currentUser:
+                    appState.currentUser,
+
+                savedAt:
+                    new Date().toISOString()
+            }
+        );
+    }
+    else {
+
+        removeStorage(
+            STORAGE_KEYS.SESSION
+        );
+    }
+
+    if (
+        appState.currentObject
+    ) {
+
+        writeStorage(
+            STORAGE_KEYS.CURRENT_OBJECT,
+            appState.currentObject
+        );
+    }
+    else {
+
+        removeStorage(
+            STORAGE_KEYS.CURRENT_OBJECT
+        );
+    }
+
+    if (
+        appState.currentShift &&
+        appState.shiftStarted === true
+    ) {
+
+        writeStorage(
+            STORAGE_KEYS.CURRENT_SHIFT,
+            appState.currentShift
+        );
+    }
+    else {
+
+        removeStorage(
+            STORAGE_KEYS.CURRENT_SHIFT
+        );
+    }
+}
+
+function restoreSession() {
+
+    const storedSession =
+        asObject(
+            readStorage(
+                STORAGE_KEYS.SESSION
+            )
+        );
+
+    const storedObject =
+        readStorage(
+            STORAGE_KEYS.CURRENT_OBJECT
+        );
+
+    const storedShift =
+        readStorage(
+            STORAGE_KEYS.CURRENT_SHIFT
+        );
+
+    if (
+        storedSession.currentUser
+    ) {
+
+        appState.currentUser =
+            cloneValue(
+                storedSession.currentUser
+            );
+    }
+
+    if (
+        storedObject &&
+        typeof storedObject === "object"
+    ) {
+
+        appState.currentObject =
+            cloneValue(
+                storedObject
+            );
+    }
+
+    if (
+        storedShift &&
+        typeof storedShift === "object"
+    ) {
+
+        appState.currentShift =
+            cloneValue(
+                storedShift
+            );
+
+        appState.shiftStarted =
+            true;
+    }
+
+    appState.sessionRestored =
+        true;
+}
+
+/************************************************
+ * ÄNDERUNGEN MELDEN
+ ************************************************/
+
+function notifySubscribers() {
+
+    appState.lastUpdatedAt =
+        new Date().toISOString();
+
+    subscribers.forEach(
+        (subscriber) => {
 
             try {
 
-                listener(
-                    stateSnapshot
+                subscriber(
+                    getAppState()
                 );
-
-            } catch (error) {
+            }
+            catch (error) {
 
                 console.error(
                     "Fehler in einem App-State-Listener:",
@@ -212,407 +428,449 @@ function notifyListeners() {
     );
 }
 
-function persistSession() {
-
-    const session = {
-
-        currentUser:
-            appState.currentUser,
-
-        currentObject:
-            appState.currentObject,
-
-        currentShift:
-            appState.currentShift,
-
-        shiftStarted:
-            appState.shiftStarted,
-
-        savedAt:
-            new Date().toISOString()
-    };
-
-    saveToStorage(
-        APP_CONFIG.STORAGE_KEYS.SESSION,
-        session
-    );
-}
-
-function isSessionExpired(
-    savedAt
-) {
-
-    if (!savedAt) {
-        return true;
-    }
-
-    const savedAtTime =
-        new Date(savedAt).getTime();
-
-    if (
-        Number.isNaN(savedAtTime)
-    ) {
-
-        return true;
-    }
-
-    const timeoutMinutes =
-        Number(
-            APP_CONFIG
-                .SESSION_TIMEOUT_MINUTES
-        );
-
-    const timeoutMs =
-        timeoutMinutes *
-        60 *
-        1000;
-
-    return (
-        Date.now() - savedAtTime >
-        timeoutMs
-    );
-}
-
 /************************************************
  * INITIALISIERUNG
  ************************************************/
 
 export function initializeAppState() {
 
-    const storedSession =
-        loadFromStorage(
-            APP_CONFIG.STORAGE_KEYS.SESSION,
-            null
-        );
-
     if (
-        storedSession?.currentUser &&
-        !isSessionExpired(
-            storedSession.savedAt
-        )
+        appState.initialized === true
     ) {
 
-        appState = {
-
-            ...appState,
-
-            currentUser:
-                cloneValue(
-                    storedSession.currentUser
-                ),
-
-            currentObject:
-                storedSession.currentObject
-                    ? cloneValue(
-                        storedSession.currentObject
-                    )
-                    : null,
-
-            currentShift:
-                storedSession.currentShift
-                    ? cloneValue(
-                        storedSession.currentShift
-                    )
-                    : null,
-
-            shiftStarted:
-                Boolean(
-                    storedSession.shiftStarted
-                ),
-
-            currentRoute:
-                APP_CONFIG
-                    .AUTHENTICATED_DEFAULT_ROUTE
-        };
-
-    } else {
-
-        removeFromStorage(
-            APP_CONFIG.STORAGE_KEYS.SESSION
-        );
+        return getAppState();
     }
 
-    appState.initialized = true;
+    restoreSession();
 
-    notifyListeners();
+    appState.initialized =
+        true;
+
+    appState.lastUpdatedAt =
+        new Date().toISOString();
 
     return getAppState();
 }
 
 /************************************************
- * STATE LESEN
+ * STATUS AUSLESEN
  ************************************************/
 
 export function getAppState() {
+
+    return appState;
+}
+
+export function getAppStateSnapshot() {
 
     return cloneValue(
         appState
     );
 }
 
+export function getCurrentUser() {
+
+    return appState.currentUser;
+}
+
+export function getCurrentObject() {
+
+    return appState.currentObject;
+}
+
+export function getCurrentShift() {
+
+    return appState.currentShift;
+}
+
+export function getCurrentRoute() {
+
+    return appState.currentRoute;
+}
+
 /************************************************
- * STATE AKTUALISIEREN
+ * STATUS AKTUALISIEREN
  ************************************************/
 
 export function updateAppState(
-    partialState
+    partialState,
+    {
+        notify = true,
+        persist = false
+    } = {}
 ) {
 
-    if (
-        !partialState ||
-        typeof partialState !== "object" ||
-        Array.isArray(partialState)
-    ) {
-
-        throw new TypeError(
-            "updateAppState erwartet ein Objekt."
+    const update =
+        asObject(
+            partialState
         );
+
+    Object.entries(
+        update
+    ).forEach(
+        ([
+            key,
+            value
+        ]) => {
+
+            appState[key] =
+                value;
+        }
+    );
+
+    if (persist) {
+
+        persistSession();
     }
 
-    appState = {
+    if (notify) {
 
-        ...appState,
-
-        ...cloneValue(
-            partialState
-        )
-    };
-
-    notifyListeners();
+        notifySubscribers();
+    }
 
     return getAppState();
 }
 
 /************************************************
- * DATEN ÜBERNEHMEN
+ * DATENBESTÄNDE SETZEN
  ************************************************/
 
 export function setDataCollections(
     collections,
-    metadata = {}
+    {
+        notify = false
+    } = {}
 ) {
 
-    if (
-        !collections ||
-        typeof collections !== "object" ||
-        Array.isArray(collections)
-    ) {
-
-        throw new TypeError(
-            "Die geladenen Daten müssen als Objekt übergeben werden."
+    const normalizedCollections =
+        asObject(
+            collections
         );
+
+    DATA_COLLECTION_NAMES.forEach(
+        (collectionName) => {
+
+            appState[
+                collectionName
+            ] =
+                asArray(
+                    normalizedCollections[
+                        collectionName
+                    ]
+                );
+        }
+    );
+
+    reconcilePersistedEntities();
+
+    appState.lastUpdatedAt =
+        new Date().toISOString();
+
+    if (notify) {
+
+        notifySubscribers();
     }
-
-    appState = {
-
-        ...appState,
-
-        users:
-            normalizeArray(
-                collections.users
-            ),
-
-        objects:
-            normalizeArray(
-                collections.objects
-            ),
-
-        rooms:
-            normalizeArray(
-                collections.rooms
-            ),
-
-        tasks:
-            normalizeArray(
-                collections.tasks
-            ),
-
-        materials:
-            normalizeArray(
-                collections.materials
-            ),
-
-        materialStock:
-            normalizeArray(
-                collections.materialStock
-            ),
-
-        shifts:
-            normalizeArray(
-                collections.shifts
-            ),
-
-        checkins:
-            normalizeArray(
-                collections.checkins
-            ),
-
-        checkouts:
-            normalizeArray(
-                collections.checkouts
-            ),
-
-        tickets:
-            normalizeArray(
-                collections.tickets
-            ),
-
-        messages:
-            normalizeArray(
-                collections.messages
-            ),
-
-        notifications:
-            normalizeArray(
-                collections.notifications
-            ),
-
-        objectGuide:
-            normalizeArray(
-                collections.objectGuide
-            ),
-
-        objectSettings:
-            normalizeArray(
-                collections.objectSettings
-            ),
-
-        taskLogs:
-            normalizeArray(
-                collections.taskLogs
-            ),
-
-        timeDeviations:
-            normalizeArray(
-                collections.timeDeviations
-            ),
-
-        keybook:
-            normalizeArray(
-                collections.keybook
-            ),
-
-        customerAccess:
-            normalizeArray(
-                collections.customerAccess
-            ),
-
-        customerRequests:
-            normalizeArray(
-                collections.customerRequests
-            ),
-
-        workOrders:
-            normalizeArray(
-                collections.workOrders
-            ),
-
-        objectSecurity:
-            normalizeArray(
-                collections.objectSecurity
-            ),
-
-        objectWaste:
-            normalizeArray(
-                collections.objectWaste
-            ),
-
-        userPerformance:
-            normalizeArray(
-                collections.userPerformance
-            ),
-
-        help:
-            normalizeArray(
-                collections.help
-            ),
-
-        dataLoaded: true,
-
-        dataSource:
-            metadata.source ??
-            null,
-
-        dataLoadedAt:
-            metadata.loadedAt ??
-            new Date().toISOString(),
-
-        dataWarnings:
-            normalizeArray(
-                metadata.warnings
-            ),
-
-        loading: false,
-
-        error: null
-    };
-
-    notifyListeners();
 
     return getAppState();
 }
 
 /************************************************
- * LADESTATUS
+ * PERSISTIERTE ENTITÄTEN MIT GELADENEN DATEN
+ * ABGLEICHEN
  ************************************************/
 
-export function setLoading(
-    loading
-) {
+function reconcilePersistedEntities() {
 
-    updateAppState({
+    if (
+        appState.currentUser?.id
+    ) {
 
-        loading:
-            Boolean(loading)
-    });
-}
+        const matchingUser =
+            appState.users.find(
+                (user) =>
+                    user.id ===
+                    appState.currentUser.id
+            );
 
-export function setError(
-    error
-) {
+        if (matchingUser) {
 
-    updateAppState({
+            appState.currentUser = {
+                ...matchingUser,
 
-        error:
-            error
-                ? String(
-                    error.message ??
-                    error
-                )
-                : null,
+                ...appState.currentUser
+            };
+        }
+    }
 
-        loading: false
-    });
-}
+    if (
+        appState.currentObject?.id
+    ) {
 
-export function clearError() {
+        const matchingObject =
+            appState.objects.find(
+                (object) =>
+                    object.id ===
+                    appState.currentObject.id
+            );
 
-    updateAppState({
-        error: null
-    });
+        if (matchingObject) {
+
+            appState.currentObject =
+                matchingObject;
+        }
+        else {
+
+            appState.currentObject =
+                null;
+        }
+    }
+
+    if (
+        appState.currentShift?.id
+    ) {
+
+        const matchingShift =
+            appState.shifts.find(
+                (shift) =>
+                    shift.id ===
+                    appState.currentShift.id
+            );
+
+        if (matchingShift) {
+
+            appState.currentShift = {
+                ...matchingShift,
+
+                ...appState.currentShift
+            };
+        }
+    }
+
+    persistSession();
 }
 
 /************************************************
- * ROUTING
+ * EINZELNE DATENSAMMLUNG SETZEN
  ************************************************/
 
-export function setCurrentRoute(
-    route
+export function setCollection(
+    collectionName,
+    values,
+    {
+        notify = true
+    } = {}
 ) {
 
     if (
-        typeof route !== "string" ||
-        route.trim() === ""
+        !DATA_COLLECTION_NAMES.includes(
+            collectionName
+        )
     ) {
 
-        return;
+        throw new Error(
+            `Unbekannte Datensammlung: ${collectionName}`
+        );
     }
 
-    updateAppState({
+    appState[
+        collectionName
+    ] =
+        asArray(
+            values
+        );
 
-        currentRoute:
-            route.trim()
-    });
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return appState[
+        collectionName
+    ];
+}
+
+/************************************************
+ * EINTRAG HINZUFÜGEN
+ ************************************************/
+
+export function addCollectionEntry(
+    collectionName,
+    entry,
+    {
+        notify = true
+    } = {}
+) {
+
+    if (
+        !DATA_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        throw new Error(
+            `Unbekannte Datensammlung: ${collectionName}`
+        );
+    }
+
+    const normalizedEntry =
+        asObject(
+            entry
+        );
+
+    appState[
+        collectionName
+    ] = [
+        ...asArray(
+            appState[
+                collectionName
+            ]
+        ),
+
+        normalizedEntry
+    ];
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return normalizedEntry;
+}
+
+/************************************************
+ * EINTRAG AKTUALISIEREN
+ ************************************************/
+
+export function updateCollectionEntry(
+    collectionName,
+    entryId,
+    changes,
+    {
+        notify = true
+    } = {}
+) {
+
+    if (
+        !DATA_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        throw new Error(
+            `Unbekannte Datensammlung: ${collectionName}`
+        );
+    }
+
+    const normalizedId =
+        normalizeId(
+            entryId
+        );
+
+    const normalizedChanges =
+        asObject(
+            changes
+        );
+
+    let updatedEntry =
+        null;
+
+    appState[
+        collectionName
+    ] =
+        asArray(
+            appState[
+                collectionName
+            ]
+        ).map(
+            (entry) => {
+
+                if (
+                    entry.id !==
+                    normalizedId
+                ) {
+
+                    return entry;
+                }
+
+                updatedEntry = {
+                    ...entry,
+
+                    ...normalizedChanges
+                };
+
+                return updatedEntry;
+            }
+        );
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return updatedEntry;
+}
+
+/************************************************
+ * EINTRAG ENTFERNEN
+ ************************************************/
+
+export function removeCollectionEntry(
+    collectionName,
+    entryId,
+    {
+        notify = true
+    } = {}
+) {
+
+    if (
+        !DATA_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        throw new Error(
+            `Unbekannte Datensammlung: ${collectionName}`
+        );
+    }
+
+    const normalizedId =
+        normalizeId(
+            entryId
+        );
+
+    const previousLength =
+        appState[
+            collectionName
+        ].length;
+
+    appState[
+        collectionName
+    ] =
+        asArray(
+            appState[
+                collectionName
+            ]
+        ).filter(
+            (entry) =>
+                entry.id !==
+                normalizedId
+        );
+
+    const removed =
+        appState[
+            collectionName
+        ].length <
+        previousLength;
+
+    if (
+        removed &&
+        notify
+    ) {
+
+        notifySubscribers();
+    }
+
+    return removed;
 }
 
 /************************************************
@@ -620,83 +878,44 @@ export function setCurrentRoute(
  ************************************************/
 
 export function setCurrentUser(
-    user
+    user,
+    {
+        notify = true,
+        persist = true
+    } = {}
 ) {
 
-    if (
-        !user ||
-        typeof user !== "object"
-    ) {
+    appState.currentUser =
+        user &&
+        typeof user === "object"
+            ? cloneValue(
+                user
+            )
+            : null;
 
-        throw new TypeError(
-            "Es wurde kein gültiger Benutzer übergeben."
-        );
+    if (!appState.currentUser) {
+
+        appState.currentObject =
+            null;
+
+        appState.currentShift =
+            null;
+
+        appState.shiftStarted =
+            false;
     }
 
-    if (!user.id) {
+    if (persist) {
 
-        throw new Error(
-            "Der Benutzer benötigt eine ID."
-        );
+        persistSession();
     }
 
-    if (!user.role) {
+    if (notify) {
 
-        throw new Error(
-            "Der Benutzer benötigt eine Rolle."
-        );
+        notifySubscribers();
     }
 
-    appState = {
-
-        ...appState,
-
-        currentUser:
-            cloneValue(user),
-
-        currentObject: null,
-
-        currentShift: null,
-
-        shiftStarted: false,
-
-        error: null
-    };
-
-    persistSession();
-
-    notifyListeners();
-
-    return getAppState();
-}
-
-export function logoutCurrentUser() {
-
-    appState = {
-
-        ...appState,
-
-        currentUser: null,
-
-        currentObject: null,
-
-        currentShift: null,
-
-        shiftStarted: false,
-
-        currentRoute:
-            APP_CONFIG.DEFAULT_ROUTE,
-
-        error: null
-    };
-
-    removeFromStorage(
-        APP_CONFIG.STORAGE_KEYS.SESSION
-    );
-
-    notifyListeners();
-
-    return getAppState();
+    return appState.currentUser;
 }
 
 /************************************************
@@ -704,318 +923,418 @@ export function logoutCurrentUser() {
  ************************************************/
 
 export function setCurrentObject(
-    object
+    object,
+    {
+        notify = true,
+        persist = true
+    } = {}
 ) {
 
-    appState = {
-
-        ...appState,
-
-        currentObject:
-            object
-                ? cloneValue(object)
-                : null
-    };
-
-    persistSession();
-
-    notifyListeners();
-
-    return getAppState();
-}
-
-/************************************************
- * SCHICHT
- ************************************************/
-
-export function setCurrentShift(
-    shift
-) {
-
-    appState = {
-
-        ...appState,
-
-        currentShift:
-            shift
-                ? cloneValue(shift)
-                : null,
-
-        shiftStarted:
-            Boolean(
-                shift &&
-                shift.status === "ACTIVE"
+    appState.currentObject =
+        object &&
+        typeof object === "object"
+            ? cloneValue(
+                object
             )
-    };
+            : null;
 
-    persistSession();
+    if (persist) {
 
-    notifyListeners();
-
-    return getAppState();
-}
-
-export function startShift(
-    shift = null
-) {
-
-    const activeShift = {
-
-        ...(shift
-            ? cloneValue(shift)
-            : {}),
-
-        status: "ACTIVE"
-    };
-
-    appState = {
-
-        ...appState,
-
-        currentShift:
-            activeShift,
-
-        shiftStarted: true
-    };
-
-    persistSession();
-
-    notifyListeners();
-
-    return getAppState();
-}
-
-export function stopShift() {
-
-    appState = {
-
-        ...appState,
-
-        currentShift: null,
-
-        shiftStarted: false
-    };
-
-    persistSession();
-
-    notifyListeners();
-
-    return getAppState();
-}
-
-/************************************************
- * DATENSUCHE
- ************************************************/
-
-export function findUserById(
-    userId
-) {
-
-    return (
-        appState.users.find(
-            (user) =>
-                user.id === userId
-        ) ?? null
-    );
-}
-
-export function findObjectById(
-    objectId
-) {
-
-    return (
-        appState.objects.find(
-            (object) =>
-                object.id === objectId
-        ) ?? null
-    );
-}
-
-export function findRoomById(
-    roomId
-) {
-
-    return (
-        appState.rooms.find(
-            (room) =>
-                room.id === roomId
-        ) ?? null
-    );
-}
-
-export function findTaskById(
-    taskId
-) {
-
-    return (
-        appState.tasks.find(
-            (task) =>
-                task.id === taskId
-        ) ?? null
-    );
-}
-
-export function getObjectsForUser(
-    userId
-) {
-
-    const user =
-        findUserById(
-            userId
-        );
-
-    if (!user) {
-        return [];
+        persistSession();
     }
 
-    const assignedObjectIds =
-        Array.isArray(
-            user.assignedObjectIds
-        )
-            ? user.assignedObjectIds
-            : [];
+    if (notify) {
 
-    return appState.objects.filter(
-        (object) => {
+        notifySubscribers();
+    }
 
-            return (
-                assignedObjectIds.includes(
-                    object.id
-                ) ||
-                object.objectLeaderId ===
-                    userId
+    return appState.currentObject;
+}
+
+/************************************************
+ * ROUTE
+ ************************************************/
+
+export function setCurrentRoute(
+    route,
+    {
+        notify = false
+    } = {}
+) {
+
+    const normalizedRoute =
+        String(
+            route ??
+            "/dashboard"
+        ).trim() ||
+        "/dashboard";
+
+    appState.currentRoute =
+        normalizedRoute;
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return appState.currentRoute;
+}
+
+/************************************************
+ * LADESTATUS
+ ************************************************/
+
+export function setLoading(
+    loading,
+    {
+        notify = false
+    } = {}
+) {
+
+    appState.loading =
+        loading === true;
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return appState.loading;
+}
+
+/************************************************
+ * FEHLERSTATUS
+ ************************************************/
+
+export function setError(
+    error,
+    {
+        notify = false
+    } = {}
+) {
+
+    appState.error =
+        error
+            ? String(error)
+            : null;
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return appState.error;
+}
+
+/************************************************
+ * SCHICHT STARTEN
+ ************************************************/
+
+export function startShift(
+    shift = null,
+    {
+        notify = true,
+        persist = true
+    } = {}
+) {
+
+    const stateUser =
+        appState.currentUser;
+
+    const stateObject =
+        appState.currentObject;
+
+    const normalizedShift =
+        shift &&
+        typeof shift === "object"
+            ? cloneValue(
+                shift
+            )
+            : {
+                id:
+                    `SHIFT-LOCAL-${Date.now()}`,
+
+                userId:
+                    stateUser?.id ??
+                    null,
+
+                employeeId:
+                    stateUser?.id ??
+                    null,
+
+                objectId:
+                    stateObject?.id ??
+                    null,
+
+                startTime:
+                    new Date().toISOString(),
+
+                endTime:
+                    null,
+
+                status:
+                    "RUNNING",
+
+                source:
+                    "LOCAL_TEST"
+            };
+
+    appState.currentShift =
+        normalizedShift;
+
+    appState.shiftStarted =
+        true;
+
+    if (persist) {
+
+        persistSession();
+    }
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return appState.currentShift;
+}
+
+/************************************************
+ * SCHICHT BEENDEN
+ ************************************************/
+
+export function stopShift(
+    completedShift = null,
+    {
+        notify = true,
+        persist = true
+    } = {}
+) {
+
+    const finalShift =
+        completedShift &&
+        typeof completedShift === "object"
+            ? cloneValue(
+                completedShift
+            )
+            : (
+                appState.currentShift
+                    ? {
+                        ...appState.currentShift,
+
+                        endTime:
+                            new Date().toISOString(),
+
+                        status:
+                            "FINISHED"
+                    }
+                    : null
             );
-        }
+
+    appState.currentShift =
+        null;
+
+    appState.shiftStarted =
+        false;
+
+    if (persist) {
+
+        persistSession();
+    }
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return finalShift;
+}
+
+/************************************************
+ * LOGOUT
+ ************************************************/
+
+export function logoutCurrentUser({
+    notify = true
+} = {}) {
+
+    appState.currentUser =
+        null;
+
+    appState.currentObject =
+        null;
+
+    appState.currentShift =
+        null;
+
+    appState.shiftStarted =
+        false;
+
+    appState.currentRoute =
+        "/login";
+
+    removeStorage(
+        STORAGE_KEYS.SESSION
+    );
+
+    removeStorage(
+        STORAGE_KEYS.CURRENT_OBJECT
+    );
+
+    removeStorage(
+        STORAGE_KEYS.CURRENT_SHIFT
+    );
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return true;
+}
+
+/************************************************
+ * SUCHE UND FILTER
+ ************************************************/
+
+export function findById(
+    collectionName,
+    entryId
+) {
+
+    if (
+        !DATA_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        return null;
+    }
+
+    const normalizedId =
+        normalizeId(
+            entryId
+        );
+
+    return (
+        asArray(
+            appState[
+                collectionName
+            ]
+        ).find(
+            (entry) =>
+                entry.id ===
+                normalizedId
+        ) ??
+        null
     );
 }
 
-export function getRoomsForObject(
+export function getRoomsByObjectId(
     objectId
 ) {
 
-    return appState.rooms
-        .filter(
-            (room) =>
-                room.objectId ===
-                objectId
-        )
-        .sort(
-            (firstRoom, secondRoom) => {
-
-                return (
-                    Number(
-                        firstRoom.sequence ?? 0
-                    ) -
-                    Number(
-                        secondRoom.sequence ?? 0
-                    )
-                );
-            }
+    const normalizedObjectId =
+        normalizeId(
+            objectId
         );
+
+    return appState.rooms.filter(
+        (room) =>
+            room.objectId ===
+            normalizedObjectId
+    );
 }
 
-export function getTasksForObject(
+export function getTasksByObjectId(
     objectId
 ) {
 
-    return appState.tasks
-        .filter(
-            (task) =>
-                task.objectId ===
-                objectId
-        )
-        .sort(
-            (firstTask, secondTask) => {
-
-                return (
-                    Number(
-                        firstTask.sequence ?? 0
-                    ) -
-                    Number(
-                        secondTask.sequence ?? 0
-                    )
-                );
-            }
+    const normalizedObjectId =
+        normalizeId(
+            objectId
         );
+
+    return appState.tasks.filter(
+        (task) =>
+            task.objectId ===
+            normalizedObjectId
+    );
 }
 
-export function getTasksForRoom(
+export function getTasksByRoomId(
     roomId
 ) {
 
-    return appState.tasks
-        .filter(
-            (task) =>
-                task.roomId ===
-                roomId
-        )
-        .sort(
-            (firstTask, secondTask) => {
-
-                return (
-                    Number(
-                        firstTask.sequence ?? 0
-                    ) -
-                    Number(
-                        secondTask.sequence ?? 0
-                    )
-                );
-            }
+    const normalizedRoomId =
+        normalizeId(
+            roomId
         );
+
+    return appState.tasks.filter(
+        (task) =>
+            task.roomId ===
+            normalizedRoomId
+    );
 }
 
-export function getTicketsForObject(
+export function getTicketsByObjectId(
     objectId
 ) {
+
+    const normalizedObjectId =
+        normalizeId(
+            objectId
+        );
 
     return appState.tickets.filter(
         (ticket) =>
             ticket.objectId ===
-            objectId
+            normalizedObjectId
     );
 }
 
-export function getNotificationsForUser(
-    userId
+export function getMaterialStockByObjectId(
+    objectId
 ) {
 
-    return appState.notifications.filter(
-        (notification) =>
-            notification.userId ===
-            userId
+    const normalizedObjectId =
+        normalizeId(
+            objectId
+        );
+
+    return appState.materialStock.filter(
+        (stock) =>
+            stock.objectId ===
+            normalizedObjectId
+    );
+}
+
+export function getShiftsByObjectId(
+    objectId
+) {
+
+    const normalizedObjectId =
+        normalizeId(
+            objectId
+        );
+
+    return appState.shifts.filter(
+        (shift) =>
+            shift.objectId ===
+            normalizedObjectId
     );
 }
 
 /************************************************
- * STATE ZURÜCKSETZEN
- ************************************************/
-
-export function resetAppState() {
-
-    appState =
-        createInitialState();
-
-    appState.initialized = true;
-
-    removeFromStorage(
-        APP_CONFIG.STORAGE_KEYS.SESSION
-    );
-
-    notifyListeners();
-
-    return getAppState();
-}
-
-/************************************************
- * LISTENER
+ * LISTENER REGISTRIEREN
  ************************************************/
 
 export function subscribeToAppState(
-    listener
+    subscriber
 ) {
 
     if (
-        typeof listener !==
+        typeof subscriber !==
         "function"
     ) {
 
@@ -1024,14 +1343,125 @@ export function subscribeToAppState(
         );
     }
 
-    listeners.add(
-        listener
+    subscribers.add(
+        subscriber
     );
 
-    return function unsubscribe() {
+    return () => {
 
-        listeners.delete(
-            listener
+        subscribers.delete(
+            subscriber
         );
     };
+}
+
+/************************************************
+ * STATUS ZURÜCKSETZEN
+ ************************************************/
+
+export function resetAppState({
+    preserveData = false,
+    preserveSession = false,
+    notify = true
+} = {}) {
+
+    const preservedCollections =
+        preserveData
+            ? DATA_COLLECTION_NAMES.reduce(
+                (
+                    result,
+                    collectionName
+                ) => {
+
+                    result[
+                        collectionName
+                    ] =
+                        appState[
+                            collectionName
+                        ];
+
+                    return result;
+                },
+                {}
+            )
+            : createInitialDataCollections();
+
+    const preservedUser =
+        preserveSession
+            ? appState.currentUser
+            : null;
+
+    const preservedObject =
+        preserveSession
+            ? appState.currentObject
+            : null;
+
+    const preservedShift =
+        preserveSession
+            ? appState.currentShift
+            : null;
+
+    const newState =
+        createInitialState();
+
+    Object.assign(
+        appState,
+        newState,
+        preservedCollections,
+        {
+            currentUser:
+                preservedUser,
+
+            currentObject:
+                preservedObject,
+
+            currentShift:
+                preservedShift,
+
+            shiftStarted:
+                Boolean(
+                    preservedShift
+                )
+        }
+    );
+
+    if (!preserveSession) {
+
+        removeStorage(
+            STORAGE_KEYS.SESSION
+        );
+
+        removeStorage(
+            STORAGE_KEYS.CURRENT_OBJECT
+        );
+
+        removeStorage(
+            STORAGE_KEYS.CURRENT_SHIFT
+        );
+    }
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return getAppState();
+}
+
+/************************************************
+ * KOMPLETTER RESET
+ ************************************************/
+
+export function resetApp() {
+
+    return resetAppState({
+        preserveData:
+            false,
+
+        preserveSession:
+            false,
+
+        notify:
+            true
+    });
 }
