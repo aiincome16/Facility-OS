@@ -2,12 +2,12 @@
  * Facility OS
  * renderApp.js
  *
- * Neue reduzierte Benutzeroberfläche
+ * Reduzierte Benutzeroberfläche
  * - maximal fünf Hauptbereiche
- * - höchstens vier Kennzahlen pro Übersicht
- * - klare farbliche Bereichstrennung
- * - keine mehrfachen Funktionszugänge
+ * - höchstens vier Kennzahlen
+ * - klare Farbbereiche
  * - kompakte Unterseiten
+ * - Abmeldung im Bereich „Mehr“
  ************************************************/
 
 import {
@@ -739,7 +739,7 @@ function renderMetrics(metrics) {
 }
 
 /************************************************
- * KOMPAKTE HAUPTAKTIONEN
+ * HAUPTAKTIONEN
  ************************************************/
 
 function renderPrimaryAction({
@@ -2511,7 +2511,7 @@ function renderTimesPage(state) {
  * AUSWERTUNG UND BERICHTE
  ************************************************/
 
-function renderAnalysisPage(state) {
+function renderAnalysisPage() {
 
     return renderCompactSectionPage({
         area:
@@ -2595,7 +2595,7 @@ function renderAnalysisPage(state) {
     });
 }
 
-function renderReportsPage(state) {
+function renderReportsPage() {
 
     return renderCompactSectionPage({
         area:
@@ -2668,6 +2668,39 @@ function renderReportsPage(state) {
 /************************************************
  * MEHR
  ************************************************/
+
+function createLogoutGroup() {
+
+    return {
+        title:
+            "Sitzung",
+
+        description:
+            "Anmeldung und Benutzerkonto",
+
+        color:
+            "more",
+
+        open:
+            true,
+
+        items: [
+            {
+                title:
+                    "Abmelden",
+
+                description:
+                    "Facility OS verlassen und zur Anmeldung zurückkehren",
+
+                action:
+                    "logout",
+
+                color:
+                    "more"
+            }
+        ]
+    };
+}
 
 function getMoreGroups(state) {
 
@@ -2753,9 +2786,20 @@ function getMoreGroups(state) {
 
                         route:
                             ROUTES.PRIVACY
+                    },
+                    {
+                        title:
+                            "Impressum",
+
+                        description:
+                            "Anbieterinformationen",
+
+                        route:
+                            ROUTES.IMPRINT
                     }
                 ]
-            }
+            },
+            createLogoutGroup()
         ];
     }
 
@@ -2837,7 +2881,94 @@ function getMoreGroups(state) {
                             ROUTES.IMPRINT
                     }
                 ]
-            }
+            },
+            createLogoutGroup()
+        ];
+    }
+
+    if (
+        role ===
+        USER_ROLES.BUCHHALTUNG
+    ) {
+
+        return [
+            {
+                title:
+                    "Berichte und Archiv",
+
+                description:
+                    "Auswertungen und abgeschlossene Zeiträume",
+
+                color:
+                    "more",
+
+                open:
+                    true,
+
+                items: [
+                    {
+                        title:
+                            "Berichte",
+
+                        description:
+                            "Zeit- und Objektberichte",
+
+                        route:
+                            ROUTES.REPORTS
+                    },
+                    {
+                        title:
+                            "Archiv",
+
+                        description:
+                            "Abgeschlossene Abrechnungszeiträume"
+                    }
+                ]
+            },
+            {
+                title:
+                    "Hilfe und Rechtliches",
+
+                description:
+                    "Support und Pflichtinformationen",
+
+                color:
+                    "more",
+
+                items: [
+                    {
+                        title:
+                            "Hilfe",
+
+                        description:
+                            "Anleitungen und häufige Fragen",
+
+                        route:
+                            ROUTES.HELP
+                    },
+                    {
+                        title:
+                            "Datenschutz",
+
+                        description:
+                            "Datenschutzinformationen",
+
+                        route:
+                            ROUTES.PRIVACY
+                    },
+                    {
+                        title:
+                            "Impressum",
+
+                        description:
+                            "Anbieterinformationen",
+
+                        route:
+                            ROUTES.IMPRINT
+                    }
+                ]
+            },
+            createLogoutGroup()
         ];
     }
 
@@ -2957,7 +3088,8 @@ function getMoreGroups(state) {
                         ROUTES.IMPRINT
                 }
             ]
-        }
+        },
+        createLogoutGroup()
     ];
 }
 
@@ -2971,7 +3103,9 @@ function renderMorePage(state) {
             "Weitere Funktionen",
 
         description:
-            "Nur Funktionen, die nicht täglich benötigt werden.",
+            `${getUserName(state)} · ${getRoleLabel(
+                state.currentUser?.role
+            )}`,
 
         color:
             "more",
@@ -2984,7 +3118,7 @@ function renderMorePage(state) {
 }
 
 /************************************************
- * EINFACHE INFORMATIONSSEITEN
+ * EINFACHE INFORMATIONEN
  ************************************************/
 
 function renderInformationPage({
@@ -3081,15 +3215,11 @@ function renderRoute(
 
         case ROUTES.ANALYSIS:
 
-            return renderAnalysisPage(
-                state
-            );
+            return renderAnalysisPage();
 
         case ROUTES.REPORTS:
 
-            return renderReportsPage(
-                state
-            );
+            return renderReportsPage();
 
         case ROUTES.MORE:
 
