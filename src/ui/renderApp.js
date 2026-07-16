@@ -7,6 +7,13 @@ import {
     APP_CONFIG,
     USER_ROLES
 } from "../config/appConfig.js";
+import {
+    renderObjectsPage
+} from "./pages/objectsPage.js";
+
+import {
+    renderObjectDetailPage
+} from "./pages/objectDetailPage.js";
 
 /************************************************
  * HTML-SICHERHEIT
