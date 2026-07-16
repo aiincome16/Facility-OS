@@ -1,6 +1,12 @@
 /************************************************
  * Facility OS
  * renderApp.js
+ *
+ * Zentrale UI-Ausgabe
+ * - rollenbasierte Dashboards
+ * - Objektübersicht
+ * - vollständige Objektdetailseite
+ * - zentrale Event-Verarbeitung
  ************************************************/
 
 import {
@@ -11,6 +17,10 @@ import {
 import {
     renderObjectsPage
 } from "./pages/objectsPage.js";
+
+import {
+    renderObjectDetailPage
+} from "./pages/objectDetailPage.js";
 
 /************************************************
  * HTML-SICHERHEIT
@@ -27,12 +37,19 @@ function escapeHtml(value) {
 }
 
 /************************************************
- * ROLLENBEZEICHNUNGEN
+ * BASISHELFER
  ************************************************/
+
+function asArray(value) {
+
+    return Array.isArray(value)
+        ? value
+        : [];
+}
 
 function getRoleLabel(role) {
 
-    const roleLabels = {
+    const labels = {
 
         [USER_ROLES.SUPER_ADMIN]:
             "Super-Admin",
@@ -53,7 +70,76 @@ function getRoleLabel(role) {
             "Kunde"
     };
 
-    return roleLabels[role] ?? role ?? "Unbekannte Rolle";
+    return (
+        labels[role] ??
+        role ??
+        "Unbekannte Rolle"
+    );
+}
+
+function getOpenTickets(state) {
+
+    const closedStatuses = [
+        "RESOLVED",
+        "CLOSED",
+        "COMPLETED"
+    ];
+
+    return asArray(state.tickets)
+        .filter(
+            (ticket) =>
+                !closedStatuses.includes(
+                    String(
+                        ticket.status ?? ""
+                    ).toUpperCase()
+                )
+        );
+}
+
+function getMaterialWarnings(state) {
+
+    return asArray(state.materialStock)
+        .filter(
+            (stock) => {
+
+                const status =
+                    String(
+                        stock.status ?? ""
+                    ).toUpperCase();
+
+                if (
+                    [
+                        "LOW",
+                        "CRITICAL"
+                    ].includes(status)
+                ) {
+
+                    return true;
+                }
+
+                const currentAmount =
+                    Number(
+                        stock.currentAmount ??
+                        stock.quantity ??
+                        stock.stock ??
+                        0
+                    );
+
+                const minimumAmount =
+                    Number(
+                        stock.minimumAmount ??
+                        stock.minimumStock ??
+                        stock.minStock ??
+                        0
+                    );
+
+                return (
+                    Number.isFinite(currentAmount) &&
+                    Number.isFinite(minimumAmount) &&
+                    currentAmount <= minimumAmount
+                );
+            }
+        );
 }
 
 /************************************************
@@ -62,47 +148,85 @@ function getRoleLabel(role) {
 
 function renderHeader(state) {
 
-    if (!state.currentUser) {
+    const currentUser =
+        state.currentUser;
+
+    if (!currentUser) {
         return "";
     }
 
-    const userName =
-        escapeHtml(
-            state.currentUser.name ??
-            "Benutzer"
-        );
-
-    const roleLabel =
-        escapeHtml(
-            getRoleLabel(
-                state.currentUser.role
-            )
-        );
+    const currentObject =
+        state.currentObject;
 
     return `
         <header class="app-header">
 
-            <div>
-                <div class="app-title">
-                    ${escapeHtml(APP_CONFIG.APP_NAME)}
+            <div class="app-brand">
+
+                <div>
+
+                    <div class="app-title">
+                        ${escapeHtml(
+                            APP_CONFIG.APP_NAME ??
+                            "Facility OS"
+                        )}
+                    </div>
+
+                    <div class="app-version">
+                        Version
+                        ${escapeHtml(
+                            APP_CONFIG.APP_VERSION ??
+                            "2.0.0"
+                        )}
+                    </div>
+
                 </div>
 
-                <div class="app-version">
-                    Version
-                    ${escapeHtml(APP_CONFIG.APP_VERSION)}
-                </div>
+                ${
+                    currentObject
+                        ? `
+                            <button
+                                type="button"
+                                class="current-object-button"
+                                data-route="/object-detail"
+                            >
+                                <span>
+                                    Aktuelles Objekt
+                                </span>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        currentObject.name ??
+                                        currentObject.id
+                                    )}
+                                </strong>
+                            </button>
+                        `
+                        : ""
+                }
+
             </div>
 
             <div class="header-user">
 
                 <div>
+
                     <strong>
-                        ${userName}
+                        ${escapeHtml(
+                            currentUser.name ??
+                            currentUser.fullName ??
+                            "Benutzer"
+                        )}
                     </strong>
 
                     <span>
-                        ${roleLabel}
+                        ${escapeHtml(
+                            getRoleLabel(
+                                currentUser.role
+                            )
+                        )}
                     </span>
+
                 </div>
 
                 <button
@@ -123,7 +247,207 @@ function renderHeader(state) {
  * NAVIGATION
  ************************************************/
 
-function renderNavigation(state) {
+function getNavigationItems(role) {
+
+    const navigationByRole = {
+
+        [USER_ROLES.SUPER_ADMIN]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Benutzer",
+
+                route:
+                    "/employees"
+            },
+            {
+                label:
+                    "Objekte",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "System",
+
+                route:
+                    "/settings"
+            }
+        ],
+
+        [USER_ROLES.ADMIN]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Mitarbeiter",
+
+                route:
+                    "/employees"
+            },
+            {
+                label:
+                    "Objekte",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "Berichte",
+
+                route:
+                    "/reports"
+            }
+        ],
+
+        [USER_ROLES.OBJEKTLEITER]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Mitarbeiter",
+
+                route:
+                    "/employees"
+            },
+            {
+                label:
+                    "Objekte",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "Tickets",
+
+                route:
+                    "/tickets"
+            }
+        ],
+
+        [USER_ROLES.MITARBEITER]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Objekt",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "Aufgaben",
+
+                route:
+                    "/tasks"
+            },
+            {
+                label:
+                    "Meldungen",
+
+                route:
+                    "/tickets"
+            }
+        ],
+
+        [USER_ROLES.BUCHHALTUNG]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Berichte",
+
+                route:
+                    "/reports"
+            },
+            {
+                label:
+                    "Objekte",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "Zeiten",
+
+                route:
+                    "/tasks"
+            }
+        ],
+
+        [USER_ROLES.KUNDE]: [
+            {
+                label:
+                    "Start",
+
+                route:
+                    "/dashboard"
+            },
+            {
+                label:
+                    "Objekte",
+
+                route:
+                    "/objects"
+            },
+            {
+                label:
+                    "Meldung",
+
+                route:
+                    "/tickets"
+            },
+            {
+                label:
+                    "Berichte",
+
+                route:
+                    "/reports"
+            }
+        ]
+    };
+
+    return (
+        navigationByRole[role] ??
+        []
+    );
+}
+
+function renderNavigation(
+    state,
+    route
+) {
 
     const role =
         state.currentUser?.role;
@@ -132,138 +456,44 @@ function renderNavigation(state) {
         return "";
     }
 
-    const navigationByRole = {
-
-        [USER_ROLES.SUPER_ADMIN]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Benutzer",
-                route: "/employees"
-            },
-            {
-                label: "Objekte",
-                route: "/objects"
-            },
-            {
-                label: "System",
-                route: "/settings"
-            }
-        ],
-
-        [USER_ROLES.ADMIN]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Mitarbeiter",
-                route: "/employees"
-            },
-            {
-                label: "Objekte",
-                route: "/objects"
-            },
-            {
-                label: "Berichte",
-                route: "/reports"
-            }
-        ],
-
-        [USER_ROLES.OBJEKTLEITER]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Mitarbeiter",
-                route: "/employees"
-            },
-            {
-                label: "Objekte",
-                route: "/objects"
-            },
-            {
-                label: "Tickets",
-                route: "/tickets"
-            }
-        ],
-
-        [USER_ROLES.MITARBEITER]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Objekt",
-                route: "/objects"
-            },
-            {
-                label: "Aufgaben",
-                route: "/tasks"
-            },
-            {
-                label: "Meldungen",
-                route: "/tickets"
-            }
-        ],
-
-        [USER_ROLES.BUCHHALTUNG]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Berichte",
-                route: "/reports"
-            },
-            {
-                label: "Objekte",
-                route: "/objects"
-            },
-            {
-                label: "Zeiten",
-                route: "/tasks"
-            }
-        ],
-
-        [USER_ROLES.KUNDE]: [
-            {
-                label: "Start",
-                route: "/dashboard"
-            },
-            {
-                label: "Objekte",
-                route: "/objects"
-            },
-            {
-                label: "Meldung",
-                route: "/tickets"
-            },
-            {
-                label: "Berichte",
-                route: "/reports"
-            }
-        ]
-    };
-
     const navigationItems =
-        navigationByRole[role] ?? [];
+        getNavigationItems(role);
 
     return `
         <nav class="bottom-navigation">
 
             ${navigationItems
-                .map((item) => `
-                    <button
-                        type="button"
-                        data-route="${escapeHtml(item.route)}"
-                    >
-                        ${escapeHtml(item.label)}
-                    </button>
-                `)
+                .map(
+                    (item) => {
+
+                        const isActive =
+                            route === item.route ||
+                            (
+                                route ===
+                                    "/object-detail" &&
+                                item.route ===
+                                    "/objects"
+                            );
+
+                        return `
+                            <button
+                                type="button"
+                                class="${
+                                    isActive
+                                        ? "active"
+                                        : ""
+                                }"
+                                data-route="${escapeHtml(
+                                    item.route
+                                )}"
+                            >
+                                ${escapeHtml(
+                                    item.label
+                                )}
+                            </button>
+                        `;
+                    }
+                )
                 .join("")}
 
         </nav>
@@ -288,7 +518,10 @@ function renderLogin() {
                     </div>
 
                     <h1>
-                        ${escapeHtml(APP_CONFIG.APP_NAME)}
+                        ${escapeHtml(
+                            APP_CONFIG.APP_NAME ??
+                            "Facility OS"
+                        )}
                     </h1>
 
                     <p>
@@ -368,7 +601,7 @@ function renderLogin() {
 
                 <p class="login-note">
                     Der Test-Login wird später durch
-                    die Google-Sheet-Anmeldung ersetzt.
+                    die produktive Anmeldung ersetzt.
                 </p>
 
             </section>
@@ -378,7 +611,7 @@ function renderLogin() {
 }
 
 /************************************************
- * WIEDERVERWENDBARE KARTEN
+ * WIEDERVERWENDBARE ELEMENTE
  ************************************************/
 
 function renderDashboardCard(
@@ -406,21 +639,29 @@ function renderDashboardCard(
     `;
 }
 
-function renderActionCard(
+function renderActionCard({
     title,
     description,
     route = null,
     action = null
-) {
+}) {
 
     const routeAttribute =
         route
-            ? `data-route="${escapeHtml(route)}"`
+            ? `
+                data-route="${escapeHtml(
+                    route
+                )}"
+            `
             : "";
 
     const actionAttribute =
         action
-            ? `data-action="${escapeHtml(action)}"`
+            ? `
+                data-action="${escapeHtml(
+                    action
+                )}"
+            `
             : "";
 
     return `
@@ -430,6 +671,7 @@ function renderActionCard(
             ${routeAttribute}
             ${actionAttribute}
         >
+
             <strong>
                 ${escapeHtml(title)}
             </strong>
@@ -437,7 +679,66 @@ function renderActionCard(
             <span>
                 ${escapeHtml(description)}
             </span>
+
         </button>
+    `;
+}
+
+function renderActionGroup({
+    title,
+    description = "",
+    items = [],
+    open = false
+}) {
+
+    return `
+        <details
+            class="dashboard-action-group"
+            ${open ? "open" : ""}
+        >
+
+            <summary>
+
+                <div>
+
+                    <strong>
+                        ${escapeHtml(title)}
+                    </strong>
+
+                    ${
+                        description
+                            ? `
+                                <span>
+                                    ${escapeHtml(
+                                        description
+                                    )}
+                                </span>
+                            `
+                            : ""
+                    }
+
+                </div>
+
+                <span class="section-count">
+                    ${items.length}
+                </span>
+
+            </summary>
+
+            <div class="dashboard-action-group-content">
+
+                ${items
+                    .map(
+                        (item) =>
+                            renderActionCard(
+                                item
+                            )
+                    )
+                    .join("")}
+
+            </div>
+
+        </details>
     `;
 }
 
@@ -447,12 +748,16 @@ function renderActionCard(
 
 function renderSuperAdminDashboard(state) {
 
+    const openTickets =
+        getOpenTickets(state);
+
     return `
         <section class="page-section">
 
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Super-Administration
                     </span>
@@ -460,6 +765,7 @@ function renderSuperAdminDashboard(state) {
                     <h1>
                         Systemübersicht
                     </h1>
+
                 </div>
 
             </div>
@@ -468,89 +774,150 @@ function renderSuperAdminDashboard(state) {
 
                 ${renderDashboardCard(
                     "Benutzer",
-                    state.users.length,
-                    "Alle Benutzer und Rollen im System"
+                    asArray(state.users).length,
+                    "Alle Benutzer und Rollen"
                 )}
 
                 ${renderDashboardCard(
                     "Objekte",
-                    state.objects.length,
+                    asArray(state.objects).length,
                     "Alle Kunden- und Reinigungsobjekte"
                 )}
 
                 ${renderDashboardCard(
                     "Offene Tickets",
-                    state.tickets.length,
+                    openTickets.length,
                     "Systemweite Probleme und Meldungen"
                 )}
 
                 ${renderDashboardCard(
                     "Version",
-                    APP_CONFIG.APP_VERSION,
+                    APP_CONFIG.APP_VERSION ??
+                    "2.0.0",
                     "Aktuell installierte Version"
                 )}
 
             </div>
 
-            <section class="content-card">
+            <div class="dashboard-action-groups">
 
-                <h2>
-                    Systemverwaltung
-                </h2>
+                ${renderActionGroup({
+                    title:
+                        "Benutzer und Berechtigungen",
 
-                <div class="action-grid">
+                    description:
+                        "Rollen, Zugänge und Zuständigkeiten",
 
-                    ${renderActionCard(
-                        "Benutzer verwalten",
-                        "Rollen, Rechte, Aktivierung und Zugänge",
-                        "/employees"
-                    )}
+                    open:
+                        true,
 
-                    ${renderActionCard(
-                        "Alle Objekte",
-                        "Unternehmen, Kunden und Objektzuweisungen",
-                        "/objects"
-                    )}
+                    items: [
+                        {
+                            title:
+                                "Benutzer verwalten",
 
-                    ${renderActionCard(
-                        "Systemberichte",
-                        "Nutzung, Leistung und Auffälligkeiten",
-                        "/reports"
-                    )}
+                            description:
+                                "Benutzer, Rollen und Aktivierung bearbeiten",
 
-                    ${renderActionCard(
-                        "Systemeinstellungen",
-                        "App-Konfiguration, Module und Tarife",
-                        "/settings"
-                    )}
+                            route:
+                                "/employees"
+                        },
+                        {
+                            title:
+                                "Rollen und Rechte",
 
-                    ${renderActionCard(
-                        "Rollen und Rechte",
-                        "Zugriffsrechte für alle Benutzerrollen",
-                        "/settings"
-                    )}
+                            description:
+                                "Zugriffsrechte aller Rollen verwalten",
 
-                    ${renderActionCard(
-                        "Tarife und Funktionen",
-                        "Free, Pro und Pro Plus verwalten",
-                        "/settings"
-                    )}
+                            route:
+                                "/settings"
+                        }
+                    ]
+                })}
 
-                    ${renderActionCard(
-                        "Audit-Protokoll",
-                        "Systemänderungen und sicherheitsrelevante Vorgänge",
-                        "/reports"
-                    )}
+                ${renderActionGroup({
+                    title:
+                        "Objekte und Betrieb",
 
-                    ${renderActionCard(
-                        "Datenschutz",
-                        "Datenschutz, Impressum und rechtliche Inhalte",
-                        "/settings"
-                    )}
+                    description:
+                        "Objekte, Aufgaben und Betriebsdaten",
 
-                </div>
+                    items: [
+                        {
+                            title:
+                                "Alle Objekte",
 
-            </section>
+                            description:
+                                "Kundenobjekte und Objektzuweisungen",
+
+                            route:
+                                "/objects"
+                        },
+                        {
+                            title:
+                                "Systemberichte",
+
+                            description:
+                                "Nutzung, Leistung und Auffälligkeiten",
+
+                            route:
+                                "/reports"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "System und Tarife",
+
+                    description:
+                        "Module, Versionen und rechtliche Inhalte",
+
+                    items: [
+                        {
+                            title:
+                                "Systemeinstellungen",
+
+                            description:
+                                "App-Konfiguration und Module",
+
+                            route:
+                                "/settings"
+                        },
+                        {
+                            title:
+                                "Tarife und Funktionen",
+
+                            description:
+                                "Free, Pro und Pro Plus verwalten",
+
+                            route:
+                                "/settings"
+                        },
+                        {
+                            title:
+                                "Audit-Protokoll",
+
+                            description:
+                                "Systemänderungen und sicherheitsrelevante Vorgänge",
+
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Datenschutz und Impressum",
+
+                            description:
+                                "Rechtliche Inhalte verwalten",
+
+                            route:
+                                "/settings"
+                        }
+                    ]
+                })}
+
+            </div>
 
         </section>
     `;
@@ -562,12 +929,16 @@ function renderSuperAdminDashboard(state) {
 
 function renderAdminDashboard(state) {
 
+    const openTickets =
+        getOpenTickets(state);
+
     return `
         <section class="page-section">
 
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Administration
                     </span>
@@ -575,6 +946,7 @@ function renderAdminDashboard(state) {
                     <h1>
                         Verwaltungsübersicht
                     </h1>
+
                 </div>
 
             </div>
@@ -583,89 +955,149 @@ function renderAdminDashboard(state) {
 
                 ${renderDashboardCard(
                     "Mitarbeiter",
-                    state.users.length,
-                    "Mitarbeiter und Benutzer verwalten"
+                    asArray(state.users).length,
+                    "Mitarbeiter und Benutzer"
                 )}
 
                 ${renderDashboardCard(
                     "Objekte",
-                    state.objects.length,
+                    asArray(state.objects).length,
                     "Objekte, Räume und Einstellungen"
                 )}
 
                 ${renderDashboardCard(
                     "Aufgaben",
-                    state.tasks.length,
+                    asArray(state.tasks).length,
                     "Reinigungspläne und Tätigkeiten"
                 )}
 
                 ${renderDashboardCard(
-                    "Tickets",
-                    state.tickets.length,
-                    "Offene Probleme und Meldungen"
+                    "Offene Tickets",
+                    openTickets.length,
+                    "Probleme und Meldungen"
                 )}
 
             </div>
 
-            <section class="content-card">
+            <div class="dashboard-action-groups">
 
-                <h2>
-                    Administration
-                </h2>
+                ${renderActionGroup({
+                    title:
+                        "Personal",
 
-                <div class="action-grid">
+                    description:
+                        "Mitarbeiter, Schichten und Vertretungen",
 
-                    ${renderActionCard(
-                        "Mitarbeiterverwaltung",
-                        "Benutzer, Rollen und Objektzuweisungen",
-                        "/employees"
-                    )}
+                    open:
+                        true,
 
-                    ${renderActionCard(
-                        "Objektverwaltung",
-                        "Objekte, Räume und Anleitungen",
-                        "/objects"
-                    )}
+                    items: [
+                        {
+                            title:
+                                "Mitarbeiterverwaltung",
 
-                    ${renderActionCard(
-                        "Aufgabenverwaltung",
-                        "Reinigungspläne und wiederkehrende Aufgaben",
-                        "/tasks"
-                    )}
+                            description:
+                                "Benutzer, Rollen und Objektzuweisungen",
 
-                    ${renderActionCard(
-                        "Schichtplanung",
-                        "Arbeitszeiten, Einsätze und Vertretungen",
-                        "/tasks"
-                    )}
+                            route:
+                                "/employees"
+                        },
+                        {
+                            title:
+                                "Schichtplanung",
 
-                    ${renderActionCard(
-                        "Materialverwaltung",
-                        "Bestände, Mindestmengen und Bestellungen",
-                        "/materials"
-                    )}
+                            description:
+                                "Einsätze, Arbeitszeiten und Vertretungen",
 
-                    ${renderActionCard(
-                        "Tickets und Nachrichten",
-                        "Probleme, Schäden und interne Kommunikation",
-                        "/tickets"
-                    )}
+                            route:
+                                "/tasks"
+                        }
+                    ]
+                })}
 
-                    ${renderActionCard(
-                        "Berichte",
-                        "Zeiten, Leistungen und Abweichungen",
-                        "/reports"
-                    )}
+                ${renderActionGroup({
+                    title:
+                        "Objekte und Leistungen",
 
-                    ${renderActionCard(
-                        "Einstellungen",
-                        "Unternehmens- und App-Einstellungen",
-                        "/settings"
-                    )}
+                    description:
+                        "Objekte, Räume und Reinigungspläne",
 
-                </div>
+                    items: [
+                        {
+                            title:
+                                "Objektverwaltung",
 
-            </section>
+                            description:
+                                "Objekte, Räume und Anleitungen",
+
+                            route:
+                                "/objects"
+                        },
+                        {
+                            title:
+                                "Aufgabenverwaltung",
+
+                            description:
+                                "Reinigungspläne und wiederkehrende Aufgaben",
+
+                            route:
+                                "/tasks"
+                        },
+                        {
+                            title:
+                                "Materialverwaltung",
+
+                            description:
+                                "Bestände, Mindestmengen und Bestellungen",
+
+                            route:
+                                "/materials"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "Kommunikation und Auswertung",
+
+                    description:
+                        "Tickets, Berichte und Einstellungen",
+
+                    items: [
+                        {
+                            title:
+                                "Tickets und Nachrichten",
+
+                            description:
+                                "Probleme, Schäden und Kommunikation",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Berichte",
+
+                            description:
+                                "Zeiten, Leistungen und Abweichungen",
+
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Einstellungen",
+
+                            description:
+                                "Unternehmens- und App-Einstellungen",
+
+                            route:
+                                "/settings"
+                        }
+                    ]
+                })}
+
+            </div>
 
         </section>
     `;
@@ -677,12 +1109,19 @@ function renderAdminDashboard(state) {
 
 function renderManagerDashboard(state) {
 
+    const openTickets =
+        getOpenTickets(state);
+
+    const warnings =
+        getMaterialWarnings(state);
+
     return `
         <section class="page-section">
 
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Objektleitung
                     </span>
@@ -690,9 +1129,11 @@ function renderManagerDashboard(state) {
                     <h1>
                         Guten Tag,
                         ${escapeHtml(
-                            state.currentUser.name
+                            state.currentUser?.name ??
+                            "Objektleitung"
                         )}
                     </h1>
+
                 </div>
 
             </div>
@@ -701,89 +1142,149 @@ function renderManagerDashboard(state) {
 
                 ${renderDashboardCard(
                     "Mitarbeiter",
-                    state.users.length,
-                    "Zugeordnete und aktive Mitarbeiter"
+                    asArray(state.users).length,
+                    "Aktive und zugeordnete Mitarbeiter"
                 )}
 
                 ${renderDashboardCard(
                     "Objekte",
-                    state.objects.length,
+                    asArray(state.objects).length,
                     "Verantwortete Reinigungsobjekte"
                 )}
 
                 ${renderDashboardCard(
                     "Offene Tickets",
-                    state.tickets.length,
-                    "Probleme, Schäden und Kundenmeldungen"
+                    openTickets.length,
+                    "Probleme, Schäden und Meldungen"
                 )}
 
                 ${renderDashboardCard(
-                    "Material",
-                    state.materials.length,
-                    "Materialbestände und Nachbestellungen"
+                    "Materialwarnungen",
+                    warnings.length,
+                    "Niedrige und kritische Bestände"
                 )}
 
             </div>
 
-            <section class="content-card">
+            <div class="dashboard-action-groups">
 
-                <h2>
-                    Objektleitung
-                </h2>
+                ${renderActionGroup({
+                    title:
+                        "Tagessteuerung",
 
-                <div class="action-grid">
+                    description:
+                        "Aktuelle Einsätze und Abweichungen",
 
-                    ${renderActionCard(
-                        "Mitarbeiter",
-                        "Mitarbeiter, Einsätze und Zuständigkeiten",
-                        "/employees"
-                    )}
+                    open:
+                        true,
 
-                    ${renderActionCard(
-                        "Objekte",
-                        "Räume, Aufgaben und Objektinformationen",
-                        "/objects"
-                    )}
+                    items: [
+                        {
+                            title:
+                                "Laufende Schichten",
 
-                    ${renderActionCard(
-                        "Laufende Schichten",
-                        "Check-ins, Check-outs und Anwesenheiten",
-                        "/tasks"
-                    )}
+                            description:
+                                "Check-ins, Check-outs und Anwesenheiten",
 
-                    ${renderActionCard(
-                        "Vertretung suchen",
-                        "Passende Vertretung bei Ausfall finden",
-                        "/employees"
-                    )}
+                            route:
+                                "/tasks"
+                        },
+                        {
+                            title:
+                                "Vertretung suchen",
 
-                    ${renderActionCard(
-                        "Tickets",
-                        "Probleme, Schäden und Reklamationen bearbeiten",
-                        "/tickets"
-                    )}
+                            description:
+                                "Passende Vertretung bei Ausfall finden",
 
-                    ${renderActionCard(
-                        "Material",
-                        "Bestände prüfen und Nachbestellungen verwalten",
-                        "/materials"
-                    )}
+                            route:
+                                "/employees"
+                        },
+                        {
+                            title:
+                                "Offene Tickets",
 
-                    ${renderActionCard(
-                        "Berichte",
-                        "Leistung, Zeiten und Abweichungen prüfen",
-                        "/reports"
-                    )}
+                            description:
+                                "Probleme und Reklamationen bearbeiten",
 
-                    ${renderActionCard(
-                        "Objekteinstellungen",
-                        "Pflichtfragen, Sicherheit und Kundenansicht",
-                        "/settings"
-                    )}
+                            route:
+                                "/tickets"
+                        }
+                    ]
+                })}
 
-                </div>
+                ${renderActionGroup({
+                    title:
+                        "Objekte und Personal",
 
-            </section>
+                    description:
+                        "Mitarbeiter, Räume und Objektinformationen",
+
+                    items: [
+                        {
+                            title:
+                                "Mitarbeiter",
+
+                            description:
+                                "Einsätze und Zuständigkeiten",
+
+                            route:
+                                "/employees"
+                        },
+                        {
+                            title:
+                                "Objekte",
+
+                            description:
+                                "Räume, Aufgaben und Objektinformationen",
+
+                            route:
+                                "/objects"
+                        },
+                        {
+                            title:
+                                "Material",
+
+                            description:
+                                "Bestände und Nachbestellungen",
+
+                            route:
+                                "/materials"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "Auswertung und Einstellungen",
+
+                    description:
+                        "Leistung, Zeiten und Objektvorgaben",
+
+                    items: [
+                        {
+                            title:
+                                "Berichte",
+
+                            description:
+                                "Leistung, Zeiten und Abweichungen",
+
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Objekteinstellungen",
+
+                            description:
+                                "Pflichtfragen, Sicherheit und Kundenansicht",
+
+                            route:
+                                "/settings"
+                        }
+                    ]
+                })}
+
+            </div>
 
         </section>
     `;
@@ -795,25 +1296,8 @@ function renderManagerDashboard(state) {
 
 function renderEmployeeDashboard(state) {
 
-    const shiftText =
-        state.shiftStarted
-            ? "Schicht läuft"
-            : "Noch nicht eingecheckt";
-
-    const shiftAction =
-        state.shiftStarted
-            ? renderActionCard(
-                "Auschecken",
-                "Abschlussprüfung durchführen und Schicht beenden",
-                null,
-                "checkout"
-            )
-            : renderActionCard(
-                "Einchecken",
-                "QR-Code scannen oder Testmodus verwenden",
-                null,
-                "checkin"
-            );
+    const shiftStarted =
+        state.shiftStarted === true;
 
     return `
         <section class="page-section">
@@ -821,6 +1305,7 @@ function renderEmployeeDashboard(state) {
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Mitarbeiter
                     </span>
@@ -828,9 +1313,11 @@ function renderEmployeeDashboard(state) {
                     <h1>
                         Hallo,
                         ${escapeHtml(
-                            state.currentUser.name
+                            state.currentUser?.name ??
+                            "Mitarbeiter"
                         )}
                     </h1>
+
                 </div>
 
             </div>
@@ -842,85 +1329,205 @@ function renderEmployeeDashboard(state) {
                 </span>
 
                 <strong>
-                    ${escapeHtml(shiftText)}
+                    ${
+                        shiftStarted
+                            ? "Schicht läuft"
+                            : "Noch nicht eingecheckt"
+                    }
                 </strong>
 
                 <p>
-                    Nach der Objektwahl erscheinen hier
-                    Schicht, Räume und Aufgaben.
+                    ${
+                        state.currentObject
+                            ? `
+                                Aktuelles Objekt:
+                                ${escapeHtml(
+                                    state.currentObject.name ??
+                                    state.currentObject.id
+                                )}
+                            `
+                            : `
+                                Wähle zuerst dein Objekt aus.
+                            `
+                    }
                 </p>
 
             </section>
 
-            <div class="action-grid">
+            <div class="dashboard-action-groups">
 
-                ${shiftAction}
+                ${renderActionGroup({
+                    title:
+                        "Aktuelle Schicht",
 
-                ${renderActionCard(
-                    "Mein Objekt",
-                    "Objektinformationen und Besonderheiten",
-                    "/objects"
-                )}
+                    description:
+                        "Check-in, Aufgaben und Abschluss",
 
-                ${renderActionCard(
-                    "Meine Aufgaben",
-                    "Räume, Reihenfolge und Reinigungsschritte",
-                    "/tasks"
-                )}
+                    open:
+                        true,
 
-                ${renderActionCard(
-                    "Objektanleitung",
-                    "Räume, Dosierungen und Sicherheitsregeln",
-                    "/objects"
-                )}
+                    items: [
+                        shiftStarted
+                            ? {
+                                title:
+                                    "Auschecken",
 
-                ${renderActionCard(
-                    "Problem melden",
-                    "Schaden, Materialmangel oder Hindernis melden",
-                    "/tickets"
-                )}
+                                description:
+                                    "Abschlussprüfung durchführen und Schicht beenden",
 
-                ${renderActionCard(
-                    "Material",
-                    "Bestand prüfen oder Nachbestellung melden",
-                    "/materials"
-                )}
+                                action:
+                                    "checkout"
+                            }
+                            : {
+                                title:
+                                    "Einchecken",
 
-                ${renderActionCard(
-                    "Krank oder abwesend",
-                    "Abwesenheit an die Objektleitung melden",
-                    "/tickets"
-                )}
+                                description:
+                                    "QR-Code scannen oder Testmodus verwenden",
 
-                ${renderActionCard(
-                    "Urlaub",
-                    "Urlaub beantragen und Resturlaub prüfen",
-                    "/tickets"
-                )}
+                                action:
+                                    "checkin"
+                            },
+                        {
+                            title:
+                                "Mein Objekt",
 
-                ${renderActionCard(
-                    "Sofort-Notiz",
-                    "Schnelle Notiz mit Foto, Text oder Audio",
-                    "/tickets"
-                )}
+                            description:
+                                "Objektinformationen und Besonderheiten",
 
-                ${renderActionCard(
-                    "Nachrichten",
-                    "Nachrichten der Objektleitung lesen",
-                    "/tickets"
-                )}
+                            route:
+                                state.currentObject
+                                    ? "/object-detail"
+                                    : "/objects"
+                        },
+                        {
+                            title:
+                                "Meine Aufgaben",
 
-                ${renderActionCard(
-                    "Schlüsselbuch",
-                    "Schlüsselübernahme und Rückgabe dokumentieren",
-                    "/objects"
-                )}
+                            description:
+                                "Räume, Reihenfolge und Reinigungsschritte",
 
-                ${renderActionCard(
-                    "Hilfe",
-                    "Anleitungen, häufige Fragen und Unterstützung",
-                    "/settings"
-                )}
+                            route:
+                                "/tasks"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "Meldungen und Material",
+
+                    description:
+                        "Probleme, Bestände und Abwesenheiten",
+
+                    items: [
+                        {
+                            title:
+                                "Problem melden",
+
+                            description:
+                                "Schaden, Materialmangel oder Hindernis",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Material",
+
+                            description:
+                                "Bestand prüfen oder Nachbestellung melden",
+
+                            route:
+                                "/materials"
+                        },
+                        {
+                            title:
+                                "Krank oder abwesend",
+
+                            description:
+                                "Abwesenheit an die Objektleitung melden",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Urlaub",
+
+                            description:
+                                "Urlaub beantragen und Resturlaub prüfen",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Sofort-Notiz",
+
+                            description:
+                                "Schnelle Dokumentation mit Foto, Text oder Audio",
+
+                            route:
+                                "/tickets"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "Anleitungen und Kommunikation",
+
+                    description:
+                        "Objektwissen, Schlüssel und Hilfe",
+
+                    items: [
+                        {
+                            title:
+                                "Objektanleitung",
+
+                            description:
+                                "Zugang, Dosierung und Sicherheitsregeln",
+
+                            route:
+                                state.currentObject
+                                    ? "/object-detail"
+                                    : "/objects"
+                        },
+                        {
+                            title:
+                                "Schlüsselbuch",
+
+                            description:
+                                "Schlüsselübernahme und Rückgabe",
+
+                            route:
+                                state.currentObject
+                                    ? "/object-detail"
+                                    : "/objects"
+                        },
+                        {
+                            title:
+                                "Nachrichten",
+
+                            description:
+                                "Nachrichten der Objektleitung",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Hilfe",
+
+                            description:
+                                "Anleitungen und Unterstützung",
+
+                            route:
+                                "/settings"
+                        }
+                    ]
+                })}
 
             </div>
 
@@ -929,7 +1536,7 @@ function renderEmployeeDashboard(state) {
 }
 
 /************************************************
- * BUCHHALTUNGS-DASHBOARD
+ * BUCHHALTUNG
  ************************************************/
 
 function renderAccountingDashboard(state) {
@@ -940,6 +1547,7 @@ function renderAccountingDashboard(state) {
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Buchhaltung
                     </span>
@@ -947,6 +1555,7 @@ function renderAccountingDashboard(state) {
                     <h1>
                         Abrechnung und Zeiten
                     </h1>
+
                 </div>
 
             </div>
@@ -955,89 +1564,138 @@ function renderAccountingDashboard(state) {
 
                 ${renderDashboardCard(
                     "Mitarbeiter",
-                    state.users.length,
+                    asArray(state.users).length,
                     "Abrechnungsrelevante Mitarbeiter"
                 )}
 
                 ${renderDashboardCard(
                     "Schichten",
-                    state.shifts.length,
+                    asArray(state.shifts).length,
                     "Erfasste Arbeitszeiten"
                 )}
 
                 ${renderDashboardCard(
                     "Objekte",
-                    state.objects.length,
+                    asArray(state.objects).length,
                     "Kostenstellen und Kundenobjekte"
                 )}
 
                 ${renderDashboardCard(
                     "Abweichungen",
-                    "0",
-                    "Noch ungeprüfte Zeitabweichungen"
+                    asArray(state.timeDeviations).length,
+                    "Erfasste Zeitabweichungen"
                 )}
 
             </div>
 
-            <section class="content-card">
+            <div class="dashboard-action-groups">
 
-                <h2>
-                    Buchhaltung
-                </h2>
+                ${renderActionGroup({
+                    title:
+                        "Arbeitszeiten",
 
-                <div class="action-grid">
+                    description:
+                        "Zeiten, Fehlzeiten und Abweichungen",
 
-                    ${renderActionCard(
-                        "Arbeitszeitberichte",
-                        "Check-ins, Check-outs und Gesamtstunden",
-                        "/reports"
-                    )}
+                    open:
+                        true,
 
-                    ${renderActionCard(
-                        "Monatsabrechnung",
-                        "Arbeitszeiten nach Mitarbeiter und Monat",
-                        "/reports"
-                    )}
+                    items: [
+                        {
+                            title:
+                                "Arbeitszeitberichte",
 
-                    ${renderActionCard(
-                        "Objektabrechnung",
-                        "Kundenobjekte und Kostenstellen",
-                        "/objects"
-                    )}
+                            description:
+                                "Check-ins, Check-outs und Gesamtstunden",
 
-                    ${renderActionCard(
-                        "Zeitabweichungen",
-                        "Fehlzeiten und abweichende Einsatzzeiten",
-                        "/tasks"
-                    )}
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Monatsabrechnung",
 
-                    ${renderActionCard(
-                        "Fehlzeiten",
-                        "Krankheit, Urlaub und unentschuldigte Abwesenheit",
-                        "/reports"
-                    )}
+                            description:
+                                "Arbeitszeiten nach Mitarbeiter und Monat",
 
-                    ${renderActionCard(
-                        "Kilometer und Fahrten",
-                        "Fahrten zwischen Objekten und Vergütung",
-                        "/reports"
-                    )}
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Zeitabweichungen",
 
-                    ${renderActionCard(
-                        "Export",
-                        "Monatsauswertung für Lohn und Abrechnung",
-                        "/reports"
-                    )}
+                            description:
+                                "Abweichende Einsatzzeiten prüfen",
 
-                    ${renderActionCard(
-                        "Prüfung",
-                        "Unvollständige oder auffällige Zeiterfassungen",
-                        "/reports"
-                    )}
+                            route:
+                                "/tasks"
+                        },
+                        {
+                            title:
+                                "Fehlzeiten",
 
-                </div>
+                            description:
+                                "Krankheit, Urlaub und Abwesenheiten",
 
-            </section>
+                            route:
+                                "/reports"
+                        }
+                    ]
+                })}
+
+                ${renderActionGroup({
+                    title:
+                        "Objekte und Export",
+
+                    description:
+                        "Kostenstellen, Fahrten und Abrechnungsdaten",
+
+                    items: [
+                        {
+                            title:
+                                "Objektabrechnung",
+
+                            description:
+                                "Kundenobjekte und Kostenstellen",
+
+                            route:
+                                "/objects"
+                        },
+                        {
+                            title:
+                                "Kilometer und Fahrten",
+
+                            description:
+                                "Fahrten zwischen Objekten und Vergütung",
+
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Export",
+
+                            description:
+                                "Monatsauswertung für Lohn und Abrechnung",
+
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Prüfung",
+
+                            description:
+                                "Unvollständige oder auffällige Zeiterfassungen",
+
+                            route:
+                                "/reports"
+                        }
+                    ]
+                })}
+
+            </div>
 
         </section>
     `;
@@ -1049,12 +1707,16 @@ function renderAccountingDashboard(state) {
 
 function renderCustomerDashboard(state) {
 
+    const openTickets =
+        getOpenTickets(state);
+
     return `
         <section class="page-section">
 
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Kundenportal
                     </span>
@@ -1062,6 +1724,7 @@ function renderCustomerDashboard(state) {
                     <h1>
                         Objektübersicht
                     </h1>
+
                 </div>
 
             </div>
@@ -1070,136 +1733,138 @@ function renderCustomerDashboard(state) {
 
                 ${renderDashboardCard(
                     "Objekte",
-                    state.objects.length,
-                    "Für den Kunden freigegebene Objekte"
+                    asArray(state.objects).length,
+                    "Freigegebene Kundenobjekte"
                 )}
 
                 ${renderDashboardCard(
                     "Offene Meldungen",
-                    state.tickets.length,
+                    openTickets.length,
                     "Probleme und Kundenanfragen"
                 )}
 
                 ${renderDashboardCard(
                     "Aufgaben",
-                    state.tasks.length,
+                    asArray(state.tasks).length,
                     "Freigegebene Reinigungsleistungen"
                 )}
 
                 ${renderDashboardCard(
                     "Status",
                     "Aktiv",
-                    "Aktueller Vertrags- und Objektstatus"
+                    "Aktueller Objektstatus"
                 )}
 
             </div>
 
-            <section class="content-card">
+            <div class="dashboard-action-groups">
 
-                <h2>
-                    Kundenbereich
-                </h2>
+                ${renderActionGroup({
+                    title:
+                        "Objekte und Leistungen",
 
-                <div class="action-grid">
+                    description:
+                        "Status, Reinigungsplan und Nachweise",
 
-                    ${renderActionCard(
-                        "Meine Objekte",
-                        "Objektstatus und freigegebene Informationen",
-                        "/objects"
-                    )}
+                    open:
+                        true,
 
-                    ${renderActionCard(
-                        "Anfrage erstellen",
-                        "Problem, Wunsch oder Reklamation melden",
-                        "/tickets"
-                    )}
+                    items: [
+                        {
+                            title:
+                                "Meine Objekte",
 
-                    ${renderActionCard(
-                        "Leistungsnachweise",
-                        "Freigegebene Berichte und Dokumentationen",
-                        "/reports"
-                    )}
+                            description:
+                                "Objektstatus und freigegebene Informationen",
 
-                    ${renderActionCard(
-                        "Nachrichten",
-                        "Kommunikation mit der Objektleitung",
-                        "/tickets"
-                    )}
+                            route:
+                                "/objects"
+                        },
+                        {
+                            title:
+                                "Reinigungsplan",
 
-                    ${renderActionCard(
-                        "Reinigungsplan",
-                        "Freigegebene Räume und Leistungen ansehen",
-                        "/tasks"
-                    )}
+                            description:
+                                "Freigegebene Räume und Leistungen",
 
-                    ${renderActionCard(
-                        "Meldungsstatus",
-                        "Bearbeitungsstand eigener Meldungen prüfen",
-                        "/tickets"
-                    )}
+                            route:
+                                "/tasks"
+                        },
+                        {
+                            title:
+                                "Leistungsnachweise",
 
-                    ${renderActionCard(
-                        "Dokumente",
-                        "Verträge, Nachweise und freigegebene Dateien",
-                        "/reports"
-                    )}
+                            description:
+                                "Freigegebene Berichte und Dokumentationen",
 
-                    ${renderActionCard(
-                        "Kontakt",
-                        "Zuständige Objektleitung kontaktieren",
-                        "/tickets"
-                    )}
+                            route:
+                                "/reports"
+                        },
+                        {
+                            title:
+                                "Dokumente",
 
-                </div>
+                            description:
+                                "Verträge und freigegebene Dateien",
 
-            </section>
+                            route:
+                                "/reports"
+                        }
+                    ]
+                })}
 
-        </section>
-    `;
-}
+                ${renderActionGroup({
+                    title:
+                        "Meldungen und Kontakt",
 
-/************************************************
- * GENERISCHES DASHBOARD
- ************************************************/
+                    description:
+                        "Anfragen, Status und Kommunikation",
 
-function renderGenericDashboard(state) {
+                    items: [
+                        {
+                            title:
+                                "Anfrage erstellen",
 
-    return `
-        <section class="page-section">
+                            description:
+                                "Problem, Wunsch oder Reklamation melden",
 
-            <div class="page-heading">
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Meldungsstatus",
 
-                <div>
-                    <span class="eyebrow">
-                        ${escapeHtml(
-                            getRoleLabel(
-                                state.currentUser?.role
-                            )
-                        )}
-                    </span>
+                            description:
+                                "Bearbeitungsstand eigener Meldungen",
 
-                    <h1>
-                        Dashboard
-                    </h1>
-                </div>
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Nachrichten",
+
+                            description:
+                                "Kommunikation mit der Objektleitung",
+
+                            route:
+                                "/tickets"
+                        },
+                        {
+                            title:
+                                "Kontakt",
+
+                            description:
+                                "Zuständige Objektleitung kontaktieren",
+
+                            route:
+                                "/tickets"
+                        }
+                    ]
+                })}
 
             </div>
-
-            <section class="content-card">
-
-                <h2>
-                    ${escapeHtml(
-                        state.currentUser?.name ??
-                        "Benutzer"
-                    )}
-                </h2>
-
-                <p>
-                    Für diese Rolle ist noch kein
-                    eigenes Dashboard eingerichtet.
-                </p>
-
-            </section>
 
         </section>
     `;
@@ -1211,28 +1876,66 @@ function renderGenericDashboard(state) {
 
 function renderDashboard(state) {
 
-    switch (state.currentUser?.role) {
+    switch (
+        state.currentUser?.role
+    ) {
 
         case USER_ROLES.SUPER_ADMIN:
-            return renderSuperAdminDashboard(state);
+
+            return renderSuperAdminDashboard(
+                state
+            );
 
         case USER_ROLES.ADMIN:
-            return renderAdminDashboard(state);
+
+            return renderAdminDashboard(
+                state
+            );
 
         case USER_ROLES.OBJEKTLEITER:
-            return renderManagerDashboard(state);
+
+            return renderManagerDashboard(
+                state
+            );
 
         case USER_ROLES.MITARBEITER:
-            return renderEmployeeDashboard(state);
+
+            return renderEmployeeDashboard(
+                state
+            );
 
         case USER_ROLES.BUCHHALTUNG:
-            return renderAccountingDashboard(state);
+
+            return renderAccountingDashboard(
+                state
+            );
 
         case USER_ROLES.KUNDE:
-            return renderCustomerDashboard(state);
+
+            return renderCustomerDashboard(
+                state
+            );
 
         default:
-            return renderGenericDashboard(state);
+
+            return `
+                <section class="page-section">
+
+                    <section class="content-card">
+
+                        <h1>
+                            Dashboard
+                        </h1>
+
+                        <p>
+                            Für diese Rolle ist noch
+                            kein Dashboard verfügbar.
+                        </p>
+
+                    </section>
+
+                </section>
+            `;
     }
 }
 
@@ -1240,11 +1943,11 @@ function renderDashboard(state) {
  * PLATZHALTERSEITEN
  ************************************************/
 
-function renderPlaceholderPage(
+function renderPlaceholderPage({
     title,
     description,
-    items = []
-) {
+    groups = []
+}) {
 
     return `
         <section class="page-section">
@@ -1252,6 +1955,7 @@ function renderPlaceholderPage(
             <div class="page-heading">
 
                 <div>
+
                     <span class="eyebrow">
                         Facility OS
                     </span>
@@ -1259,6 +1963,7 @@ function renderPlaceholderPage(
                     <h1>
                         ${escapeHtml(title)}
                     </h1>
+
                 </div>
 
             </div>
@@ -1269,28 +1974,23 @@ function renderPlaceholderPage(
                     ${escapeHtml(description)}
                 </p>
 
-                ${
-                    items.length > 0
-                        ? `
-                            <div class="action-grid">
-
-                                ${items
-                                    .map((item) =>
-                                        renderActionCard(
-                                            item.title,
-                                            item.description,
-                                            item.route ?? null,
-                                            item.action ?? null
-                                        )
-                                    )
-                                    .join("")}
-
-                            </div>
-                        `
-                        : ""
-                }
-
             </section>
+
+            ${
+                groups.length > 0
+                    ? `
+                        <div class="dashboard-action-groups">
+
+                            ${groups
+                                .map(
+                                    renderActionGroup
+                                )
+                                .join("")}
+
+                        </div>
+                    `
+                    : ""
+            }
 
         </section>
     `;
@@ -1300,7 +2000,10 @@ function renderPlaceholderPage(
  * ROUTEN
  ************************************************/
 
-function renderRoute(route, state) {
+function renderRoute(
+    route,
+    state
+) {
 
     if (!state.currentUser) {
         return renderLogin();
@@ -1310,229 +2013,675 @@ function renderRoute(route, state) {
 
         case "/dashboard":
 
-            return renderDashboard(state);
+            return renderDashboard(
+                state
+            );
 
         case "/objects":
 
-            return renderPlaceholderPage(
-                "Objekte",
-                "Hier werden Objekte, Räume, Einstellungen und Objektanleitungen verwaltet.",
-                [
-                    {
-                        title: "Objektübersicht",
-                        description:
-                            "Alle zugewiesenen Objekte anzeigen"
-                    },
-                    {
-                        title: "Räume",
-                        description:
-                            "Räume und Reinigungsbereiche verwalten"
-                    },
-                    {
-                        title: "Objektanleitung",
-                        description:
-                            "Hinweise, Fotos, Dosierungen und Sicherheit"
-                    },
-                    {
-                        title: "Schlüsselbuch",
-                        description:
-                            "Schlüsselübergaben und Rückgaben dokumentieren"
-                    }
-                ]
+            return renderObjectsPage(
+                state
+            );
+
+        case "/object-detail":
+
+            return renderObjectDetailPage(
+                state
             );
 
         case "/employees":
 
-            return renderPlaceholderPage(
-                "Mitarbeiter",
-                "Hier werden Mitarbeiter, Rollen, Abwesenheiten und Objektzuweisungen verwaltet.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Mitarbeiter",
+
+                description:
+                    "Mitarbeiter, Rollen, Abwesenheiten und Objektzuweisungen.",
+
+                groups: [
                     {
-                        title: "Mitarbeiterübersicht",
+                        title:
+                            "Personalübersicht",
+
                         description:
-                            "Aktive und zugewiesene Mitarbeiter anzeigen"
+                            "Mitarbeiter und Zuständigkeiten",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Mitarbeiterübersicht",
+
+                                description:
+                                    "Aktive und zugewiesene Mitarbeiter"
+                            },
+                            {
+                                title:
+                                    "Objektzuweisungen",
+
+                                description:
+                                    "Mitarbeiter auf Objekte verteilen"
+                            },
+                            {
+                                title:
+                                    "Leistungsdaten",
+
+                                description:
+                                    "Bewertungen und Leistungsentwicklung"
+                            }
+                        ]
                     },
                     {
-                        title: "Abwesenheiten",
+                        title:
+                            "Abwesenheit und Vertretung",
+
                         description:
-                            "Krankheit, Urlaub und Ausfälle verwalten"
-                    },
-                    {
-                        title: "Vertretungen",
-                        description:
-                            "Passende Vertretungen suchen und zuweisen"
-                    },
-                    {
-                        title: "Leistung",
-                        description:
-                            "Bewertungen und Leistungsdaten prüfen"
+                            "Krankheit, Urlaub und Ausfälle",
+
+                        items: [
+                            {
+                                title:
+                                    "Abwesenheiten",
+
+                                description:
+                                    "Krankheit und Urlaub verwalten"
+                            },
+                            {
+                                title:
+                                    "Vertretungen",
+
+                                description:
+                                    "Passende Vertretungen suchen"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/tasks":
 
-            return renderPlaceholderPage(
-                "Aufgaben",
-                "Hier erscheinen Reinigungsaufgaben, Räume, Reihenfolge und Dokumentationspflichten.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Aufgaben",
+
+                description:
+                    "Reinigungsaufgaben, Räume, Reihenfolge und Dokumentationspflichten.",
+
+                groups: [
                     {
-                        title: "Heutige Aufgaben",
+                        title:
+                            "Tagesaufgaben",
+
                         description:
-                            "Aktuelle Räume und Arbeitsschritte"
+                            "Aktuelle Aufgaben und Räume",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Heutige Aufgaben",
+
+                                description:
+                                    "Aktuelle Räume und Arbeitsschritte"
+                            },
+                            {
+                                title:
+                                    "Aufgabenstatus",
+
+                                description:
+                                    "Offene und erledigte Aufgaben"
+                            }
+                        ]
                     },
                     {
-                        title: "Reinigungspläne",
+                        title:
+                            "Planung und Abweichungen",
+
                         description:
-                            "Wiederkehrende Aufgaben verwalten"
-                    },
-                    {
-                        title: "Zeiten",
-                        description:
-                            "Sollzeiten und tatsächliche Zeiten vergleichen"
-                    },
-                    {
-                        title: "Abweichungen",
-                        description:
-                            "Zeitabweichungen und Begründungen prüfen"
+                            "Reinigungspläne und Sollzeiten",
+
+                        items: [
+                            {
+                                title:
+                                    "Reinigungspläne",
+
+                                description:
+                                    "Wiederkehrende Aufgaben verwalten"
+                            },
+                            {
+                                title:
+                                    "Zeiten",
+
+                                description:
+                                    "Soll- und Istzeiten vergleichen"
+                            },
+                            {
+                                title:
+                                    "Abweichungen",
+
+                                description:
+                                    "Begründungen und Nachweise prüfen"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/materials":
 
-            return renderPlaceholderPage(
-                "Material",
-                "Hier werden Materialbestände, Mindestbestände und Nachbestellungen verwaltet.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Material",
+
+                description:
+                    "Materialbestände, Mindestbestände und Nachbestellungen.",
+
+                groups: [
                     {
-                        title: "Bestände",
+                        title:
+                            "Bestand",
+
                         description:
-                            "Aktuelle Materialbestände anzeigen"
+                            "Aktuelle Mengen und Warnungen",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Bestände",
+
+                                description:
+                                    "Aktuelle Materialbestände"
+                            },
+                            {
+                                title:
+                                    "Mindestbestand",
+
+                                description:
+                                    "Warnwerte pro Objekt"
+                            },
+                            {
+                                title:
+                                    "Materialschrank",
+
+                                description:
+                                    "QR-Zugriff und Schrankinhalt"
+                            }
+                        ]
                     },
                     {
-                        title: "Nachbestellung",
+                        title:
+                            "Bestellung",
+
                         description:
-                            "Fehlendes Material melden oder bestellen"
-                    },
-                    {
-                        title: "Mindestbestand",
-                        description:
-                            "Warnwerte pro Objekt festlegen"
-                    },
-                    {
-                        title: "Materialschrank",
-                        description:
-                            "QR-Zugriff und Schrankinhalt verwalten"
+                            "Fehlmengen und Nachbestellungen",
+
+                        items: [
+                            {
+                                title:
+                                    "Nachbestellung",
+
+                                description:
+                                    "Fehlendes Material melden"
+                            },
+                            {
+                                title:
+                                    "Bestellstatus",
+
+                                description:
+                                    "Offene Bestellungen verfolgen"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/tickets":
 
-            return renderPlaceholderPage(
-                "Tickets und Meldungen",
-                "Hier erscheinen Probleme, Schäden, Kundenmeldungen und interne Nachrichten.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Tickets und Meldungen",
+
+                description:
+                    "Probleme, Schäden, Kundenmeldungen und interne Nachrichten.",
+
+                groups: [
                     {
-                        title: "Neue Meldung",
+                        title:
+                            "Meldungen",
+
                         description:
-                            "Problem, Schaden oder Anfrage erfassen"
+                            "Neue und offene Vorgänge",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Neue Meldung",
+
+                                description:
+                                    "Problem, Schaden oder Anfrage erfassen"
+                            },
+                            {
+                                title:
+                                    "Offene Tickets",
+
+                                description:
+                                    "Noch nicht abgeschlossene Vorgänge"
+                            },
+                            {
+                                title:
+                                    "Sofort-Notiz",
+
+                                description:
+                                    "Foto, Text oder Audio dokumentieren"
+                            }
+                        ]
                     },
                     {
-                        title: "Offene Tickets",
+                        title:
+                            "Kommunikation",
+
                         description:
-                            "Noch nicht abgeschlossene Vorgänge"
-                    },
-                    {
-                        title: "Nachrichten",
-                        description:
-                            "Kommunikation zwischen den Rollen"
-                    },
-                    {
-                        title: "Sofort-Notiz",
-                        description:
-                            "Schnelle Dokumentation mit Foto, Text oder Audio"
+                            "Nachrichten und Bearbeitung",
+
+                        items: [
+                            {
+                                title:
+                                    "Nachrichten",
+
+                                description:
+                                    "Kommunikation zwischen den Rollen"
+                            },
+                            {
+                                title:
+                                    "Verlauf",
+
+                                description:
+                                    "Abgeschlossene Meldungen anzeigen"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/reports":
 
-            return renderPlaceholderPage(
-                "Berichte",
-                "Hier werden Zeiten, Leistungen, Abweichungen und Kennzahlen ausgewertet.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Berichte",
+
+                description:
+                    "Zeiten, Leistungen, Abweichungen und Kennzahlen.",
+
+                groups: [
                     {
-                        title: "Arbeitszeiten",
+                        title:
+                            "Arbeitszeit und Leistung",
+
                         description:
-                            "Check-ins, Check-outs und Gesamtstunden"
+                            "Zeiten, Aufgaben und Qualität",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Arbeitszeiten",
+
+                                description:
+                                    "Check-ins, Check-outs und Stunden"
+                            },
+                            {
+                                title:
+                                    "Leistung",
+
+                                description:
+                                    "Aufgabenstatus und Objektleistung"
+                            },
+                            {
+                                title:
+                                    "Abweichungen",
+
+                                description:
+                                    "Auffällige Zeiten und Nachweise"
+                            }
+                        ]
                     },
                     {
-                        title: "Leistung",
+                        title:
+                            "Ausgabe und Export",
+
                         description:
-                            "Aufgabenstatus und Objektleistung"
-                    },
-                    {
-                        title: "Abweichungen",
-                        description:
-                            "Auffällige Zeiten und fehlende Nachweise"
-                    },
-                    {
-                        title: "Export",
-                        description:
-                            "Berichte für Lohn, Kunden und Controlling"
+                            "Berichte für interne und externe Nutzung",
+
+                        items: [
+                            {
+                                title:
+                                    "Kundenberichte",
+
+                                description:
+                                    "Freigegebene Leistungsnachweise"
+                            },
+                            {
+                                title:
+                                    "Lohnexport",
+
+                                description:
+                                    "Abrechnungsdaten vorbereiten"
+                            },
+                            {
+                                title:
+                                    "Datenexport",
+
+                                description:
+                                    "Berichte herunterladen oder übertragen"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/settings":
 
-            return renderPlaceholderPage(
-                "Einstellungen",
-                "Hier werden App-, Objekt- und Benutzeroptionen festgelegt.",
-                [
+            return renderPlaceholderPage({
+                title:
+                    "Einstellungen",
+
+                description:
+                    "App-, Objekt-, Benutzer- und Unternehmensoptionen.",
+
+                groups: [
                     {
-                        title: "App-Einstellungen",
+                        title:
+                            "Unternehmen und Design",
+
                         description:
-                            "Allgemeine Funktionen und Module"
+                            "Darstellung und Stammdaten",
+
+                        open:
+                            true,
+
+                        items: [
+                            {
+                                title:
+                                    "Unternehmensdaten",
+
+                                description:
+                                    "Name, Kontakt und rechtliche Angaben"
+                            },
+                            {
+                                title:
+                                    "Design",
+
+                                description:
+                                    "Farben und Unternehmensdarstellung"
+                            }
+                        ]
                     },
                     {
-                        title: "Objekteinstellungen",
+                        title:
+                            "Objekte und Prozesse",
+
                         description:
-                            "Check-out-Fragen und Sicherheitsvorgaben"
+                            "Pflichtprüfungen und Betriebsregeln",
+
+                        items: [
+                            {
+                                title:
+                                    "Objekteinstellungen",
+
+                                description:
+                                    "Check-in, Check-out und Sicherheit"
+                            },
+                            {
+                                title:
+                                    "Benachrichtigungen",
+
+                                description:
+                                    "Meldungen und Erinnerungen"
+                            },
+                            {
+                                title:
+                                    "Offline-Modus",
+
+                                description:
+                                    "Lokale Zwischenspeicherung"
+                            }
+                        ]
                     },
                     {
-                        title: "Design",
+                        title:
+                            "Zugriff und System",
+
                         description:
-                            "Farben und Unternehmensdarstellung anpassen"
-                    },
-                    {
-                        title: "Rollen und Rechte",
-                        description:
-                            "Zugriffe und Freigaben verwalten"
+                            "Rollen, Tarife und Datenschutz",
+
+                        items: [
+                            {
+                                title:
+                                    "Rollen und Rechte",
+
+                                description:
+                                    "Zugriffe und Freigaben"
+                            },
+                            {
+                                title:
+                                    "Tarif und Module",
+
+                                description:
+                                    "Free, Pro und Pro Plus"
+                            },
+                            {
+                                title:
+                                    "Datenschutz",
+
+                                description:
+                                    "Datenschutz und Impressum",
+
+                                route:
+                                    "/datenschutz"
+                            }
+                        ]
                     }
                 ]
-            );
+            });
 
         case "/datenschutz":
 
-            return renderPlaceholderPage(
-                "Datenschutz",
-                "Hier werden die Datenschutzinformationen angezeigt."
-            );
+            return renderPlaceholderPage({
+                title:
+                    "Datenschutz",
+
+                description:
+                    "Datenschutzinformationen und Verarbeitungshinweise."
+            });
 
         case "/impressum":
 
-            return renderPlaceholderPage(
-                "Impressum",
-                "Hier werden die Anbieter- und Kontaktinformationen angezeigt."
-            );
+            return renderPlaceholderPage({
+                title:
+                    "Impressum",
+
+                description:
+                    "Anbieter-, Unternehmens- und Kontaktinformationen."
+            });
 
         default:
 
-            return renderDashboard(state);
+            return renderDashboard(
+                state
+            );
     }
+}
+
+/************************************************
+ * EVENT-HELFER
+ ************************************************/
+
+function bindRouteEvents(
+    appElement,
+    onNavigate
+) {
+
+    appElement
+        .querySelectorAll(
+            "[data-route]"
+        )
+        .forEach(
+            (element) => {
+
+                element.addEventListener(
+                    "click",
+                    () => {
+
+                        const targetRoute =
+                            element.dataset.route;
+
+                        if (
+                            targetRoute &&
+                            typeof onNavigate ===
+                                "function"
+                        ) {
+
+                            onNavigate(
+                                targetRoute
+                            );
+                        }
+                    }
+                );
+            }
+        );
+}
+
+function bindActionEvents({
+    appElement,
+    action,
+    handler
+}) {
+
+    if (
+        typeof handler !==
+        "function"
+    ) {
+
+        return;
+    }
+
+    appElement
+        .querySelectorAll(
+            `[data-action="${action}"]`
+        )
+        .forEach(
+            (element) => {
+
+                element.addEventListener(
+                    "click",
+                    handler
+                );
+            }
+        );
+}
+
+function bindObjectSelection(
+    appElement,
+    onSelectObject
+) {
+
+    if (
+        typeof onSelectObject !==
+        "function"
+    ) {
+
+        return;
+    }
+
+    appElement
+        .querySelectorAll(
+            '[data-action="select-object"]'
+        )
+        .forEach(
+            (button) => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        const objectId =
+                            button.dataset.objectId;
+
+                        if (objectId) {
+
+                            onSelectObject(
+                                objectId
+                            );
+                        }
+                    }
+                );
+            }
+        );
+}
+
+function bindLoginForm(
+    onLogin
+) {
+
+    const loginForm =
+        document.getElementById(
+            "test-login-form"
+        );
+
+    if (
+        !loginForm ||
+        typeof onLogin !==
+            "function"
+    ) {
+
+        return;
+    }
+
+    loginForm.addEventListener(
+        "submit",
+        (event) => {
+
+            event.preventDefault();
+
+            const formData =
+                new FormData(
+                    loginForm
+                );
+
+            const loginData = {
+
+                name:
+                    String(
+                        formData.get(
+                            "name"
+                        ) ?? ""
+                    ).trim(),
+
+                role:
+                    String(
+                        formData.get(
+                            "role"
+                        ) ?? ""
+                    ).trim()
+            };
+
+            onLogin(
+                loginData
+            );
+        }
+    );
 }
 
 /************************************************
@@ -1546,11 +2695,14 @@ export function renderApp({
     onLogin,
     onLogout,
     onCheckin,
-    onCheckout
+    onCheckout,
+    onSelectObject
 }) {
 
     const appElement =
-        document.getElementById("app");
+        document.getElementById(
+            "app"
+        );
 
     if (!appElement) {
 
@@ -1563,7 +2715,9 @@ export function renderApp({
 
         <div class="app-shell">
 
-            ${renderHeader(state)}
+            ${renderHeader(
+                state
+            )}
 
             <main class="app-content">
 
@@ -1574,143 +2728,49 @@ export function renderApp({
 
             </main>
 
-            ${renderNavigation(state)}
+            ${renderNavigation(
+                state,
+                route
+            )}
 
         </div>
     `;
 
-    /********************************************
-     * ROUTEN-BUTTONS
-     ********************************************/
+    bindRouteEvents(
+        appElement,
+        onNavigate
+    );
 
-    appElement
-        .querySelectorAll("[data-route]")
-        .forEach((element) => {
+    bindObjectSelection(
+        appElement,
+        onSelectObject
+    );
 
-            element.addEventListener(
-                "click",
-                () => {
+    bindLoginForm(
+        onLogin
+    );
 
-                    const targetRoute =
-                        element.dataset.route;
-
-                    if (
-                        targetRoute &&
-                        typeof onNavigate === "function"
-                    ) {
-                        onNavigate(targetRoute);
-                    }
-                }
-            );
-        });
-
-    /********************************************
-     * LOGIN
-     ********************************************/
-
-    const loginForm =
-        document.getElementById(
-            "test-login-form"
-        );
-
-    if (loginForm) {
-
-        loginForm.addEventListener(
-            "submit",
-            (event) => {
-
-                event.preventDefault();
-
-                const formData =
-                    new FormData(loginForm);
-
-                const loginData = {
-
-                    name:
-                        String(
-                            formData.get("name") ?? ""
-                        ).trim(),
-
-                    role:
-                        String(
-                            formData.get("role") ?? ""
-                        ).trim()
-                };
-
-                if (
-                    typeof onLogin === "function"
-                ) {
-                    onLogin(loginData);
-                }
-            }
-        );
-    }
-
-    /********************************************
-     * LOGOUT
-     ********************************************/
-
-    const logoutButton =
-        appElement.querySelector(
-            '[data-action="logout"]'
-        );
-
-    if (
-        logoutButton &&
-        typeof onLogout === "function"
-    ) {
-
-        logoutButton.addEventListener(
-            "click",
+    bindActionEvents({
+        appElement,
+        action:
+            "logout",
+        handler:
             onLogout
-        );
-    }
+    });
 
-    /********************************************
-     * CHECK-IN
-     ********************************************/
+    bindActionEvents({
+        appElement,
+        action:
+            "checkin",
+        handler:
+            onCheckin
+    });
 
-    const checkinButtons =
-        appElement.querySelectorAll(
-            '[data-action="checkin"]'
-        );
-
-    checkinButtons.forEach(
-        (button) => {
-
-            if (
-                typeof onCheckin === "function"
-            ) {
-
-                button.addEventListener(
-                    "click",
-                    onCheckin
-                );
-            }
-        }
-    );
-
-    /********************************************
-     * CHECK-OUT
-     ********************************************/
-
-    const checkoutButtons =
-        appElement.querySelectorAll(
-            '[data-action="checkout"]'
-        );
-
-    checkoutButtons.forEach(
-        (button) => {
-
-            if (
-                typeof onCheckout === "function"
-            ) {
-
-                button.addEventListener(
-                    "click",
-                    onCheckout
-                );
-            }
-        }
-    );
+    bindActionEvents({
+        appElement,
+        action:
+            "checkout",
+        handler:
+            onCheckout
+    });
 }
