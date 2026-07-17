@@ -5,7 +5,7 @@
  * Zentrale Anwendungssteuerung
  * - lokale Daten laden
  * - App-State initialisieren
- * - Router steuern
+ * - Router synchronisieren
  * - Login und Logout
  * - Objektauswahl
  * - Check-in und Check-out
@@ -24,7 +24,9 @@ import {
     initializeRouter,
     navigateTo,
     getCurrentRoute,
-    updateRouterContext
+    setRouterContext,
+    subscribeToRoute,
+    resetRouter
 } from "./router.js";
 
 import {
@@ -32,7 +34,7 @@ import {
 } from "./ui/renderApp.js";
 
 /************************************************
- * APP-STATUS
+ * APP-LAUFZEITSTATUS
  ************************************************/
 
 let appInitialized =
@@ -45,7 +47,16 @@ let routerInitialized =
     false;
 
 let currentRoute =
-    ROUTES.OVERVIEW;
+    ROUTES.LOGIN;
+
+let unsubscribeFromRouter =
+    null;
+
+let unsubscribeFromState =
+    null;
+
+let renderScheduled =
+    false;
 
 /************************************************
  * DATENSAMMLUNGEN
@@ -76,7 +87,8 @@ const DATA_COLLECTION_NAMES =
         "userPerformance",
         "help",
         "customerRequests",
-        "workOrders"
+        "workOrders",
+        "reports"
     ]);
 
 const REQUIRED_COLLECTION_NAMES =
@@ -124,6 +136,12 @@ function normalizeRole(value) {
         .toUpperCase();
 }
 
+function normalizeIdentifier(value) {
+
+    return normalizeText(value)
+        .toLowerCase();
+}
+
 function escapeHtml(value) {
 
     return String(value ?? "")
@@ -138,16 +156,26 @@ function createLocalId(prefix) {
 
     const normalizedPrefix =
         normalizeText(prefix)
+            .replace(
+                /[^A-Za-z0-9_-]/g,
+                ""
+            )
             .toUpperCase() ||
         "ENTRY";
 
     const randomPart =
         Math.random()
             .toString(36)
-            .slice(2, 8)
+            .slice(2, 9)
             .toUpperCase();
 
     return `${normalizedPrefix}-${Date.now()}-${randomPart}`;
+}
+
+function getCurrentTimestamp() {
+
+    return new Date()
+        .toISOString();
 }
 
 /************************************************
@@ -177,7 +205,21 @@ function getState() {
         );
     }
 
-    return AppState.getAppState();
+    const state =
+        AppState.getAppState();
+
+    if (
+        !state ||
+        typeof state !==
+        "object"
+    ) {
+
+        throw new Error(
+            "getAppState() hat keinen gültigen State zurückgegeben."
+        );
+    }
+
+    return state;
 }
 
 /************************************************
@@ -227,10 +269,16 @@ function setLoadingState(value) {
         return;
     }
 
-    updateState({
-        loading:
-            value === true
-    });
+    updateState(
+        {
+            loading:
+                value === true
+        },
+        {
+            notify:
+                false
+        }
+    );
 }
 
 function setErrorState(error) {
@@ -256,10 +304,16 @@ function setErrorState(error) {
         return;
     }
 
-    updateState({
-        error:
-            message
-    });
+    updateState(
+        {
+            error:
+                message
+        },
+        {
+            notify:
+                false
+        }
+    );
 }
 
 function setRouteState(route) {
@@ -270,6 +324,17 @@ function setRouteState(route) {
 
     currentRoute =
         normalizedRoute;
+
+    const state =
+        getState();
+
+    if (
+        state.currentRoute ===
+        normalizedRoute
+    ) {
+
+        return;
+    }
 
     if (
         typeof AppState.setCurrentRoute ===
@@ -283,10 +348,16 @@ function setRouteState(route) {
         return;
     }
 
-    updateState({
-        currentRoute:
-            normalizedRoute
-    });
+    updateState(
+        {
+            currentRoute:
+                normalizedRoute
+        },
+        {
+            notify:
+                false
+        }
+    );
 }
 
 function setUserState(user) {
@@ -373,6 +444,35 @@ function clearSessionState() {
         {
             persist:
                 true
+        }
+    );
+}
+
+/************************************************
+ * RENDERING PLANEN
+ ************************************************/
+
+function scheduleRender() {
+
+    if (
+        renderScheduled ||
+        !appInitialized ||
+        !dataLoaded
+    ) {
+
+        return;
+    }
+
+    renderScheduled =
+        true;
+
+    window.requestAnimationFrame(
+        () => {
+
+            renderScheduled =
+                false;
+
+            renderCurrentApp();
         }
     );
 }
@@ -585,6 +685,7 @@ function renderLoadingScreen(
         getAppElement();
 
     if (!appElement) {
+
         return;
     }
 
@@ -622,6 +723,7 @@ function renderFatalError(error) {
         getAppElement();
 
     if (!appElement) {
+
         return;
     }
 
@@ -704,6 +806,8 @@ function renderFatalError(error) {
 
                         window.localStorage.clear();
                     }
+
+                    resetRouter();
                 }
                 finally {
 
@@ -715,105 +819,93 @@ function renderFatalError(error) {
 }
 
 /************************************************
- * BENUTZER FÜR TEST-LOGIN FINDEN
+ * LOGIN-BENUTZER FINDEN
  ************************************************/
 
-function findUserForLogin({
-    name,
-    role
-}) {
+function getUserLoginIdentifiers(user) {
 
-    const state =
-        getState();
+    return [
+        user.id,
+        user.username,
+        user.email,
+        user.employeeNumber,
+        user.login,
+        user.userName,
+        user.name,
+        user.fullName,
+        user.displayName
+    ]
+        .map(
+            normalizeIdentifier
+        )
+        .filter(Boolean);
+}
 
-    const normalizedName =
-        normalizeText(name)
-            .toLowerCase();
+function findUserForLogin(identifier) {
 
-    const normalizedRole =
-        normalizeRole(role);
-
-    const activeUsers =
-        asArray(state.users)
-            .filter(
-                (user) =>
-                    user.active !== false
-            );
-
-    const exactMatch =
-        activeUsers.find(
-            (user) => {
-
-                const userName =
-                    normalizeText(
-                        user.name ??
-                        user.fullName
-                    ).toLowerCase();
-
-                return (
-                    normalizeRole(
-                        user.role
-                    ) ===
-                        normalizedRole &&
-                    userName ===
-                        normalizedName
-                );
-            }
+    const normalizedIdentifier =
+        normalizeIdentifier(
+            identifier
         );
 
-    if (exactMatch) {
-        return exactMatch;
+    if (!normalizedIdentifier) {
+
+        return null;
     }
 
-    return (
-        activeUsers.find(
+    return asArray(
+        getState().users
+    )
+        .filter(
             (user) =>
-                normalizeRole(
-                    user.role
-                ) ===
-                normalizedRole
+                user.active !== false
+        )
+        .find(
+            (user) =>
+                getUserLoginIdentifiers(
+                    user
+                ).includes(
+                    normalizedIdentifier
+                )
         ) ??
-        null
+        null;
+}
+
+function getStoredPassword(user) {
+
+    return String(
+        user.password ??
+        user.testPassword ??
+        user.pin ??
+        ""
     );
 }
 
-function createFallbackTestUser({
-    name,
-    role
-}) {
+function validateLoginPassword(
+    user,
+    suppliedPassword
+) {
 
-    const normalizedRole =
-        normalizeRole(role);
+    const storedPassword =
+        getStoredPassword(
+            user
+        );
 
-    const normalizedName =
-        normalizeText(name) ||
-        "Test Benutzer";
+    const password =
+        String(
+            suppliedPassword ??
+            ""
+        );
 
-    return {
-        id:
-            createLocalId(
-                normalizedRole ||
-                "USER"
-            ),
+    if (!storedPassword) {
 
-        name:
-            normalizedName,
+        return true;
+    }
 
-        fullName:
-            normalizedName,
-
-        role:
-            normalizedRole,
-
-        active:
-            true,
-
-        assignedObjectIds:
-            [],
-
-        source:
-            "LOCAL_TEST"
-    };
+    return (
+        storedPassword ===
+        password
+    );
 }
 
 /************************************************
@@ -834,6 +926,7 @@ function getObjectsForUser(user) {
         );
 
     if (!user) {
+
         return [];
     }
 
@@ -858,6 +951,13 @@ function getObjectsForUser(user) {
         "OBJEKTLEITER"
     ) {
 
+        const managedObjectIds =
+            asArray(
+                user.assignedObjectIds ??
+                user.objectIds ??
+                user.managedObjectIds
+            );
+
         const managedObjects =
             objects.filter(
                 (object) =>
@@ -866,7 +966,10 @@ function getObjectsForUser(user) {
                     object.managerId ===
                         user.id ||
                     object.leaderId ===
-                        user.id
+                        user.id ||
+                    managedObjectIds.includes(
+                        object.id
+                    )
             );
 
         return managedObjects.length > 0
@@ -917,13 +1020,18 @@ function getObjectsForUser(user) {
                 .filter(
                     (access) =>
                         access.active !== false &&
-                        access.customerUserId ===
-                            user.id
+                        (
+                            access.customerUserId ===
+                                user.id ||
+                            access.userId ===
+                                user.id
+                        )
                 )
                 .map(
                     (access) =>
                         access.objectId
-                );
+                )
+                .filter(Boolean);
 
         return objects.filter(
             (object) =>
@@ -987,33 +1095,42 @@ function validateCurrentObject() {
 }
 
 /************************************************
- * ROUTER-KONTEXT
+ * ROUTER-KONTEXT SYNCHRONISIEREN
  ************************************************/
 
-function synchronizeRouterContext() {
+function synchronizeRouterContext({
+    notify = false
+} = {}) {
 
     if (!routerInitialized) {
+
         return currentRoute;
     }
 
     const state =
         getState();
 
-    const resolvedRoute =
-        updateRouterContext({
+    setRouterContext(
+        {
             currentUser:
                 state.currentUser,
 
             currentObject:
                 state.currentObject
-        });
+        },
+        {
+            notify,
+            resolve:
+                true
+        }
+    );
 
-    if (resolvedRoute) {
+    const resolvedRoute =
+        getCurrentRoute();
 
-        setRouteState(
-            resolvedRoute
-        );
-    }
+    setRouteState(
+        resolvedRoute
+    );
 
     return resolvedRoute;
 }
@@ -1027,20 +1144,25 @@ function handleNavigate(route) {
     const state =
         getState();
 
-    const resolvedRoute =
-        navigateTo(
-            route,
-            {
-                currentUser:
-                    state.currentUser,
+    setRouterContext(
+        {
+            currentUser:
+                state.currentUser,
 
-                currentObject:
-                    state.currentObject
-            }
-        );
+            currentObject:
+                state.currentObject
+        },
+        {
+            notify:
+                false,
 
-    setRouteState(
-        resolvedRoute
+            resolve:
+                true
+        }
+    );
+
+    return navigateTo(
+        route
     );
 }
 
@@ -1050,48 +1172,66 @@ function handleNavigate(route) {
 
 function handleLogin(loginData) {
 
-    const name =
+    const identifier =
         normalizeText(
-            loginData?.name
+            loginData?.identifier
         );
 
-    const role =
-        normalizeRole(
-            loginData?.role
+    const password =
+        String(
+            loginData?.password ??
+            ""
         );
 
-    if (!role) {
+    if (!identifier) {
 
-        window.alert(
-            "Bitte wähle eine Benutzerrolle aus."
+        throw new Error(
+            "Bitte wähle einen Benutzer oder gib einen Benutzernamen ein."
         );
-
-        return;
     }
 
-    const existingUser =
-        findUserForLogin({
-            name,
-            role
-        });
-
     const selectedUser =
-        existingUser
-            ? {
-                ...existingUser,
+        findUserForLogin(
+            identifier
+        );
 
-                name:
-                    name ||
-                    existingUser.name ||
-                    existingUser.fullName
-            }
-            : createFallbackTestUser({
-                name,
-                role
-            });
+    if (!selectedUser) {
+
+        throw new Error(
+            "Der Benutzer wurde nicht gefunden."
+        );
+    }
+
+    if (
+        !normalizeRole(
+            selectedUser.role
+        )
+    ) {
+
+        throw new Error(
+            "Für diesen Benutzer wurde keine gültige Rolle hinterlegt."
+        );
+    }
+
+    if (
+        !validateLoginPassword(
+            selectedUser,
+            password
+        )
+    ) {
+
+        throw new Error(
+            "Das eingegebene Passwort ist nicht korrekt."
+        );
+    }
 
     setUserState(
-        selectedUser
+        {
+            ...selectedUser,
+
+            lastLoginAt:
+                getCurrentTimestamp()
+        }
     );
 
     const visibleObjects =
@@ -1109,16 +1249,35 @@ function handleLogin(loginData) {
     }
     else {
 
+        const previousObjectId =
+            getState()
+                .currentObject
+                ?.id;
+
+        const previousObject =
+            visibleObjects.find(
+                (object) =>
+                    object.id ===
+                    previousObjectId
+            ) ??
+            null;
+
         setObjectState(
-            null
+            previousObject
         );
     }
 
     synchronizeRouterContext();
 
-    handleNavigate(
-        ROUTES.OVERVIEW
+    navigateTo(
+        ROUTES.OVERVIEW,
+        {
+            replace:
+                true
+        }
     );
+
+    return true;
 }
 
 /************************************************
@@ -1129,26 +1288,32 @@ function handleLogout() {
 
     clearSessionState();
 
-    synchronizeRouterContext();
+    setRouterContext(
+        {
+            currentUser:
+                null,
 
-    const resolvedRoute =
-        navigateTo(
-            ROUTES.LOGIN,
-            {
-                replace:
-                    true,
+            currentObject:
+                null
+        },
+        {
+            notify:
+                false,
 
-                currentUser:
-                    null,
-
-                currentObject:
-                    null
-            }
-        );
-
-    setRouteState(
-        resolvedRoute
+            resolve:
+                true
+        }
     );
+
+    navigateTo(
+        ROUTES.LOGIN,
+        {
+            replace:
+                true
+        }
+    );
+
+    return true;
 }
 
 /************************************************
@@ -1164,15 +1329,20 @@ function handleSelectObject(objectId) {
 
     if (!normalizedObjectId) {
 
-        window.alert(
+        throw new Error(
             "Es wurde kein Objekt ausgewählt."
         );
-
-        return;
     }
 
     const state =
         getState();
+
+    if (!state.currentUser) {
+
+        throw new Error(
+            "Für die Objektauswahl ist eine Anmeldung erforderlich."
+        );
+    }
 
     const selectedObject =
         getObjectsForUser(
@@ -1185,11 +1355,9 @@ function handleSelectObject(objectId) {
 
     if (!selectedObject) {
 
-        window.alert(
-            "Das Objekt wurde nicht gefunden oder ist nicht freigegeben."
+        throw new Error(
+            "Das Objekt wurde nicht gefunden oder ist für diesen Benutzer nicht freigegeben."
         );
-
-        return;
     }
 
     setObjectState(
@@ -1198,9 +1366,80 @@ function handleSelectObject(objectId) {
 
     synchronizeRouterContext();
 
-    handleNavigate(
-        ROUTES.OBJECT_DETAIL
-    );
+    return selectedObject;
+}
+
+/************************************************
+ * LAUFENDE SCHICHT ERMITTELN
+ ************************************************/
+
+function getRunningShiftForCurrentUser(state) {
+
+    const currentUserId =
+        state.currentUser?.id;
+
+    if (!currentUserId) {
+
+        return null;
+    }
+
+    if (
+        state.currentShift &&
+        (
+            state.currentShift.userId ===
+                currentUserId ||
+            state.currentShift.employeeId ===
+                currentUserId
+        )
+    ) {
+
+        return state.currentShift;
+    }
+
+    return asArray(
+        state.shifts
+    ).find(
+        (shift) => {
+
+            const status =
+                normalizeRole(
+                    shift.status
+                );
+
+            const belongsToUser =
+                shift.userId ===
+                    currentUserId ||
+                shift.employeeId ===
+                    currentUserId;
+
+            const isRunning =
+                [
+                    "RUNNING",
+                    "ACTIVE"
+                ].includes(status) ||
+                (
+                    Boolean(
+                        shift.startTime ??
+                        shift.checkinTime
+                    ) &&
+                    !(
+                        shift.endTime ??
+                        shift.checkoutTime
+                    ) &&
+                    ![
+                        "FINISHED",
+                        "COMPLETED",
+                        "CANCELLED"
+                    ].includes(status)
+                );
+
+            return (
+                belongsToUser &&
+                isRunning
+            );
+        }
+    ) ??
+    null;
 }
 
 /************************************************
@@ -1249,7 +1488,10 @@ function createCheckinEntry(
             "COMPLETED",
 
         source:
-            "LOCAL_TEST"
+            "LOCAL_TEST",
+
+        createdAt:
+            shift.startTime
     };
 }
 
@@ -1264,41 +1506,39 @@ function handleCheckin() {
 
     if (!state.currentUser) {
 
-        window.alert(
+        throw new Error(
             "Für den Check-in ist eine Anmeldung erforderlich."
         );
-
-        return;
     }
 
     if (!state.currentObject) {
-
-        window.alert(
-            "Bitte wähle vor dem Check-in ein Objekt aus."
-        );
 
         handleNavigate(
             ROUTES.OBJECTS
         );
 
-        return;
+        throw new Error(
+            "Bitte wähle vor dem Check-in ein Objekt aus."
+        );
     }
 
-    if (
-        state.shiftStarted === true
-    ) {
-
-        window.alert(
-            "Es läuft bereits eine Schicht."
+    const runningShift =
+        getRunningShiftForCurrentUser(
+            state
         );
 
-        return;
+    if (runningShift) {
+
+        throw new Error(
+            "Für diesen Benutzer läuft bereits eine Schicht."
+        );
     }
 
     const startTime =
-        new Date().toISOString();
+        getCurrentTimestamp();
 
     const currentShift = {
+
         id:
             createLocalId(
                 "SHIFT"
@@ -1312,24 +1552,38 @@ function handleCheckin() {
 
         employeeName:
             state.currentUser.name ??
-            state.currentUser.fullName,
+            state.currentUser.fullName ??
+            state.currentUser.displayName,
 
         objectId:
             state.currentObject.id,
 
         objectName:
-            state.currentObject.name,
+            state.currentObject.name ??
+            state.currentObject.id,
 
         startTime,
 
+        checkinTime:
+            startTime,
+
         endTime:
+            null,
+
+        checkoutTime:
             null,
 
         status:
             "RUNNING",
 
         source:
-            "LOCAL_TEST"
+            "LOCAL_TEST",
+
+        createdAt:
+            startTime,
+
+        updatedAt:
+            startTime
     };
 
     const checkinEntry =
@@ -1344,7 +1598,6 @@ function handleCheckin() {
                 ...asArray(
                     state.shifts
                 ),
-
                 currentShift
             ],
 
@@ -1352,13 +1605,15 @@ function handleCheckin() {
                 ...asArray(
                     state.checkins
                 ),
-
                 checkinEntry
             ]
         },
         {
             notify:
-                false
+                false,
+
+            persist:
+                true
         }
     );
 
@@ -1386,6 +1641,10 @@ function handleCheckin() {
             }
         );
     }
+
+    scheduleRender();
+
+    return currentShift;
 }
 
 /************************************************
@@ -1440,7 +1699,10 @@ function createCheckoutEntry(
             "COMPLETED",
 
         source:
-            "LOCAL_TEST"
+            "LOCAL_TEST",
+
+        createdAt:
+            completedShift.endTime
     };
 }
 
@@ -1453,42 +1715,95 @@ function handleCheckout() {
     const state =
         getState();
 
-    if (
-        state.shiftStarted !== true ||
-        !state.currentShift
-    ) {
-
-        window.alert(
-            "Es läuft derzeit keine Schicht."
+    const runningShift =
+        getRunningShiftForCurrentUser(
+            state
         );
 
-        return;
+    if (!runningShift) {
+
+        throw new Error(
+            "Es läuft derzeit keine Schicht."
+        );
     }
 
     const endTime =
-        new Date().toISOString();
+        getCurrentTimestamp();
+
+    const startTime =
+        new Date(
+            runningShift.startTime ??
+            runningShift.checkinTime
+        );
+
+    const endDate =
+        new Date(
+            endTime
+        );
+
+    const durationMinutes =
+        Number.isNaN(
+            startTime.getTime()
+        )
+            ? 0
+            : Math.max(
+                Math.round(
+                    (
+                        endDate.getTime() -
+                        startTime.getTime()
+                    ) /
+                    60000
+                ),
+                0
+            );
 
     const completedShift = {
         ...asObject(
-            state.currentShift
+            runningShift
         ),
 
         endTime,
 
+        checkoutTime:
+            endTime,
+
+        durationMinutes,
+
+        actualMinutes:
+            durationMinutes,
+
         status:
-            "FINISHED"
+            "FINISHED",
+
+        updatedAt:
+            endTime
     };
 
-    const updatedShifts =
+    const existingShifts =
         asArray(
             state.shifts
-        ).map(
+        );
+
+    const shiftExists =
+        existingShifts.some(
             (shift) =>
                 shift.id ===
-                    completedShift.id
-                    ? completedShift
-                    : shift
+                completedShift.id
         );
+
+    const updatedShifts =
+        shiftExists
+            ? existingShifts.map(
+                (shift) =>
+                    shift.id ===
+                    completedShift.id
+                        ? completedShift
+                        : shift
+            )
+            : [
+                ...existingShifts,
+                completedShift
+            ];
 
     const checkoutEntry =
         createCheckoutEntry(
@@ -1505,13 +1820,15 @@ function handleCheckout() {
                 ...asArray(
                     state.checkouts
                 ),
-
                 checkoutEntry
             ]
         },
         {
             notify:
-                false
+                false,
+
+            persist:
+                true
         }
     );
 
@@ -1540,6 +1857,10 @@ function handleCheckout() {
             }
         );
     }
+
+    scheduleRender();
+
+    return completedShift;
 }
 
 /************************************************
@@ -1565,7 +1886,11 @@ function renderCurrentApp() {
         currentRoute ||
         state.currentRoute ||
         getCurrentRoute() ||
-        ROUTES.OVERVIEW;
+        (
+            state.currentUser
+                ? ROUTES.OVERVIEW
+                : ROUTES.LOGIN
+        );
 
     renderApp({
         route,
@@ -1607,17 +1932,7 @@ function startRouter() {
                 state.currentUser,
 
             currentObject:
-                state.currentObject,
-
-            onRouteChange:
-                (route) => {
-
-                    setRouteState(
-                        route
-                    );
-
-                    renderCurrentApp();
-                }
+                state.currentObject
         });
 
     routerInitialized =
@@ -1626,6 +1941,36 @@ function startRouter() {
     setRouteState(
         currentRoute
     );
+
+    if (
+        typeof unsubscribeFromRouter ===
+        "function"
+    ) {
+
+        unsubscribeFromRouter();
+    }
+
+    unsubscribeFromRouter =
+        subscribeToRoute(
+            (route) => {
+
+                if (
+                    route ===
+                    currentRoute
+                ) {
+
+                    scheduleRender();
+
+                    return;
+                }
+
+                setRouteState(
+                    route
+                );
+
+                scheduleRender();
+            }
+        );
 }
 
 /************************************************
@@ -1669,6 +2014,17 @@ function initializeState() {
 function subscribeToState() {
 
     if (
+        typeof unsubscribeFromState ===
+        "function"
+    ) {
+
+        unsubscribeFromState();
+
+        unsubscribeFromState =
+            null;
+    }
+
+    if (
         typeof AppState.subscribeToAppState !==
         "function"
     ) {
@@ -1676,18 +2032,32 @@ function subscribeToState() {
         return;
     }
 
-    AppState.subscribeToAppState(
-        () => {
+    const unsubscribe =
+        AppState.subscribeToAppState(
+            () => {
 
-            if (
-                appInitialized &&
-                dataLoaded
-            ) {
+                if (
+                    !appInitialized ||
+                    !dataLoaded
+                ) {
 
-                renderCurrentApp();
+                    return;
+                }
+
+                synchronizeRouterContext();
+
+                scheduleRender();
             }
-        }
-    );
+        );
+
+    if (
+        typeof unsubscribe ===
+        "function"
+    ) {
+
+        unsubscribeFromState =
+            unsubscribe;
+    }
 }
 
 /************************************************
