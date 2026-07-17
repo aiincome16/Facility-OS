@@ -2,12 +2,16 @@
  * Facility OS
  * renderApp.js
  *
- * Reduzierte Benutzeroberfläche
- * - maximal fünf Hauptbereiche
- * - höchstens vier Kennzahlen
- * - klare Farbbereiche
- * - kompakte Unterseiten
- * - Abmeldung im Bereich „Mehr“
+ * Zentrale Benutzeroberfläche
+ * - bindet alle neuen App-Seiten ein
+ * - mobile App-Struktur
+ * - gemeinsamer Header
+ * - rollenabhängige Navigation
+ * - Login
+ * - zentrale Ereignissteuerung
+ * - Check-in und Check-out
+ * - Objektauswahl
+ * - vorbereitete Dialogaktionen
  ************************************************/
 
 import {
@@ -17,9 +21,20 @@ import {
 
 import {
     ROUTES,
-    getMainNavigationForRole,
-    getActiveMainRoute
+    getRouteTitle
 } from "../router.js";
+
+import {
+    renderAppHeader
+} from "./components/appHeader.js";
+
+import {
+    renderBottomNavigation
+} from "./components/bottomNavigation.js";
+
+import {
+    renderOverviewPage
+} from "./pages/overviewPage.js";
 
 import {
     renderObjectsPage
@@ -28,6 +43,70 @@ import {
 import {
     renderObjectDetailPage
 } from "./pages/objectDetailPage.js";
+
+import {
+    renderPersonnelPage
+} from "./pages/personnelPage.js";
+
+import {
+    renderCommunicationPage
+} from "./pages/communicationPage.js";
+
+import {
+    renderMaterialsPage
+} from "./pages/materialsPage.js";
+
+import {
+    renderTasksPage
+} from "./pages/tasksPage.js";
+
+import {
+    renderTimesPage
+} from "./pages/timesPage.js";
+
+import {
+    renderAnalysisPage
+} from "./pages/analysisPage.js";
+
+import {
+    renderReportsPage
+} from "./pages/reportsPage.js";
+
+import {
+    renderMorePage
+} from "./pages/morePage.js";
+
+import {
+    renderSettingsPage
+} from "./pages/settingsPage.js";
+
+import {
+    renderHelpPage
+} from "./pages/helpPage.js";
+
+import {
+    renderPrivacyPage
+} from "./pages/privacyPage.js";
+
+import {
+    renderImprintPage
+} from "./pages/imprintPage.js";
+
+/************************************************
+ * LOKALER UI-ZUSTAND
+ ************************************************/
+
+const uiState = {
+
+    dialog:
+        null,
+
+    toast:
+        null,
+
+    toastTimer:
+        null
+};
 
 /************************************************
  * HTML-SICHERHEIT
@@ -54,21 +133,25 @@ function asArray(value) {
         : [];
 }
 
-function asNumber(value) {
+function normalizeText(value) {
 
-    const number =
-        Number(value);
-
-    return Number.isFinite(number)
-        ? number
-        : 0;
+    return String(value ?? "")
+        .trim();
 }
 
 function normalizeStatus(value) {
 
-    return String(value ?? "")
-        .trim()
+    return normalizeText(value)
         .toUpperCase();
+}
+
+function getAppName() {
+
+    return (
+        APP_CONFIG.APP_NAME ??
+        APP_CONFIG.NAME ??
+        "Facility OS"
+    );
 }
 
 function getRoleLabel(role) {
@@ -95,542 +178,311 @@ function getRoleLabel(role) {
     };
 
     return (
-        labels[role] ??
-        "Facility OS"
-    );
-}
-
-function getUserName(state) {
-
-    return (
-        state.currentUser?.name ??
-        state.currentUser?.fullName ??
+        labels[
+            normalizeStatus(role)
+        ] ??
         "Benutzer"
     );
 }
 
 /************************************************
- * DATENFILTER
+ * LOGIN-DATEN
  ************************************************/
 
-function getOpenTickets(state) {
-
-    const closedStatuses = [
-        "RESOLVED",
-        "CLOSED",
-        "COMPLETED"
-    ];
-
-    return asArray(state.tickets)
-        .filter(
-            (ticket) =>
-                !closedStatuses.includes(
-                    normalizeStatus(
-                        ticket.status
-                    )
-                )
-        );
-}
-
-function getCriticalTickets(state) {
-
-    return getOpenTickets(state)
-        .filter(
-            (ticket) =>
-                [
-                    "CRITICAL",
-                    "URGENT",
-                    "HIGH"
-                ].includes(
-                    normalizeStatus(
-                        ticket.priority ??
-                        ticket.severity
-                    )
-                )
-        );
-}
-
-function getMaterialWarnings(state) {
-
-    return asArray(state.materialStock)
-        .filter(
-            (stock) => {
-
-                const status =
-                    normalizeStatus(
-                        stock.status
-                    );
-
-                if (
-                    [
-                        "LOW",
-                        "CRITICAL"
-                    ].includes(status)
-                ) {
-
-                    return true;
-                }
-
-                const currentAmount =
-                    asNumber(
-                        stock.currentAmount ??
-                        stock.quantity ??
-                        stock.stock
-                    );
-
-                const minimumAmount =
-                    asNumber(
-                        stock.minimumAmount ??
-                        stock.minimumStock ??
-                        stock.minStock
-                    );
-
-                return (
-                    minimumAmount > 0 &&
-                    currentAmount <=
-                        minimumAmount
-                );
-            }
-        );
-}
-
-function getRunningShifts(state) {
-
-    return asArray(state.shifts)
-        .filter(
-            (shift) => {
-
-                const status =
-                    normalizeStatus(
-                        shift.status
-                    );
-
-                return (
-                    status === "RUNNING" ||
-                    (
-                        shift.startTime &&
-                        !shift.endTime &&
-                        ![
-                            "FINISHED",
-                            "COMPLETED",
-                            "CANCELLED"
-                        ].includes(status)
-                    )
-                );
-            }
-        );
-}
-
-function getOpenTimeDeviations(state) {
-
-    return asArray(state.timeDeviations)
-        .filter(
-            (deviation) =>
-                ![
-                    "RESOLVED",
-                    "CLOSED",
-                    "COMPLETED"
-                ].includes(
-                    normalizeStatus(
-                        deviation.status
-                    )
-                )
-        );
-}
-
-function getActiveUsers(state) {
-
-    return asArray(state.users)
-        .filter(
-            (user) =>
-                user.active !== false
-        );
-}
-
-function getVisibleObjects(state) {
-
-    const currentUser =
-        state.currentUser;
-
-    const objects =
-        asArray(state.objects);
-
-    if (!currentUser) {
-        return [];
-    }
-
-    switch (currentUser.role) {
-
-        case USER_ROLES.SUPER_ADMIN:
-        case USER_ROLES.ADMIN:
-        case USER_ROLES.BUCHHALTUNG:
-
-            return objects;
-
-        case USER_ROLES.OBJEKTLEITER: {
-
-            const managedObjects =
-                objects.filter(
-                    (object) =>
-                        object.objectLeaderId ===
-                            currentUser.id ||
-                        object.managerId ===
-                            currentUser.id
-                );
-
-            return managedObjects.length > 0
-                ? managedObjects
-                : objects;
-        }
-
-        case USER_ROLES.MITARBEITER: {
-
-            const assignedObjectIds =
-                asArray(
-                    currentUser.assignedObjectIds ??
-                    currentUser.objectIds
-                );
-
-            const assignedObjects =
-                objects.filter(
-                    (object) =>
-                        assignedObjectIds.includes(
-                            object.id
-                        ) ||
-                        asArray(
-                            object.assignedEmployeeIds
-                        ).includes(
-                            currentUser.id
-                        )
-                );
-
-            return assignedObjects.length > 0
-                ? assignedObjects
-                : objects;
-        }
-
-        case USER_ROLES.KUNDE: {
-
-            const allowedObjectIds =
-                asArray(state.customerAccess)
-                    .filter(
-                        (access) =>
-                            access.active !== false &&
-                            access.customerUserId ===
-                                currentUser.id
-                    )
-                    .map(
-                        (access) =>
-                            access.objectId
-                    );
-
-            return objects.filter(
-                (object) =>
-                    allowedObjectIds.includes(
-                        object.id
-                    ) ||
-                    object.customerUserId ===
-                        currentUser.id
-            );
-        }
-
-        default:
-
-            return [];
-    }
-}
-
-/************************************************
- * KOPFBEREICH
- ************************************************/
-
-function renderHeader(state) {
-
-    if (!state.currentUser) {
-        return "";
-    }
-
-    return `
-        <header class="app-header">
-
-            <div class="app-header-brand">
-
-                <strong>
-                    ${escapeHtml(
-                        APP_CONFIG.APP_NAME ??
-                        "Facility OS"
-                    )}
-                </strong>
-
-                <span>
-                    ${escapeHtml(
-                        getRoleLabel(
-                            state.currentUser.role
-                        )
-                    )}
-                </span>
-
-            </div>
-
-            <div class="app-header-actions">
-
-                ${
-                    state.currentObject
-                        ? `
-                            <button
-                                type="button"
-                                class="header-object-button"
-                                data-route="${ROUTES.OBJECT_DETAIL}"
-                            >
-                                <span>
-                                    Objekt
-                                </span>
-
-                                <strong>
-                                    ${escapeHtml(
-                                        state.currentObject.name ??
-                                        state.currentObject.id
-                                    )}
-                                </strong>
-                            </button>
-                        `
-                        : ""
-                }
-
-                <button
-                    type="button"
-                    class="header-profile-button"
-                    data-route="${ROUTES.MORE}"
-                    aria-label="Profil und weitere Funktionen"
-                >
-                    ${escapeHtml(
-                        getUserName(state)
-                            .charAt(0)
-                            .toUpperCase()
-                    )}
-                </button>
-
-            </div>
-
-        </header>
-    `;
-}
-
-/************************************************
- * UNTERE NAVIGATION
- ************************************************/
-
-function getNavigationIcon(itemId) {
-
-    const icons = {
-
-        overview:
-            "⌂",
-
-        objects:
-            "▦",
-
-        object:
-            "▦",
-
-        personnel:
-            "♙",
-
-        communication:
-            "✉",
-
-        tasks:
-            "✓",
-
-        times:
-            "◷",
-
-        analysis:
-            "▥",
-
-        reports:
-            "▥",
-
-        more:
-            "•••"
-    };
-
-    return (
-        icons[itemId] ??
-        "•"
+function getLoginUsers(state) {
+
+    return asArray(
+        state.users
+    ).filter(
+        (user) =>
+            user.active !== false
     );
 }
 
-function renderNavigation(
-    state,
-    route
-) {
+function getLoginIdentifier(user) {
 
-    const role =
-        state.currentUser?.role;
+    return (
+        user.username ??
+        user.email ??
+        user.employeeNumber ??
+        user.id ??
+        ""
+    );
+}
 
-    if (!role) {
-        return "";
-    }
+function getLoginDisplayName(user) {
 
-    const navigationItems =
-        getMainNavigationForRole(
-            role
-        );
-
-    const activeMainRoute =
-        getActiveMainRoute(
-            route,
-            role
-        );
-
-    return `
-        <nav class="bottom-navigation">
-
-            ${navigationItems
-                .map(
-                    (item) => {
-
-                        const active =
-                            activeMainRoute ===
-                            item.route;
-
-                        return `
-                            <button
-                                type="button"
-                                class="navigation-item navigation-${escapeHtml(
-                                    item.color
-                                )} ${
-                                    active
-                                        ? "active"
-                                        : ""
-                                }"
-                                data-route="${escapeHtml(
-                                    item.route
-                                )}"
-                            >
-                                <span class="navigation-icon">
-                                    ${escapeHtml(
-                                        getNavigationIcon(
-                                            item.id
-                                        )
-                                    )}
-                                </span>
-
-                                <span class="navigation-label">
-                                    ${escapeHtml(
-                                        item.label
-                                    )}
-                                </span>
-                            </button>
-                        `;
-                    }
-                )
-                .join("")}
-
-        </nav>
-    `;
+    return (
+        user.name ??
+        user.fullName ??
+        user.displayName ??
+        user.email ??
+        user.id ??
+        "Benutzer"
+    );
 }
 
 /************************************************
- * LOGIN
+ * LOGIN-SEITE
  ************************************************/
 
-function renderLogin() {
+function renderLoginUserOptions(state) {
+
+    const users =
+        getLoginUsers(state);
+
+    if (
+        users.length === 0
+    ) {
+
+        return `
+            <option value="">
+                Keine Benutzer verfügbar
+            </option>
+        `;
+    }
+
+    return users
+        .map(
+            (user) => {
+
+                const identifier =
+                    getLoginIdentifier(
+                        user
+                    );
+
+                return `
+                    <option
+                        value="${escapeHtml(
+                            identifier
+                        )}"
+                    >
+                        ${escapeHtml(
+                            getLoginDisplayName(
+                                user
+                            )
+                        )}
+                        ·
+                        ${escapeHtml(
+                            getRoleLabel(
+                                user.role
+                            )
+                        )}
+                    </option>
+                `;
+            }
+        )
+        .join("");
+}
+
+function renderLoginPage(state) {
+
+    const testMode =
+        APP_CONFIG.TEST_MODE ===
+        true;
 
     return `
-        <main class="login-page">
+        <main class="facility-login-page">
 
-            <section class="login-card">
+            <section class="facility-login-shell">
 
-                <div class="brand-block">
+                <div class="facility-login-brand">
 
-                    <div class="brand-mark">
+                    <div class="facility-login-logo">
                         FO
                     </div>
 
-                    <h1>
-                        Facility OS
-                    </h1>
+                    <div>
 
-                    <p>
-                        Digitale Objekt- und
-                        Reinigungsverwaltung
-                    </p>
+                        <span class="facility-login-eyebrow">
+                            Digitale Objektsteuerung
+                        </span>
+
+                        <h1>
+                            ${escapeHtml(
+                                getAppName()
+                            )}
+                        </h1>
+
+                        <p>
+                            Objekte, Personal, Aufgaben und Meldungen
+                            in einer mobilen Anwendung.
+                        </p>
+
+                    </div>
 
                 </div>
 
-                <form id="test-login-form">
+                <form
+                    class="facility-login-card"
+                    data-login-form
+                    novalidate
+                >
 
-                    <div class="form-group">
+                    <header>
 
-                        <label for="login-name">
-                            Name
-                        </label>
+                        <span class="facility-login-card-label">
+                            Willkommen
+                        </span>
 
-                        <input
-                            id="login-name"
-                            name="name"
-                            type="text"
-                            value="Test Benutzer"
-                            autocomplete="name"
-                            required
-                        >
+                        <h2>
+                            Anmelden
+                        </h2>
 
-                    </div>
+                        <p>
+                            Melde dich mit deinem Facility-OS-Zugang an.
+                        </p>
 
-                    <div class="form-group">
+                    </header>
 
-                        <label for="login-role">
-                            Rolle
-                        </label>
+                    ${
+                        testMode
+                            ? `
+                                <div class="facility-login-test-notice">
 
-                        <select
-                            id="login-role"
-                            name="role"
-                            required
-                        >
+                                    <strong>
+                                        Präsentationsmodus
+                                    </strong>
 
-                            <option value="OBJEKTLEITER">
-                                Objektleiter
-                            </option>
+                                    <span>
+                                        Wähle einen Testbenutzer aus.
+                                    </span>
 
-                            <option value="MITARBEITER">
-                                Mitarbeiter
-                            </option>
+                                </div>
 
-                            <option value="ADMIN">
-                                Administration
-                            </option>
+                                <label class="facility-form-field">
 
-                            <option value="BUCHHALTUNG">
-                                Buchhaltung
-                            </option>
+                                    <span>
+                                        Benutzer
+                                    </span>
 
-                            <option value="KUNDE">
-                                Kunde
-                            </option>
+                                    <select
+                                        name="identifier"
+                                        required
+                                        autocomplete="username"
+                                    >
+                                        ${renderLoginUserOptions(
+                                            state
+                                        )}
+                                    </select>
 
-                            <option value="SUPER_ADMIN">
-                                Super-Admin
-                            </option>
+                                </label>
+                            `
+                            : `
+                                <label class="facility-form-field">
 
-                        </select>
+                                    <span>
+                                        E-Mail oder Benutzername
+                                    </span>
 
-                    </div>
+                                    <input
+                                        type="text"
+                                        name="identifier"
+                                        placeholder="Benutzername"
+                                        autocomplete="username"
+                                        required
+                                    >
+
+                                </label>
+                            `
+                    }
+
+                    <label class="facility-form-field">
+
+                        <span>
+                            Passwort
+                        </span>
+
+                        <div class="facility-password-field">
+
+                            <input
+                                type="password"
+                                name="password"
+                                placeholder="${
+                                    testMode
+                                        ? "Im Testmodus optional"
+                                        : "Passwort"
+                                }"
+                                autocomplete="current-password"
+                                ${
+                                    testMode
+                                        ? ""
+                                        : "required"
+                                }
+                            >
+
+                            <button
+                                type="button"
+                                class="facility-password-toggle"
+                                data-action="toggle-password"
+                                aria-label="Passwort anzeigen"
+                            >
+                                Anzeigen
+                            </button>
+
+                        </div>
+
+                    </label>
+
+                    <p
+                        class="facility-login-error"
+                        data-login-error
+                        hidden
+                    ></p>
 
                     <button
                         type="submit"
-                        class="button button-primary button-full"
+                        class="facility-login-submit"
                     >
-                        Anmelden
+                        <span>
+                            Anmelden
+                        </span>
+
+                        <span aria-hidden="true">
+                            →
+                        </span>
                     </button>
+
+                    <footer class="facility-login-footer">
+
+                        <span>
+                            Sichere rollenbasierte Anmeldung
+                        </span>
+
+                        <span>
+                            Version
+                            ${escapeHtml(
+                                APP_CONFIG.VERSION ??
+                                APP_CONFIG.APP_VERSION ??
+                                "2.0.0"
+                            )}
+                        </span>
+
+                    </footer>
 
                 </form>
 
-                <p class="login-note">
-                    Testmodus mit lokalen Daten
-                </p>
+                <div class="facility-login-legal">
+
+                    <button
+                        type="button"
+                        data-route="${ROUTES.PRIVACY}"
+                    >
+                        Datenschutz
+                    </button>
+
+                    <span>
+                        ·
+                    </span>
+
+                    <button
+                        type="button"
+                        data-route="${ROUTES.IMPRINT}"
+                    >
+                        Impressum
+                    </button>
+
+                </div>
 
             </section>
 
@@ -639,2553 +491,43 @@ function renderLogin() {
 }
 
 /************************************************
- * SEITENKOPF
+ * SEITEN RENDERN
  ************************************************/
 
-function renderPageHeader({
-    area,
-    title,
-    description = "",
-    color = "overview"
-}) {
-
-    return `
-        <header class="page-intro page-intro-${escapeHtml(
-            color
-        )}">
-
-            <span class="page-area-label">
-                ${escapeHtml(area)}
-            </span>
-
-            <h1>
-                ${escapeHtml(title)}
-            </h1>
-
-            ${
-                description
-                    ? `
-                        <p>
-                            ${escapeHtml(
-                                description
-                            )}
-                        </p>
-                    `
-                    : ""
-            }
-
-        </header>
-    `;
-}
-
-/************************************************
- * KENNZAHLEN
- ************************************************/
-
-function renderMetric({
-    label,
-    value,
-    status = "neutral",
-    route = null
-}) {
-
-    const routeAttribute =
-        route
-            ? `data-route="${escapeHtml(
-                route
-            )}"`
-            : "";
-
-    const tag =
-        route
-            ? "button"
-            : "article";
-
-    return `
-        <${tag}
-            class="summary-metric summary-metric-${escapeHtml(
-                status
-            )}"
-            ${routeAttribute}
-            ${route ? 'type="button"' : ""}
-        >
-
-            <span>
-                ${escapeHtml(label)}
-            </span>
-
-            <strong>
-                ${escapeHtml(value)}
-            </strong>
-
-        </${tag}>
-    `;
-}
-
-function renderMetrics(metrics) {
-
-    return `
-        <section class="summary-grid">
-
-            ${metrics
-                .slice(0, 4)
-                .map(
-                    renderMetric
-                )
-                .join("")}
-
-        </section>
-    `;
-}
-
-/************************************************
- * HAUPTAKTIONEN
- ************************************************/
-
-function renderPrimaryAction({
-    title,
-    description,
-    route = null,
-    action = null,
-    color = "overview"
-}) {
-
-    const routeAttribute =
-        route
-            ? `data-route="${escapeHtml(
-                route
-            )}"`
-            : "";
-
-    const actionAttribute =
-        action
-            ? `data-action="${escapeHtml(
-                action
-            )}"`
-            : "";
-
-    return `
-        <button
-            type="button"
-            class="primary-action primary-action-${escapeHtml(
-                color
-            )}"
-            ${routeAttribute}
-            ${actionAttribute}
-        >
-
-            <strong>
-                ${escapeHtml(title)}
-            </strong>
-
-            <span>
-                ${escapeHtml(description)}
-            </span>
-
-            <span class="primary-action-arrow">
-                ›
-            </span>
-
-        </button>
-    `;
-}
-
-function renderActionList(actions) {
-
-    return `
-        <section class="primary-action-list">
-
-            ${actions
-                .map(
-                    renderPrimaryAction
-                )
-                .join("")}
-
-        </section>
-    `;
-}
-
-/************************************************
- * WARNUNGEN
- ************************************************/
-
-function renderNotice({
-    title,
-    text,
-    level = "info",
-    route = null
-}) {
-
-    const tag =
-        route
-            ? "button"
-            : "article";
-
-    const routeAttribute =
-        route
-            ? `data-route="${escapeHtml(
-                route
-            )}"`
-            : "";
-
-    return `
-        <${tag}
-            class="notice-card notice-${escapeHtml(
-                level
-            )}"
-            ${routeAttribute}
-            ${route ? 'type="button"' : ""}
-        >
-
-            <strong>
-                ${escapeHtml(title)}
-            </strong>
-
-            <span>
-                ${escapeHtml(text)}
-            </span>
-
-        </${tag}>
-    `;
-}
-
-function renderNoticeList(notices) {
-
-    if (
-        notices.length === 0
-    ) {
-
-        return "";
-    }
-
-    return `
-        <section class="notice-list">
-
-            ${notices
-                .slice(0, 3)
-                .map(
-                    renderNotice
-                )
-                .join("")}
-
-        </section>
-    `;
-}
-
-/************************************************
- * OBJEKTLEITER-ÜBERSICHT
- ************************************************/
-
-function renderManagerOverview(state) {
-
-    const visibleObjects =
-        getVisibleObjects(state);
-
-    const runningShifts =
-        getRunningShifts(state);
-
-    const criticalTickets =
-        getCriticalTickets(state);
-
-    const openTickets =
-        getOpenTickets(state);
-
-    const materialWarnings =
-        getMaterialWarnings(state);
-
-    const deviations =
-        getOpenTimeDeviations(state);
-
-    const notices = [];
-
-    if (
-        criticalTickets.length > 0
-    ) {
-
-        notices.push({
-            title:
-                "Kritische Meldungen",
-
-            text:
-                `${criticalTickets.length} Vorgänge benötigen eine schnelle Prüfung.`,
-
-            level:
-                "critical",
-
-            route:
-                ROUTES.COMMUNICATION
-        });
-    }
-
-    if (
-        materialWarnings.length > 0
-    ) {
-
-        notices.push({
-            title:
-                "Material prüfen",
-
-            text:
-                `${materialWarnings.length} Bestände sind niedrig oder kritisch.`,
-
-            level:
-                "warning",
-
-            route:
-                ROUTES.OBJECTS
-        });
-    }
-
-    if (
-        deviations.length > 0
-    ) {
-
-        notices.push({
-            title:
-                "Zeitabweichungen",
-
-            text:
-                `${deviations.length} Abweichungen sind noch ungeklärt.`,
-
-            level:
-                "warning",
-
-            route:
-                ROUTES.MORE
-        });
-    }
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Übersicht",
-
-                title:
-                    `Guten Tag, ${getUserName(
-                        state
-                    )}`,
-
-                description:
-                    "Das Wichtigste für den heutigen Betrieb.",
-
-                color:
-                    "overview"
-            })}
-
-            ${renderMetrics([
-                {
-                    label:
-                        "Aktive Schichten",
-
-                    value:
-                        runningShifts.length,
-
-                    status:
-                        runningShifts.length > 0
-                            ? "success"
-                            : "neutral"
-                },
-                {
-                    label:
-                        "Offene Tickets",
-
-                    value:
-                        openTickets.length,
-
-                    status:
-                        openTickets.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.COMMUNICATION
-                },
-                {
-                    label:
-                        "Materialwarnungen",
-
-                    value:
-                        materialWarnings.length,
-
-                    status:
-                        materialWarnings.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.OBJECTS
-                },
-                {
-                    label:
-                        "Objekte",
-
-                    value:
-                        visibleObjects.length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.OBJECTS
-                }
-            ])}
-
-            ${renderNoticeList(
-                notices
-            )}
-
-            ${renderActionList([
-                {
-                    title:
-                        "Objekte öffnen",
-
-                    description:
-                        "Räume, Aufgaben und Objektstatus",
-
-                    route:
-                        ROUTES.OBJECTS,
-
-                    color:
-                        "objects"
-                },
-                {
-                    title:
-                        "Personal steuern",
-
-                    description:
-                        "Mitarbeiter, Abwesenheit und Vertretung",
-
-                    route:
-                        ROUTES.PERSONNEL,
-
-                    color:
-                        "personnel"
-                },
-                {
-                    title:
-                        "Meldungen bearbeiten",
-
-                    description:
-                        "Tickets, Nachrichten und Kundenanfragen",
-
-                    route:
-                        ROUTES.COMMUNICATION,
-
-                    color:
-                        "communication"
-                }
-            ])}
-
-        </section>
-    `;
-}
-
-/************************************************
- * MITARBEITER-ÜBERSICHT
- ************************************************/
-
-function renderEmployeeOverview(state) {
-
-    const currentObject =
-        state.currentObject;
-
-    const objectTasks =
-        currentObject
-            ? asArray(state.tasks)
-                .filter(
-                    (task) =>
-                        task.objectId ===
-                            currentObject.id &&
-                        task.active !== false
-                )
-            : [];
-
-    const ownOpenTickets =
-        getOpenTickets(state)
-            .filter(
-                (ticket) =>
-                    ticket.createdByUserId ===
-                        state.currentUser?.id ||
-                    ticket.userId ===
-                        state.currentUser?.id
-            );
-
-    const shiftStarted =
-        state.shiftStarted === true;
-
-    const notices = [];
-
-    if (!currentObject) {
-
-        notices.push({
-            title:
-                "Kein Objekt ausgewählt",
-
-            text:
-                "Wähle dein Objekt, bevor du mit der Arbeit beginnst.",
-
-            level:
-                "warning",
-
-            route:
-                ROUTES.OBJECTS
-        });
-    }
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Übersicht",
-
-                title:
-                    `Hallo, ${getUserName(
-                        state
-                    )}`,
-
-                description:
-                    currentObject
-                        ? `Heute im Objekt: ${
-                            currentObject.name ??
-                            currentObject.id
-                        }`
-                        : "Bereit für deinen nächsten Einsatz.",
-
-                color:
-                    "overview"
-            })}
-
-            ${renderMetrics([
-                {
-                    label:
-                        "Schicht",
-
-                    value:
-                        shiftStarted
-                            ? "Läuft"
-                            : "Offen",
-
-                    status:
-                        shiftStarted
-                            ? "success"
-                            : "warning"
-                },
-                {
-                    label:
-                        "Aufgaben",
-
-                    value:
-                        objectTasks.length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.TASKS
-                },
-                {
-                    label:
-                        "Eigene Meldungen",
-
-                    value:
-                        ownOpenTickets.length,
-
-                    status:
-                        ownOpenTickets.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.COMMUNICATION
-                },
-                {
-                    label:
-                        "Objekt",
-
-                    value:
-                        currentObject
-                            ? "Gewählt"
-                            : "Fehlt",
-
-                    status:
-                        currentObject
-                            ? "success"
-                            : "warning",
-
-                    route:
-                        ROUTES.OBJECTS
-                }
-            ])}
-
-            ${renderNoticeList(
-                notices
-            )}
-
-            ${renderActionList([
-                shiftStarted
-                    ? {
-                        title:
-                            "Schicht beenden",
-
-                        description:
-                            "Abschlussprüfung durchführen",
-
-                        action:
-                            "checkout",
-
-                        color:
-                            "overview"
-                    }
-                    : {
-                        title:
-                            "Einchecken",
-
-                        description:
-                            currentObject
-                                ? "Schicht im aktuellen Objekt starten"
-                                : "Zuerst ein Objekt auswählen",
-
-                        action:
-                            currentObject
-                                ? "checkin"
-                                : null,
-
-                        route:
-                            currentObject
-                                ? null
-                                : ROUTES.OBJECTS,
-
-                        color:
-                            "overview"
-                    },
-                {
-                    title:
-                        "Aufgaben öffnen",
-
-                    description:
-                        "Räume und Arbeitsschritte anzeigen",
-
-                    route:
-                        ROUTES.TASKS,
-
-                    color:
-                        "tasks"
-                },
-                {
-                    title:
-                        "Problem melden",
-
-                    description:
-                        "Schaden, Materialmangel oder Hinweis",
-
-                    route:
-                        ROUTES.COMMUNICATION,
-
-                    color:
-                        "communication"
-                },
-                {
-                    title:
-                        "Objektinformationen",
-
-                    description:
-                        "Anleitung, Sicherheit und Materialstandorte",
-
-                    route:
-                        currentObject
-                            ? ROUTES.OBJECT_DETAIL
-                            : ROUTES.OBJECTS,
-
-                    color:
-                        "objects"
-                }
-            ])}
-
-        </section>
-    `;
-}
-
-/************************************************
- * ADMIN-ÜBERSICHT
- ************************************************/
-
-function renderAdminOverview(state) {
-
-    const activeUsers =
-        getActiveUsers(state);
-
-    const openTickets =
-        getOpenTickets(state);
-
-    const materialWarnings =
-        getMaterialWarnings(state);
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Übersicht",
-
-                title:
-                    "Unternehmensübersicht",
-
-                description:
-                    "Benutzer, Objekte und offene Vorgänge.",
-
-                color:
-                    "overview"
-            })}
-
-            ${renderMetrics([
-                {
-                    label:
-                        "Benutzer",
-
-                    value:
-                        activeUsers.length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.PERSONNEL
-                },
-                {
-                    label:
-                        "Objekte",
-
-                    value:
-                        asArray(
-                            state.objects
-                        ).length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.OBJECTS
-                },
-                {
-                    label:
-                        "Offene Tickets",
-
-                    value:
-                        openTickets.length,
-
-                    status:
-                        openTickets.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.COMMUNICATION
-                },
-                {
-                    label:
-                        "Bestandswarnungen",
-
-                    value:
-                        materialWarnings.length,
-
-                    status:
-                        materialWarnings.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.OBJECTS
-                }
-            ])}
-
-            ${renderActionList([
-                {
-                    title:
-                        "Objekte verwalten",
-
-                    description:
-                        "Objekte, Räume und Leistungen",
-
-                    route:
-                        ROUTES.OBJECTS,
-
-                    color:
-                        "objects"
-                },
-                {
-                    title:
-                        "Personal verwalten",
-
-                    description:
-                        "Benutzer, Rollen und Zuweisungen",
-
-                    route:
-                        ROUTES.PERSONNEL,
-
-                    color:
-                        "personnel"
-                },
-                {
-                    title:
-                        "Kommunikation",
-
-                    description:
-                        "Tickets, Nachrichten und Kundenanfragen",
-
-                    route:
-                        ROUTES.COMMUNICATION,
-
-                    color:
-                        "communication"
-                },
-                {
-                    title:
-                        "System und Berichte",
-
-                    description:
-                        "Einstellungen, Auswertung und Verwaltung",
-
-                    route:
-                        ROUTES.MORE,
-
-                    color:
-                        "more"
-                }
-            ])}
-
-        </section>
-    `;
-}
-
-/************************************************
- * BUCHHALTUNGS-ÜBERSICHT
- ************************************************/
-
-function renderAccountingOverview(state) {
-
-    const shifts =
-        asArray(state.shifts);
-
-    const deviations =
-        getOpenTimeDeviations(state);
-
-    const incompleteShifts =
-        shifts.filter(
-            (shift) =>
-                shift.startTime &&
-                !shift.endTime &&
-                ![
-                    "RUNNING",
-                    "PLANNED"
-                ].includes(
-                    normalizeStatus(
-                        shift.status
-                    )
-                )
-        );
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Übersicht",
-
-                title:
-                    "Abrechnung und Zeiten",
-
-                description:
-                    "Aktueller Stand der Zeiterfassung.",
-
-                color:
-                    "overview"
-            })}
-
-            ${renderMetrics([
-                {
-                    label:
-                        "Schichten",
-
-                    value:
-                        shifts.length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.TIMES
-                },
-                {
-                    label:
-                        "Abweichungen",
-
-                    value:
-                        deviations.length,
-
-                    status:
-                        deviations.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.TIMES
-                },
-                {
-                    label:
-                        "Unvollständig",
-
-                    value:
-                        incompleteShifts.length,
-
-                    status:
-                        incompleteShifts.length > 0
-                            ? "critical"
-                            : "success",
-
-                    route:
-                        ROUTES.TIMES
-                },
-                {
-                    label:
-                        "Objekte",
-
-                    value:
-                        asArray(
-                            state.objects
-                        ).length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.OBJECTS
-                }
-            ])}
-
-            ${renderActionList([
-                {
-                    title:
-                        "Zeiten prüfen",
-
-                    description:
-                        "Schichten, Check-ins und Abweichungen",
-
-                    route:
-                        ROUTES.TIMES,
-
-                    color:
-                        "times"
-                },
-                {
-                    title:
-                        "Objektstunden",
-
-                    description:
-                        "Zeiten nach Objekt und Kostenstelle",
-
-                    route:
-                        ROUTES.OBJECTS,
-
-                    color:
-                        "objects"
-                },
-                {
-                    title:
-                        "Auswertung öffnen",
-
-                    description:
-                        "Monatsabrechnung und Export",
-
-                    route:
-                        ROUTES.ANALYSIS,
-
-                    color:
-                        "analysis"
-                }
-            ])}
-
-        </section>
-    `;
-}
-
-/************************************************
- * KUNDEN-ÜBERSICHT
- ************************************************/
-
-function renderCustomerOverview(state) {
-
-    const visibleObjects =
-        getVisibleObjects(state);
-
-    const ownTickets =
-        getOpenTickets(state)
-            .filter(
-                (ticket) =>
-                    ticket.customerUserId ===
-                        state.currentUser?.id ||
-                    ticket.createdByUserId ===
-                        state.currentUser?.id
-            );
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Übersicht",
-
-                title:
-                    "Kundenportal",
-
-                description:
-                    "Objektstatus und aktuelle Meldungen.",
-
-                color:
-                    "overview"
-            })}
-
-            ${renderMetrics([
-                {
-                    label:
-                        "Objekte",
-
-                    value:
-                        visibleObjects.length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.OBJECTS
-                },
-                {
-                    label:
-                        "Offene Meldungen",
-
-                    value:
-                        ownTickets.length,
-
-                    status:
-                        ownTickets.length > 0
-                            ? "warning"
-                            : "success",
-
-                    route:
-                        ROUTES.COMMUNICATION
-                },
-                {
-                    label:
-                        "Berichte",
-
-                    value:
-                        asArray(
-                            state.taskLogs
-                        ).length,
-
-                    status:
-                        "info",
-
-                    route:
-                        ROUTES.REPORTS
-                },
-                {
-                    label:
-                        "Status",
-
-                    value:
-                        "Aktiv",
-
-                    status:
-                        "success"
-                }
-            ])}
-
-            ${renderActionList([
-                {
-                    title:
-                        "Objekte ansehen",
-
-                    description:
-                        "Status und freigegebene Leistungen",
-
-                    route:
-                        ROUTES.OBJECTS,
-
-                    color:
-                        "objects"
-                },
-                {
-                    title:
-                        "Meldung erstellen",
-
-                    description:
-                        "Anfrage, Wunsch oder Reklamation",
-
-                    route:
-                        ROUTES.COMMUNICATION,
-
-                    color:
-                        "communication"
-                },
-                {
-                    title:
-                        "Berichte öffnen",
-
-                    description:
-                        "Freigegebene Leistungsnachweise",
-
-                    route:
-                        ROUTES.REPORTS,
-
-                    color:
-                        "reports"
-                }
-            ])}
-
-        </section>
-    `;
-}
-
-/************************************************
- * ÜBERSICHT AUSWÄHLEN
- ************************************************/
-
-function renderOverview(state) {
-
-    switch (
-        state.currentUser?.role
-    ) {
-
-        case USER_ROLES.SUPER_ADMIN:
-        case USER_ROLES.ADMIN:
-
-            return renderAdminOverview(
-                state
-            );
-
-        case USER_ROLES.OBJEKTLEITER:
-
-            return renderManagerOverview(
-                state
-            );
-
-        case USER_ROLES.MITARBEITER:
-
-            return renderEmployeeOverview(
-                state
-            );
-
-        case USER_ROLES.BUCHHALTUNG:
-
-            return renderAccountingOverview(
-                state
-            );
-
-        case USER_ROLES.KUNDE:
-
-            return renderCustomerOverview(
-                state
-            );
-
-        default:
-
-            return renderAdminOverview(
-                state
-            );
-    }
-}
-
-/************************************************
- * KOMPAKTE BEREICHSSEITEN
- ************************************************/
-
-function renderCompactSectionPage({
-    area,
-    title,
-    description,
-    color,
-    metrics = [],
-    groups = []
-}) {
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area,
-                title,
-                description,
-                color
-            })}
-
-            ${
-                metrics.length > 0
-                    ? renderMetrics(
-                        metrics
-                    )
-                    : ""
-            }
-
-            <section class="section-group-list">
-
-                ${groups
-                    .map(
-                        (group) => `
-                            <details
-                                class="compact-section-group compact-section-${escapeHtml(
-                                    group.color ??
-                                    color
-                                )}"
-                                ${group.open ? "open" : ""}
-                            >
-
-                                <summary>
-
-                                    <div>
-
-                                        <strong>
-                                            ${escapeHtml(
-                                                group.title
-                                            )}
-                                        </strong>
-
-                                        ${
-                                            group.description
-                                                ? `
-                                                    <span>
-                                                        ${escapeHtml(
-                                                            group.description
-                                                        )}
-                                                    </span>
-                                                `
-                                                : ""
-                                        }
-
-                                    </div>
-
-                                    <span class="section-count">
-                                        ${group.items.length}
-                                    </span>
-
-                                </summary>
-
-                                <div class="compact-section-content">
-
-                                    ${group.items
-                                        .map(
-                                            (item) =>
-                                                renderPrimaryAction({
-                                                    ...item,
-
-                                                    color:
-                                                        item.color ??
-                                                        group.color ??
-                                                        color
-                                                })
-                                        )
-                                        .join("")}
-
-                                </div>
-
-                            </details>
-                        `
-                    )
-                    .join("")}
-
-            </section>
-
-        </section>
-    `;
-}
-
-/************************************************
- * PERSONAL
- ************************************************/
-
-function renderPersonnelPage(state) {
-
-    const activeUsers =
-        getActiveUsers(state);
-
-    return renderCompactSectionPage({
-        area:
-            "Personal",
-
-        title:
-            "Mitarbeiter und Einsatzplanung",
-
-        description:
-            "Zuständigkeiten, Abwesenheiten und Vertretungen.",
-
-        color:
-            "personnel",
-
-        metrics: [
-            {
-                label:
-                    "Aktive Mitarbeiter",
-
-                value:
-                    activeUsers.length,
-
-                status:
-                    "info"
-            },
-            {
-                label:
-                    "Laufende Schichten",
-
-                value:
-                    getRunningShifts(
-                        state
-                    ).length,
-
-                status:
-                    "success"
-            },
-            {
-                label:
-                    "Abwesenheiten",
-
-                value:
-                    asArray(
-                        state.customerRequests
-                    ).filter(
-                        (request) =>
-                            [
-                                "SICK",
-                                "ABSENCE",
-                                "VACATION"
-                            ].includes(
-                                normalizeStatus(
-                                    request.type
-                                )
-                            )
-                    ).length,
-
-                status:
-                    "warning"
-            },
-            {
-                label:
-                    "Objekte",
-
-                value:
-                    getVisibleObjects(
-                        state
-                    ).length,
-
-                status:
-                    "info"
-            }
-        ],
-
-        groups: [
-            {
-                title:
-                    "Mitarbeiter",
-
-                description:
-                    "Personen und Objektzuweisungen",
-
-                color:
-                    "personnel",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Mitarbeiterübersicht",
-
-                        description:
-                            "Aktive Personen und Zuständigkeiten"
-                    },
-                    {
-                        title:
-                            "Objektzuweisungen",
-
-                        description:
-                            "Mitarbeiter auf Objekte verteilen"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Abwesenheit und Vertretung",
-
-                description:
-                    "Krankheit, Urlaub und Ausfälle",
-
-                color:
-                    "personnel",
-
-                items: [
-                    {
-                        title:
-                            "Abwesenheiten",
-
-                        description:
-                            "Krankmeldungen und Urlaub prüfen"
-                    },
-                    {
-                        title:
-                            "Vertretungen",
-
-                        description:
-                            "Passende Vertretung suchen und zuweisen"
-                    },
-                    {
-                        title:
-                            "Schichtplanung",
-
-                        description:
-                            "Einsätze und Arbeitszeiten planen",
-
-                        route:
-                            ROUTES.TIMES
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-/************************************************
- * KOMMUNIKATION
- ************************************************/
-
-function renderCommunicationPage(state) {
-
-    const openTickets =
-        getOpenTickets(state);
-
-    const criticalTickets =
-        getCriticalTickets(state);
-
-    return renderCompactSectionPage({
-        area:
-            "Kommunikation",
-
-        title:
-            state.currentUser?.role ===
-            USER_ROLES.MITARBEITER
-                ? "Meldungen"
-                : "Tickets und Nachrichten",
-
-        description:
-            "Alle Probleme, Anfragen und Nachrichten an einem Ort.",
-
-        color:
-            "communication",
-
-        metrics: [
-            {
-                label:
-                    "Offen",
-
-                value:
-                    openTickets.length,
-
-                status:
-                    openTickets.length > 0
-                        ? "warning"
-                        : "success"
-            },
-            {
-                label:
-                    "Kritisch",
-
-                value:
-                    criticalTickets.length,
-
-                status:
-                    criticalTickets.length > 0
-                        ? "critical"
-                        : "success"
-            },
-            {
-                label:
-                    "Nachrichten",
-
-                value:
-                    asArray(
-                        state.messages
-                    ).length,
-
-                status:
-                    "info"
-            },
-            {
-                label:
-                    "Kundenanfragen",
-
-                value:
-                    asArray(
-                        state.customerRequests
-                    ).length,
-
-                status:
-                    "info"
-            }
-        ],
-
-        groups: [
-            {
-                title:
-                    "Neue Meldung",
-
-                description:
-                    "Problem oder Hinweis erfassen",
-
-                color:
-                    "communication",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Problem melden",
-
-                        description:
-                            "Schaden, Hindernis oder Reklamation"
-                    },
-                    {
-                        title:
-                            "Materialmangel melden",
-
-                        description:
-                            "Fehlendes oder knappes Material"
-                    },
-                    {
-                        title:
-                            "Sofort-Notiz",
-
-                        description:
-                            "Kurzer Hinweis mit Text, Foto oder Audio"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Bearbeitung",
-
-                description:
-                    "Offene Vorgänge und Nachrichten",
-
-                color:
-                    "communication",
-
-                items: [
-                    {
-                        title:
-                            "Offene Tickets",
-
-                        description:
-                            "Aktuelle Meldungen bearbeiten"
-                    },
-                    {
-                        title:
-                            "Nachrichten",
-
-                        description:
-                            "Interne und externe Kommunikation"
-                    },
-                    {
-                        title:
-                            "Archiv",
-
-                        description:
-                            "Abgeschlossene Vorgänge"
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-/************************************************
- * AUFGABEN
- ************************************************/
-
-function renderTasksPage(state) {
-
-    const currentObject =
-        state.currentObject;
-
-    const tasks =
-        currentObject
-            ? asArray(state.tasks)
-                .filter(
-                    (task) =>
-                        task.objectId ===
-                            currentObject.id &&
-                        task.active !== false
-                )
-            : [];
-
-    const totalMinutes =
-        tasks.reduce(
-            (total, task) =>
-                total +
-                asNumber(
-                    task.estimatedMinutes
-                ),
-            0
-        );
-
-    return renderCompactSectionPage({
-        area:
-            "Aufgaben",
-
-        title:
-            currentObject
-                ? currentObject.name
-                : "Kein Objekt ausgewählt",
-
-        description:
-            currentObject
-                ? "Räume, Reihenfolge und Arbeitsschritte."
-                : "Wähle zuerst ein Objekt aus.",
-
-        color:
-            "tasks",
-
-        metrics: [
-            {
-                label:
-                    "Aufgaben",
-
-                value:
-                    tasks.length,
-
-                status:
-                    "info"
-            },
-            {
-                label:
-                    "Sollzeit",
-
-                value:
-                    `${totalMinutes} Min.`,
-
-                status:
-                    "neutral"
-            },
-            {
-                label:
-                    "Nachweispflicht",
-
-                value:
-                    tasks.filter(
-                        (task) =>
-                            task.documentationRequired ===
-                            true
-                    ).length,
-
-                status:
-                    "warning"
-            },
-            {
-                label:
-                    "Räume",
-
-                value:
-                    currentObject
-                        ? asArray(state.rooms)
-                            .filter(
-                                (room) =>
-                                    room.objectId ===
-                                    currentObject.id
-                            ).length
-                        : 0,
-
-                status:
-                    "info"
-            }
-        ],
-
-        groups: [
-            {
-                title:
-                    "Heutige Arbeit",
-
-                description:
-                    "Aufgaben nach Raum und Reihenfolge",
-
-                color:
-                    "tasks",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            currentObject
-                                ? "Objektdetails öffnen"
-                                : "Objekt auswählen",
-
-                        description:
-                            currentObject
-                                ? "Räume und Aufgaben vollständig anzeigen"
-                                : "Zuerst ein Arbeitsobjekt wählen",
-
-                        route:
-                            currentObject
-                                ? ROUTES.OBJECT_DETAIL
-                                : ROUTES.OBJECTS
-                    }
-                ]
-            },
-            {
-                title:
-                    "Dokumentation",
-
-                description:
-                    "Nachweise und Abweichungen",
-
-                color:
-                    "tasks",
-
-                items: [
-                    {
-                        title:
-                            "Aufgabenstatus",
-
-                        description:
-                            "Offen, begonnen und erledigt"
-                    },
-                    {
-                        title:
-                            "Zeitabweichung",
-
-                        description:
-                            "Begründung mit Text, Foto oder Audio"
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-/************************************************
- * ZEITEN
- ************************************************/
-
-function renderTimesPage(state) {
-
-    return renderCompactSectionPage({
-        area:
-            "Zeiten",
-
-        title:
-            "Arbeitszeit und Schichten",
-
-        description:
-            "Check-ins, Check-outs und Abweichungen.",
-
-        color:
-            "times",
-
-        metrics: [
-            {
-                label:
-                    "Schichten",
-
-                value:
-                    asArray(
-                        state.shifts
-                    ).length,
-
-                status:
-                    "info"
-            },
-            {
-                label:
-                    "Check-ins",
-
-                value:
-                    asArray(
-                        state.checkins
-                    ).length,
-
-                status:
-                    "success"
-            },
-            {
-                label:
-                    "Check-outs",
-
-                value:
-                    asArray(
-                        state.checkouts
-                    ).length,
-
-                status:
-                    "success"
-            },
-            {
-                label:
-                    "Abweichungen",
-
-                value:
-                    getOpenTimeDeviations(
-                        state
-                    ).length,
-
-                status:
-                    "warning"
-            }
-        ],
-
-        groups: [
-            {
-                title:
-                    "Zeiterfassung",
-
-                description:
-                    "Schichten und Buchungen",
-
-                color:
-                    "times",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Schichten",
-
-                        description:
-                            "Geplante und geleistete Einsätze"
-                    },
-                    {
-                        title:
-                            "Check-ins und Check-outs",
-
-                        description:
-                            "Zeitbuchungen prüfen"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Prüfung",
-
-                description:
-                    "Fehler und Korrekturen",
-
-                color:
-                    "times",
-
-                items: [
-                    {
-                        title:
-                            "Zeitabweichungen",
-
-                        description:
-                            "Auffällige Einsatzzeiten"
-                    },
-                    {
-                        title:
-                            "Unvollständige Buchungen",
-
-                        description:
-                            "Fehlende oder offene Abschlüsse"
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-/************************************************
- * AUSWERTUNG UND BERICHTE
- ************************************************/
-
-function renderAnalysisPage() {
-
-    return renderCompactSectionPage({
-        area:
-            "Auswertung",
-
-        title:
-            "Abrechnung und Berichte",
-
-        description:
-            "Arbeitszeiten nach Mitarbeiter, Objekt und Monat.",
-
-        color:
-            "analysis",
-
-        groups: [
-            {
-                title:
-                    "Abrechnung",
-
-                description:
-                    "Monatliche Auswertungen",
-
-                color:
-                    "analysis",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Monatsabrechnung",
-
-                        description:
-                            "Stunden nach Mitarbeiter und Monat"
-                    },
-                    {
-                        title:
-                            "Objektabrechnung",
-
-                        description:
-                            "Stunden nach Objekt und Kostenstelle"
-                    },
-                    {
-                        title:
-                            "Fahrten und Kilometer",
-
-                        description:
-                            "Vergütungsrelevante Wege"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Export",
-
-                description:
-                    "Daten ausgeben und übergeben",
-
-                color:
-                    "analysis",
-
-                items: [
-                    {
-                        title:
-                            "Lohnexport",
-
-                        description:
-                            "Daten für die Abrechnung vorbereiten"
-                    },
-                    {
-                        title:
-                            "Berichtsexport",
-
-                        description:
-                            "Monats- und Objektberichte"
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-function renderReportsPage() {
-
-    return renderCompactSectionPage({
-        area:
-            "Berichte",
-
-        title:
-            "Leistungsnachweise",
-
-        description:
-            "Freigegebene Berichte und Dokumente.",
-
-        color:
-            "reports",
-
-        groups: [
-            {
-                title:
-                    "Objektberichte",
-
-                description:
-                    "Leistung und Reinigungsstatus",
-
-                color:
-                    "reports",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Leistungsnachweise",
-
-                        description:
-                            "Freigegebene Reinigungsnachweise"
-                    },
-                    {
-                        title:
-                            "Objektstatus",
-
-                        description:
-                            "Aktuelle und vergangene Leistungen"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Dokumente",
-
-                description:
-                    "Freigegebene Unterlagen",
-
-                color:
-                    "reports",
-
-                items: [
-                    {
-                        title:
-                            "Dokumentenübersicht",
-
-                        description:
-                            "Verträge und Nachweise"
-                    }
-                ]
-            }
-        ]
-    });
-}
-
-/************************************************
- * MEHR
- ************************************************/
-
-function createLogoutGroup() {
-
-    return {
-        title:
-            "Sitzung",
-
-        description:
-            "Anmeldung und Benutzerkonto",
-
-        color:
-            "more",
-
-        open:
-            true,
-
-        items: [
-            {
-                title:
-                    "Abmelden",
-
-                description:
-                    "Facility OS verlassen und zur Anmeldung zurückkehren",
-
-                action:
-                    "logout",
-
-                color:
-                    "more"
-            }
-        ]
-    };
-}
-
-function getMoreGroups(state) {
-
-    const role =
-        state.currentUser?.role;
-
-    if (
-        role ===
-        USER_ROLES.MITARBEITER
-    ) {
-
-        return [
-            {
-                title:
-                    "Persönlich",
-
-                description:
-                    "Zeiten, Urlaub und Profil",
-
-                color:
-                    "more",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Meine Arbeitszeiten",
-
-                        description:
-                            "Persönliche Schichten und Stunden",
-
-                        route:
-                            ROUTES.TIMES
-                    },
-                    {
-                        title:
-                            "Krankheit und Urlaub",
-
-                        description:
-                            "Abwesenheit melden oder Urlaub beantragen",
-
-                        route:
-                            ROUTES.COMMUNICATION
-                    },
-                    {
-                        title:
-                            "Profil",
-
-                        description:
-                            "Persönliche Angaben"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Hilfe und App",
-
-                description:
-                    "Unterstützung und rechtliche Hinweise",
-
-                color:
-                    "more",
-
-                items: [
-                    {
-                        title:
-                            "Hilfe",
-
-                        description:
-                            "Anleitungen und häufige Fragen",
-
-                        route:
-                            ROUTES.HELP
-                    },
-                    {
-                        title:
-                            "Datenschutz",
-
-                        description:
-                            "Datenschutzinformationen",
-
-                        route:
-                            ROUTES.PRIVACY
-                    },
-                    {
-                        title:
-                            "Impressum",
-
-                        description:
-                            "Anbieterinformationen",
-
-                        route:
-                            ROUTES.IMPRINT
-                    }
-                ]
-            },
-            createLogoutGroup()
-        ];
-    }
-
-    if (
-        role ===
-        USER_ROLES.KUNDE
-    ) {
-
-        return [
-            {
-                title:
-                    "Kontakt und Profil",
-
-                description:
-                    "Ansprechpartner und persönliche Angaben",
-
-                color:
-                    "more",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Ansprechpartner",
-
-                        description:
-                            "Zuständige Objektleitung"
-                    },
-                    {
-                        title:
-                            "Profil",
-
-                        description:
-                            "Kundendaten und Kontakt"
-                    },
-                    {
-                        title:
-                            "Hilfe",
-
-                        description:
-                            "Unterstützung und häufige Fragen",
-
-                        route:
-                            ROUTES.HELP
-                    }
-                ]
-            },
-            {
-                title:
-                    "Rechtliches",
-
-                description:
-                    "Datenschutz und Impressum",
-
-                color:
-                    "more",
-
-                items: [
-                    {
-                        title:
-                            "Datenschutz",
-
-                        description:
-                            "Hinweise zur Datenverarbeitung",
-
-                        route:
-                            ROUTES.PRIVACY
-                    },
-                    {
-                        title:
-                            "Impressum",
-
-                        description:
-                            "Anbieterinformationen",
-
-                        route:
-                            ROUTES.IMPRINT
-                    }
-                ]
-            },
-            createLogoutGroup()
-        ];
-    }
-
-    if (
-        role ===
-        USER_ROLES.BUCHHALTUNG
-    ) {
-
-        return [
-            {
-                title:
-                    "Berichte und Archiv",
-
-                description:
-                    "Auswertungen und abgeschlossene Zeiträume",
-
-                color:
-                    "more",
-
-                open:
-                    true,
-
-                items: [
-                    {
-                        title:
-                            "Berichte",
-
-                        description:
-                            "Zeit- und Objektberichte",
-
-                        route:
-                            ROUTES.REPORTS
-                    },
-                    {
-                        title:
-                            "Archiv",
-
-                        description:
-                            "Abgeschlossene Abrechnungszeiträume"
-                    }
-                ]
-            },
-            {
-                title:
-                    "Hilfe und Rechtliches",
-
-                description:
-                    "Support und Pflichtinformationen",
-
-                color:
-                    "more",
-
-                items: [
-                    {
-                        title:
-                            "Hilfe",
-
-                        description:
-                            "Anleitungen und häufige Fragen",
-
-                        route:
-                            ROUTES.HELP
-                    },
-                    {
-                        title:
-                            "Datenschutz",
-
-                        description:
-                            "Datenschutzinformationen",
-
-                        route:
-                            ROUTES.PRIVACY
-                    },
-                    {
-                        title:
-                            "Impressum",
-
-                        description:
-                            "Anbieterinformationen",
-
-                        route:
-                            ROUTES.IMPRINT
-                    }
-                ]
-            },
-            createLogoutGroup()
-        ];
-    }
-
-    return [
-        {
-            title:
-                "Auswertung",
-
-            description:
-                "Berichte und Zeiterfassung",
-
-            color:
-                "more",
-
-            open:
-                true,
-
-            items: [
-                {
-                    title:
-                        "Berichte",
-
-                    description:
-                        "Zeiten, Leistung und Abweichungen",
-
-                    route:
-                        ROUTES.REPORTS
-                },
-                {
-                    title:
-                        "Zeiterfassung",
-
-                    description:
-                        "Schichten und Zeitbuchungen",
-
-                    route:
-                        ROUTES.TIMES
-                }
-            ]
-        },
-        {
-            title:
-                "Administration",
-
-            description:
-                "System, Rollen und Einstellungen",
-
-            color:
-                "more",
-
-            items: [
-                {
-                    title:
-                        "Einstellungen",
-
-                    description:
-                        "Unternehmen, Objekte und Prozesse",
-
-                    route:
-                        ROUTES.SETTINGS
-                },
-                {
-                    title:
-                        "Rollen und Rechte",
-
-                    description:
-                        "Zugriffssteuerung"
-                },
-                {
-                    title:
-                        "Tarife und Module",
-
-                    description:
-                        "Free, Pro und Pro Plus"
-                }
-            ]
-        },
-        {
-            title:
-                "Hilfe und Rechtliches",
-
-            description:
-                "Support und Pflichtinformationen",
-
-            color:
-                "more",
-
-            items: [
-                {
-                    title:
-                        "Hilfe",
-
-                    description:
-                        "Anleitungen und häufige Fragen",
-
-                    route:
-                        ROUTES.HELP
-                },
-                {
-                    title:
-                        "Datenschutz",
-
-                    description:
-                        "Datenschutzinformationen",
-
-                    route:
-                        ROUTES.PRIVACY
-                },
-                {
-                    title:
-                        "Impressum",
-
-                    description:
-                        "Anbieterinformationen",
-
-                    route:
-                        ROUTES.IMPRINT
-                }
-            ]
-        },
-        createLogoutGroup()
-    ];
-}
-
-function renderMorePage(state) {
-
-    return renderCompactSectionPage({
-        area:
-            "Mehr",
-
-        title:
-            "Weitere Funktionen",
-
-        description:
-            `${getUserName(state)} · ${getRoleLabel(
-                state.currentUser?.role
-            )}`,
-
-        color:
-            "more",
-
-        groups:
-            getMoreGroups(
-                state
-            )
-    });
-}
-
-/************************************************
- * EINFACHE INFORMATIONEN
- ************************************************/
-
-function renderInformationPage({
-    title,
-    description
-}) {
-
-    return `
-        <section class="page-section">
-
-            ${renderPageHeader({
-                area:
-                    "Facility OS",
-
-                title,
-
-                description,
-
-                color:
-                    "more"
-            })}
-
-            <section class="information-card">
-
-                <p>
-                    ${escapeHtml(
-                        description
-                    )}
-                </p>
-
-            </section>
-
-        </section>
-    `;
-}
-
-/************************************************
- * ROUTEN
- ************************************************/
-
-function renderRoute(
+function renderRouteContent(
     route,
-    state
-) {
-
-    if (!state.currentUser) {
-
-        return renderLogin();
+    state,
+    {
+        onSelectObject
     }
+) {
 
     switch (route) {
 
         case ROUTES.OVERVIEW:
 
-            return renderOverview(
+            return renderOverviewPage(
                 state
             );
 
         case ROUTES.OBJECTS:
 
             return renderObjectsPage(
-                state
+                state,
+                {
+                    onSelectObject
+                }
             );
 
         case ROUTES.OBJECT_DETAIL:
 
             return renderObjectDetailPage(
+                state
+            );
+
+        case ROUTES.MATERIALS:
+
+            return renderMaterialsPage(
                 state
             );
 
@@ -3215,11 +557,15 @@ function renderRoute(
 
         case ROUTES.ANALYSIS:
 
-            return renderAnalysisPage();
+            return renderAnalysisPage(
+                state
+            );
 
         case ROUTES.REPORTS:
 
-            return renderReportsPage();
+            return renderReportsPage(
+                state
+            );
 
         case ROUTES.MORE:
 
@@ -3229,274 +575,2027 @@ function renderRoute(
 
         case ROUTES.SETTINGS:
 
-            return renderCompactSectionPage({
-                area:
-                    "Einstellungen",
-
-                title:
-                    "System und Prozesse",
-
-                description:
-                    "Unternehmen, Objekte, Rollen und Darstellung.",
-
-                color:
-                    "more",
-
-                groups: [
-                    {
-                        title:
-                            "Unternehmen",
-
-                        description:
-                            "Stammdaten und Design",
-
-                        color:
-                            "more",
-
-                        open:
-                            true,
-
-                        items: [
-                            {
-                                title:
-                                    "Unternehmensdaten",
-
-                                description:
-                                    "Name, Kontakt und Anbieterinformationen"
-                            },
-                            {
-                                title:
-                                    "Design",
-
-                                description:
-                                    "Farben und Darstellung"
-                            }
-                        ]
-                    },
-                    {
-                        title:
-                            "Prozesse",
-
-                        description:
-                            "Check-in, Check-out und Benachrichtigungen",
-
-                        color:
-                            "more",
-
-                        items: [
-                            {
-                                title:
-                                    "Objekteinstellungen",
-
-                                description:
-                                    "Pflichtprüfungen und Sicherheitsvorgaben"
-                            },
-                            {
-                                title:
-                                    "Benachrichtigungen",
-
-                                description:
-                                    "Hinweise, Warnungen und Erinnerungen"
-                            }
-                        ]
-                    }
-                ]
-            });
+            return renderSettingsPage(
+                state
+            );
 
         case ROUTES.HELP:
 
-            return renderInformationPage({
-                title:
-                    "Hilfe",
-
-                description:
-                    "Hier werden Anleitungen, häufige Fragen und Kontaktmöglichkeiten bereitgestellt."
-            });
+            return renderHelpPage(
+                state
+            );
 
         case ROUTES.PRIVACY:
 
-            return renderInformationPage({
-                title:
-                    "Datenschutz",
-
-                description:
-                    "Hier werden die Datenschutzinformationen von Facility OS angezeigt."
-            });
+            return renderPrivacyPage(
+                state
+            );
 
         case ROUTES.IMPRINT:
 
-            return renderInformationPage({
-                title:
-                    "Impressum",
-
-                description:
-                    "Hier werden Anbieter-, Unternehmens- und Kontaktinformationen angezeigt."
-            });
+            return renderImprintPage(
+                state
+            );
 
         default:
 
-            return renderOverview(
+            return renderOverviewPage(
                 state
             );
     }
 }
 
 /************************************************
- * EVENTS
+ * APP-ANSICHT
  ************************************************/
 
-function bindRouteEvents(
-    appElement,
-    onNavigate
-) {
-
-    if (
-        typeof onNavigate !==
-        "function"
-    ) {
-
-        return;
-    }
-
-    appElement
-        .querySelectorAll(
-            "[data-route]"
-        )
-        .forEach(
-            (element) => {
-
-                element.addEventListener(
-                    "click",
-                    () => {
-
-                        const route =
-                            element.dataset.route;
-
-                        if (route) {
-
-                            onNavigate(
-                                route
-                            );
-                        }
-                    }
-                );
-            }
-        );
-}
-
-function bindActionEvents(
-    appElement,
-    action,
-    handler
-) {
-
-    if (
-        typeof handler !==
-        "function"
-    ) {
-
-        return;
-    }
-
-    appElement
-        .querySelectorAll(
-            `[data-action="${action}"]`
-        )
-        .forEach(
-            (element) => {
-
-                element.addEventListener(
-                    "click",
-                    handler
-                );
-            }
-        );
-}
-
-function bindObjectSelection(
-    appElement,
+function renderAuthenticatedApp({
+    route,
+    state,
     onSelectObject
+}) {
+
+    const content =
+        renderRouteContent(
+            route,
+            state,
+            {
+                onSelectObject
+            }
+        );
+
+    return `
+        <div class="facility-app">
+
+            <div class="facility-app-background"></div>
+
+            <div class="facility-app-shell">
+
+                ${renderAppHeader(
+                    state
+                )}
+
+                <main
+                    class="facility-app-content"
+                    aria-label="${escapeHtml(
+                        getRouteTitle(
+                            route
+                        )
+                    )}"
+                >
+
+                    ${content}
+
+                </main>
+
+                ${renderBottomNavigation({
+                    state,
+                    route
+                })}
+
+            </div>
+
+            <div
+                class="facility-live-region"
+                aria-live="polite"
+                aria-atomic="true"
+            ></div>
+
+        </div>
+    `;
+}
+
+/************************************************
+ * DIALOGDATEN
+ ************************************************/
+
+const ACTION_DIALOGS =
+    Object.freeze({
+
+        "create-ticket":
+            {
+                title:
+                    "Neue Meldung",
+
+                text:
+                    "Erfasse ein Problem, einen Schaden oder einen wichtigen Hinweis.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "title",
+
+                            label:
+                                "Betreff",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "description",
+
+                            label:
+                                "Beschreibung",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Meldung speichern"
+            },
+
+        "create-problem-ticket":
+            {
+                title:
+                    "Problem melden",
+
+                text:
+                    "Dokumentiere ein Hindernis, einen Schaden oder eine nicht mögliche Aufgabe.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "title",
+
+                            label:
+                                "Problem",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "description",
+
+                            label:
+                                "Beschreibung",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Problem melden"
+            },
+
+        "create-material-ticket":
+            {
+                title:
+                    "Materialmangel",
+
+                text:
+                    "Melde fehlendes oder leeres Material am aktuellen Objekt.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "material",
+
+                            label:
+                                "Material",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "description",
+
+                            label:
+                                "Hinweis",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Materialmangel melden"
+            },
+
+        "create-message":
+            {
+                title:
+                    "Nachricht senden",
+
+                text:
+                    "Erstelle eine interne Nachricht oder eine Mitteilung an die zuständige Stelle.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "subject",
+
+                            label:
+                                "Betreff",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "message",
+
+                            label:
+                                "Nachricht",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Nachricht senden"
+            },
+
+        "create-quick-note":
+            {
+                title:
+                    "Sofort-Notiz",
+
+                text:
+                    "Speichere einen kurzen internen Hinweis.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "message",
+
+                            label:
+                                "Notiz",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Notiz speichern"
+            },
+
+        "create-customer-request":
+            {
+                title:
+                    "Neue Kundenanfrage",
+
+                text:
+                    "Erfasse eine Frage, einen Wunsch oder eine Serviceanfrage.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "subject",
+
+                            label:
+                                "Betreff",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "message",
+
+                            label:
+                                "Anfrage",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Anfrage senden"
+            },
+
+        "create-customer-complaint":
+            {
+                title:
+                    "Reklamation",
+
+                text:
+                    "Beschreibe das festgestellte Problem möglichst genau.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "subject",
+
+                            label:
+                                "Betreff",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "message",
+
+                            label:
+                                "Beschreibung",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Reklamation senden"
+            },
+
+        "create-absence":
+            {
+                title:
+                    "Abwesenheit melden",
+
+                text:
+                    "Erfasse Krankheit, Urlaub oder eine sonstige Abwesenheit.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "type",
+
+                            label:
+                                "Art",
+
+                            type:
+                                "select",
+
+                            options:
+                                [
+                                    "Krankheit",
+                                    "Urlaub",
+                                    "Sonstige Abwesenheit"
+                                ],
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "startDate",
+
+                            label:
+                                "Beginn",
+
+                            type:
+                                "date",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "endDate",
+
+                            label:
+                                "Ende",
+
+                            type:
+                                "date",
+
+                            required:
+                                false
+                        },
+                        {
+                            name:
+                                "note",
+
+                            label:
+                                "Hinweis",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Abwesenheit melden"
+            },
+
+        "create-employee":
+            {
+                title:
+                    "Mitarbeiter anlegen",
+
+                text:
+                    "Erfasse die grundlegenden Benutzerdaten.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "name",
+
+                            label:
+                                "Name",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "email",
+
+                            label:
+                                "E-Mail",
+
+                            type:
+                                "email",
+
+                            required:
+                                false
+                        },
+                        {
+                            name:
+                                "phone",
+
+                            label:
+                                "Telefon",
+
+                            type:
+                                "tel",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Mitarbeiter speichern"
+            },
+
+        "create-shift":
+            {
+                title:
+                    "Schicht anlegen",
+
+                text:
+                    "Plane einen neuen Arbeitseinsatz.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "date",
+
+                            label:
+                                "Datum",
+
+                            type:
+                                "date",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "start",
+
+                            label:
+                                "Beginn",
+
+                            type:
+                                "time",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "end",
+
+                            label:
+                                "Ende",
+
+                            type:
+                                "time",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Schicht speichern"
+            },
+
+        "create-material-order":
+            {
+                title:
+                    "Material bestellen",
+
+                text:
+                    "Bereite eine Materialnachbestellung vor.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "material",
+
+                            label:
+                                "Material",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "quantity",
+
+                            label:
+                                "Menge",
+
+                            type:
+                                "number",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "note",
+
+                            label:
+                                "Hinweis",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Bestellung vormerken"
+            },
+
+        "create-material":
+            {
+                title:
+                    "Material anlegen",
+
+                text:
+                    "Erfasse einen neuen Artikel im Materialstamm.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "name",
+
+                            label:
+                                "Bezeichnung",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "unit",
+
+                            label:
+                                "Einheit",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "dosage",
+
+                            label:
+                                "Dosierung",
+
+                            type:
+                                "text",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Material speichern"
+            },
+
+        "create-task":
+            {
+                title:
+                    "Aufgabe anlegen",
+
+                text:
+                    "Erstelle eine neue Aufgabe für das gewählte Objekt.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "title",
+
+                            label:
+                                "Aufgabe",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "minutes",
+
+                            label:
+                                "Sollzeit in Minuten",
+
+                            type:
+                                "number",
+
+                            required:
+                                false
+                        },
+                        {
+                            name:
+                                "description",
+
+                            label:
+                                "Beschreibung",
+
+                            type:
+                                "textarea",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Aufgabe speichern"
+            },
+
+        "edit-profile":
+            {
+                title:
+                    "Profil bearbeiten",
+
+                text:
+                    "Aktualisiere deine persönlichen Kontaktdaten.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "name",
+
+                            label:
+                                "Name",
+
+                            type:
+                                "text",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "email",
+
+                            label:
+                                "E-Mail",
+
+                            type:
+                                "email",
+
+                            required:
+                                false
+                        },
+                        {
+                            name:
+                                "phone",
+
+                            label:
+                                "Telefon",
+
+                            type:
+                                "tel",
+
+                            required:
+                                false
+                        }
+                    ],
+
+                submitLabel:
+                    "Änderungen speichern"
+            },
+
+        "change-password":
+            {
+                title:
+                    "Passwort ändern",
+
+                text:
+                    "Lege ein neues Passwort für dein Benutzerkonto fest.",
+
+                fields:
+                    [
+                        {
+                            name:
+                                "currentPassword",
+
+                            label:
+                                "Aktuelles Passwort",
+
+                            type:
+                                "password",
+
+                            required:
+                                true
+                        },
+                        {
+                            name:
+                                "newPassword",
+
+                            label:
+                                "Neues Passwort",
+
+                            type:
+                                "password",
+
+                            required:
+                                true
+                        }
+                    ],
+
+                submitLabel:
+                    "Passwort ändern"
+            }
+    });
+
+/************************************************
+ * DIALOGFELDER
+ ************************************************/
+
+function renderDialogField(field) {
+
+    const requiredAttribute =
+        field.required
+            ? "required"
+            : "";
+
+    if (
+        field.type ===
+        "textarea"
+    ) {
+
+        return `
+            <label class="facility-dialog-field">
+
+                <span>
+                    ${escapeHtml(
+                        field.label
+                    )}
+                </span>
+
+                <textarea
+                    name="${escapeHtml(
+                        field.name
+                    )}"
+                    rows="4"
+                    ${requiredAttribute}
+                ></textarea>
+
+            </label>
+        `;
+    }
+
+    if (
+        field.type ===
+        "select"
+    ) {
+
+        return `
+            <label class="facility-dialog-field">
+
+                <span>
+                    ${escapeHtml(
+                        field.label
+                    )}
+                </span>
+
+                <select
+                    name="${escapeHtml(
+                        field.name
+                    )}"
+                    ${requiredAttribute}
+                >
+
+                    ${asArray(
+                        field.options
+                    )
+                        .map(
+                            (option) => `
+                                <option
+                                    value="${escapeHtml(
+                                        option
+                                    )}"
+                                >
+                                    ${escapeHtml(
+                                        option
+                                    )}
+                                </option>
+                            `
+                        )
+                        .join("")}
+
+                </select>
+
+            </label>
+        `;
+    }
+
+    return `
+        <label class="facility-dialog-field">
+
+            <span>
+                ${escapeHtml(
+                    field.label
+                )}
+            </span>
+
+            <input
+                type="${escapeHtml(
+                    field.type ??
+                    "text"
+                )}"
+                name="${escapeHtml(
+                    field.name
+                )}"
+                ${requiredAttribute}
+            >
+
+        </label>
+    `;
+}
+
+/************************************************
+ * DIALOG
+ ************************************************/
+
+function renderDialog() {
+
+    const dialog =
+        uiState.dialog;
+
+    if (!dialog) {
+
+        return "";
+    }
+
+    return `
+        <div
+            class="facility-dialog-backdrop"
+            data-dialog-backdrop
+        >
+
+            <section
+                class="facility-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="facility-dialog-title"
+            >
+
+                <header class="facility-dialog-header">
+
+                    <div>
+
+                        <span>
+                            Facility OS
+                        </span>
+
+                        <h2 id="facility-dialog-title">
+                            ${escapeHtml(
+                                dialog.title
+                            )}
+                        </h2>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        class="facility-dialog-close"
+                        data-action="close-dialog"
+                        aria-label="Dialog schließen"
+                    >
+                        ×
+                    </button>
+
+                </header>
+
+                ${
+                    dialog.text
+                        ? `
+                            <p class="facility-dialog-description">
+                                ${escapeHtml(
+                                    dialog.text
+                                )}
+                            </p>
+                        `
+                        : ""
+                }
+
+                ${
+                    asArray(
+                        dialog.fields
+                    ).length > 0
+                        ? `
+                            <form
+                                class="facility-dialog-form"
+                                data-dialog-form
+                            >
+
+                                <div class="facility-dialog-fields">
+
+                                    ${dialog.fields
+                                        .map(
+                                            renderDialogField
+                                        )
+                                        .join("")}
+
+                                </div>
+
+                                <div class="facility-dialog-actions">
+
+                                    <button
+                                        type="button"
+                                        class="facility-dialog-secondary"
+                                        data-action="close-dialog"
+                                    >
+                                        Abbrechen
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        class="facility-dialog-primary"
+                                    >
+                                        ${escapeHtml(
+                                            dialog.submitLabel ??
+                                            "Speichern"
+                                        )}
+                                    </button>
+
+                                </div>
+
+                            </form>
+                        `
+                        : `
+                            <div class="facility-dialog-actions">
+
+                                <button
+                                    type="button"
+                                    class="facility-dialog-primary"
+                                    data-action="close-dialog"
+                                >
+                                    Schließen
+                                </button>
+
+                            </div>
+                        `
+                }
+
+            </section>
+
+        </div>
+    `;
+}
+
+/************************************************
+ * TOAST
+ ************************************************/
+
+function renderToast() {
+
+    if (!uiState.toast) {
+
+        return "";
+    }
+
+    return `
+        <div
+            class="
+                facility-toast
+                facility-toast-${escapeHtml(
+                    uiState.toast.type ??
+                    "info"
+                )}
+            "
+            role="status"
+        >
+
+            <strong>
+                ${escapeHtml(
+                    uiState.toast.title ??
+                    "Facility OS"
+                )}
+            </strong>
+
+            <span>
+                ${escapeHtml(
+                    uiState.toast.message
+                )}
+            </span>
+
+        </div>
+    `;
+}
+
+/************************************************
+ * OVERLAYS AKTUALISIEREN
+ ************************************************/
+
+function updateOverlays(root) {
+
+    root
+        .querySelectorAll(
+            ".facility-dialog-backdrop, .facility-toast"
+        )
+        .forEach(
+            (element) =>
+                element.remove()
+        );
+
+    root.insertAdjacentHTML(
+        "beforeend",
+        renderDialog()
+    );
+
+    root.insertAdjacentHTML(
+        "beforeend",
+        renderToast()
+    );
+}
+
+/************************************************
+ * TOAST ANZEIGEN
+ ************************************************/
+
+function showToast(
+    root,
+    {
+        title = "Facility OS",
+        message,
+        type = "info"
+    }
 ) {
 
     if (
-        typeof onSelectObject !==
-        "function"
+        uiState.toastTimer
     ) {
 
-        return;
+        clearTimeout(
+            uiState.toastTimer
+        );
     }
 
-    appElement
-        .querySelectorAll(
-            '[data-action="select-object"]'
-        )
-        .forEach(
-            (button) => {
+    uiState.toast = {
 
-                button.addEventListener(
-                    "click",
-                    () => {
+        title,
+        message,
+        type
+    };
 
-                        const objectId =
-                            button.dataset.objectId;
+    updateOverlays(
+        root
+    );
 
-                        if (objectId) {
+    uiState.toastTimer =
+        window.setTimeout(
+            () => {
 
-                            onSelectObject(
-                                objectId
-                            );
-                        }
-                    }
+                uiState.toast =
+                    null;
+
+                updateOverlays(
+                    root
                 );
-            }
+            },
+            3200
         );
 }
 
-function bindLoginForm(onLogin) {
+/************************************************
+ * DIALOG ÖFFNEN
+ ************************************************/
 
-    if (
-        typeof onLogin !==
-        "function"
-    ) {
+function openDialog(
+    root,
+    action
+) {
 
-        return;
+    const definition =
+        ACTION_DIALOGS[
+            action
+        ];
+
+    if (definition) {
+
+        uiState.dialog = {
+
+            action,
+            ...definition
+        };
     }
+    else {
+
+        uiState.dialog = {
+
+            action,
+
+            title:
+                "Funktion vorbereitet",
+
+            text:
+                "Dieser Bereich ist bereits in der Benutzeroberfläche vorgesehen. Die dauerhafte Speicherung wird mit der zentralen Datenanbindung aktiviert.",
+
+            fields:
+                []
+        };
+    }
+
+    updateOverlays(
+        root
+    );
+
+    window.setTimeout(
+        () => {
+
+            const firstField =
+                root.querySelector(
+                    ".facility-dialog input, .facility-dialog textarea, .facility-dialog select"
+                );
+
+            firstField?.focus();
+        },
+        0
+    );
+}
+
+function closeDialog(root) {
+
+    uiState.dialog =
+        null;
+
+    updateOverlays(
+        root
+    );
+}
+
+/************************************************
+ * LOGIN-EREIGNIS
+ ************************************************/
+
+async function handleLoginSubmit(
+    event,
+    {
+        root,
+        onLogin
+    }
+) {
+
+    event.preventDefault();
 
     const form =
-        document.getElementById(
-            "test-login-form"
+        event.currentTarget;
+
+    const formData =
+        new FormData(
+            form
         );
 
-    if (!form) {
+    const identifier =
+        normalizeText(
+            formData.get(
+                "identifier"
+            )
+        );
+
+    const password =
+        String(
+            formData.get(
+                "password"
+            ) ??
+            ""
+        );
+
+    const errorElement =
+        form.querySelector(
+            "[data-login-error]"
+        );
+
+    if (!identifier) {
+
+        if (errorElement) {
+
+            errorElement.textContent =
+                "Bitte wähle einen Benutzer oder gib einen Benutzernamen ein.";
+
+            errorElement.hidden =
+                false;
+        }
+
         return;
     }
 
-    form.addEventListener(
-        "submit",
-        (event) => {
+    const submitButton =
+        form.querySelector(
+            "button[type='submit']"
+        );
 
-            event.preventDefault();
+    submitButton?.setAttribute(
+        "disabled",
+        "disabled"
+    );
 
-            const formData =
-                new FormData(form);
+    try {
 
-            onLogin({
-                name:
-                    String(
-                        formData.get(
-                            "name"
-                        ) ?? ""
-                    ).trim(),
-
-                role:
-                    String(
-                        formData.get(
-                            "role"
-                        ) ?? ""
-                    ).trim()
+        const result =
+            await onLogin?.({
+                identifier,
+                password
             });
+
+        if (
+            result === false
+        ) {
+
+            throw new Error(
+                "Anmeldung nicht möglich."
+            );
+        }
+    }
+    catch (error) {
+
+        if (errorElement) {
+
+            errorElement.textContent =
+                error?.message ??
+                "Die Anmeldung ist fehlgeschlagen.";
+
+            errorElement.hidden =
+                false;
+        }
+
+        submitButton?.removeAttribute(
+            "disabled"
+        );
+
+        showToast(
+            root,
+            {
+                title:
+                    "Anmeldung fehlgeschlagen",
+
+                message:
+                    error?.message ??
+                    "Bitte überprüfe deine Zugangsdaten.",
+
+                type:
+                    "error"
+            }
+        );
+    }
+}
+
+/************************************************
+ * OBJEKTAUSWAHL
+ ************************************************/
+
+function getObjectIdFromElement(element) {
+
+    return (
+        element.dataset.objectId ??
+        element.dataset.selectObject ??
+        element.dataset.id ??
+        ""
+    );
+}
+
+async function handleObjectSelection(
+    element,
+    {
+        state,
+        onSelectObject,
+        onNavigate,
+        root
+    }
+) {
+
+    const objectId =
+        getObjectIdFromElement(
+            element
+        );
+
+    if (!objectId) {
+
+        return;
+    }
+
+    const object =
+        asArray(state.objects)
+            .find(
+                (entry) =>
+                    entry.id ===
+                    objectId
+            ) ??
+        null;
+
+    try {
+
+        await onSelectObject?.(
+            objectId,
+            object
+        );
+
+        const shouldOpenDetail =
+            element.dataset.openObject ===
+                "true" ||
+            element.dataset.route ===
+                ROUTES.OBJECT_DETAIL ||
+            element.hasAttribute(
+                "data-object-detail"
+            );
+
+        if (shouldOpenDetail) {
+
+            onNavigate?.(
+                ROUTES.OBJECT_DETAIL
+            );
+        }
+    }
+    catch (error) {
+
+        showToast(
+            root,
+            {
+                title:
+                    "Objekt konnte nicht geöffnet werden",
+
+                message:
+                    error?.message ??
+                    "Die Objektauswahl ist fehlgeschlagen.",
+
+                type:
+                    "error"
+            }
+        );
+    }
+}
+
+/************************************************
+ * CHECK-IN UND CHECK-OUT
+ ************************************************/
+
+async function handleShiftAction(
+    action,
+    {
+        state,
+        onCheckin,
+        onCheckout,
+        root
+    }
+) {
+
+    if (
+        action ===
+        "checkin"
+    ) {
+
+        if (
+            !state.currentObject
+        ) {
+
+            showToast(
+                root,
+                {
+                    title:
+                        "Objekt erforderlich",
+
+                    message:
+                        "Wähle zuerst ein Objekt aus.",
+
+                    type:
+                        "warning"
+                }
+            );
+
+            return;
+        }
+
+        try {
+
+            await onCheckin?.();
+
+            showToast(
+                root,
+                {
+                    title:
+                        "Schicht gestartet",
+
+                    message:
+                        `Check-in für ${
+                            state.currentObject.name ??
+                            state.currentObject.id ??
+                            "das Objekt"
+                        } wurde ausgeführt.`,
+
+                    type:
+                        "success"
+                }
+            );
+        }
+        catch (error) {
+
+            showToast(
+                root,
+                {
+                    title:
+                        "Check-in fehlgeschlagen",
+
+                    message:
+                        error?.message ??
+                        "Die Schicht konnte nicht gestartet werden.",
+
+                    type:
+                        "error"
+                }
+            );
+        }
+
+        return;
+    }
+
+    if (
+        action ===
+        "checkout"
+    ) {
+
+        try {
+
+            await onCheckout?.();
+
+            showToast(
+                root,
+                {
+                    title:
+                        "Schicht beendet",
+
+                    message:
+                        "Der Check-out wurde ausgeführt.",
+
+                    type:
+                        "success"
+                }
+            );
+        }
+        catch (error) {
+
+            showToast(
+                root,
+                {
+                    title:
+                        "Check-out fehlgeschlagen",
+
+                    message:
+                        error?.message ??
+                        "Die Schicht konnte nicht beendet werden.",
+
+                    type:
+                        "error"
+                }
+            );
+        }
+    }
+}
+
+/************************************************
+ * SONSTIGE AKTIONEN
+ ************************************************/
+
+async function handleUtilityAction(
+    action,
+    {
+        root,
+        onLogout
+    }
+) {
+
+    switch (action) {
+
+        case "logout":
+
+            await onLogout?.();
+
+            return true;
+
+        case "reload-app":
+
+            window.location.reload();
+
+            return true;
+
+        case "close-dialog":
+
+            closeDialog(
+                root
+            );
+
+            return true;
+
+        case "toggle-password": {
+
+            const input =
+                root.querySelector(
+                    ".facility-password-field input"
+                );
+
+            const button =
+                root.querySelector(
+                    "[data-action='toggle-password']"
+                );
+
+            if (!input) {
+
+                return true;
+            }
+
+            const showPassword =
+                input.type ===
+                "password";
+
+            input.type =
+                showPassword
+                    ? "text"
+                    : "password";
+
+            if (button) {
+
+                button.textContent =
+                    showPassword
+                        ? "Ausblenden"
+                        : "Anzeigen";
+            }
+
+            return true;
+        }
+
+        case "reset-test-data":
+
+            if (
+                APP_CONFIG.TEST_MODE !==
+                true
+            ) {
+
+                return true;
+            }
+
+            if (
+                window.confirm(
+                    "Lokale Testdaten wirklich zurücksetzen?"
+                )
+            ) {
+
+                localStorage.clear();
+
+                window.location.reload();
+            }
+
+            return true;
+
+        default:
+
+            return false;
+    }
+}
+
+/************************************************
+ * ZENTRALES KLICKEREIGNIS
+ ************************************************/
+
+async function handleRootClick(
+    event,
+    context
+) {
+
+    const {
+        root,
+        route,
+        state,
+        onNavigate,
+        onLogout,
+        onCheckin,
+        onCheckout,
+        onSelectObject
+    } = context;
+
+    const routeElement =
+        event.target.closest(
+            "[data-route]"
+        );
+
+    const actionElement =
+        event.target.closest(
+            "[data-action]"
+        );
+
+    const objectElement =
+        event.target.closest(
+            "[data-object-id], [data-select-object], [data-object-detail]"
+        );
+
+    if (
+        event.target ===
+        root.querySelector(
+            "[data-dialog-backdrop]"
+        )
+    ) {
+
+        closeDialog(
+            root
+        );
+
+        return;
+    }
+
+    if (
+        objectElement
+    ) {
+
+        await handleObjectSelection(
+            objectElement,
+            {
+                state,
+                onSelectObject,
+                onNavigate,
+                root
+            }
+        );
+
+        const objectRoute =
+            objectElement.dataset.route;
+
+        if (
+            objectRoute
+        ) {
+
+            onNavigate?.(
+                objectRoute
+            );
+        }
+
+        return;
+    }
+
+    if (
+        actionElement
+    ) {
+
+        const action =
+            normalizeText(
+                actionElement.dataset.action
+            );
+
+        if (!action) {
+
+            return;
+        }
+
+        const handledUtility =
+            await handleUtilityAction(
+                action,
+                {
+                    root,
+                    onLogout
+                }
+            );
+
+        if (handledUtility) {
+
+            return;
+        }
+
+        if (
+            [
+                "checkin",
+                "checkout"
+            ].includes(action)
+        ) {
+
+            await handleShiftAction(
+                action,
+                {
+                    state,
+                    onCheckin,
+                    onCheckout,
+                    root
+                }
+            );
+
+            return;
+        }
+
+        openDialog(
+            root,
+            action
+        );
+
+        return;
+    }
+
+    if (
+        routeElement
+    ) {
+
+        const targetRoute =
+            normalizeText(
+                routeElement.dataset.route
+            );
+
+        if (!targetRoute) {
+
+            return;
+        }
+
+        if (
+            !state.currentUser &&
+            [
+                ROUTES.PRIVACY,
+                ROUTES.IMPRINT
+            ].includes(targetRoute)
+        ) {
+
+            root.innerHTML = `
+                <div class="facility-public-legal-view">
+
+                    <button
+                        type="button"
+                        class="facility-public-back-button"
+                        data-action="return-login"
+                    >
+                        ‹ Zur Anmeldung
+                    </button>
+
+                    ${
+                        targetRoute ===
+                        ROUTES.PRIVACY
+                            ? renderPrivacyPage(
+                                state
+                            )
+                            : renderImprintPage(
+                                state
+                            )
+                    }
+
+                </div>
+            `;
+
+            bindEvents(
+                root,
+                {
+                    ...context,
+                    route
+                }
+            );
+
+            return;
+        }
+
+        onNavigate?.(
+            targetRoute
+        );
+    }
+}
+
+/************************************************
+ * DIALOG SPEICHERN
+ ************************************************/
+
+function handleDialogSubmit(
+    event,
+    {
+        root
+    }
+) {
+
+    event.preventDefault();
+
+    const form =
+        event.currentTarget;
+
+    if (
+        !form.checkValidity()
+    ) {
+
+        form.reportValidity();
+
+        return;
+    }
+
+    const action =
+        uiState.dialog?.action ??
+        "save";
+
+    uiState.dialog =
+        null;
+
+    updateOverlays(
+        root
+    );
+
+    showToast(
+        root,
+        {
+            title:
+                "Eingabe übernommen",
+
+            message:
+                action.includes(
+                    "message"
+                )
+                    ? "Die Nachricht wurde für die spätere Datenanbindung vorbereitet."
+                    : "Die Eingabe wurde in der Präsentationsansicht bestätigt.",
+
+            type:
+                "success"
         }
     );
+}
+
+/************************************************
+ * EREIGNISSE BINDEN
+ ************************************************/
+
+function bindEvents(
+    root,
+    context
+) {
+
+    root
+        .querySelectorAll(
+            "[data-login-form]"
+        )
+        .forEach(
+            (form) => {
+
+                form.addEventListener(
+                    "submit",
+                    (event) =>
+                        handleLoginSubmit(
+                            event,
+                            {
+                                root,
+                                onLogin:
+                                    context.onLogin
+                            }
+                        )
+                );
+            }
+        );
+
+    root
+        .querySelectorAll(
+            "[data-dialog-form]"
+        )
+        .forEach(
+            (form) => {
+
+                form.addEventListener(
+                    "submit",
+                    (event) =>
+                        handleDialogSubmit(
+                            event,
+                            {
+                                root
+                            }
+                        )
+                );
+            }
+        );
+
+    root.addEventListener(
+        "click",
+        (event) =>
+            handleRootClick(
+                event,
+                context
+            ),
+        {
+            once:
+                true
+        }
+    );
+
+    root.addEventListener(
+        "click",
+        (event) => {
+
+            if (
+                event.target.closest(
+                    "[data-action='return-login']"
+                )
+            ) {
+
+                context.render?.();
+            }
+        },
+        {
+            once:
+                true
+        }
+    );
+}
+
+/************************************************
+ * DOKUMENTTITEL
+ ************************************************/
+
+function updateDocumentTitle(route) {
+
+    const routeTitle =
+        getRouteTitle(
+            route
+        );
+
+    document.title =
+        `${routeTitle} · ${getAppName()}`;
 }
 
 /************************************************
@@ -3514,79 +2613,92 @@ export function renderApp({
     onSelectObject
 }) {
 
-    const appElement =
+    const root =
         document.getElementById(
             "app"
         );
 
-    if (!appElement) {
+    if (!root) {
 
         throw new Error(
-            "Das HTML-Element #app wurde nicht gefunden."
+            "Das App-Element mit der ID „app“ wurde nicht gefunden."
         );
     }
 
-    const loggedIn =
-        Boolean(
-            state.currentUser
+    const safeState =
+        state &&
+        typeof state ===
+        "object"
+            ? state
+            : {};
+
+    const currentRoute =
+        route ??
+        (
+            safeState.currentUser
+                ? ROUTES.OVERVIEW
+                : ROUTES.LOGIN
         );
 
-    appElement.innerHTML =
-        loggedIn
-            ? `
-                <div class="app-shell">
-
-                    ${renderHeader(
-                        state
-                    )}
-
-                    <main class="app-content">
-
-                        ${renderRoute(
-                            route,
-                            state
-                        )}
-
-                    </main>
-
-                    ${renderNavigation(
-                        state,
-                        route
-                    )}
-
-                </div>
-            `
-            : renderLogin();
-
-    bindRouteEvents(
-        appElement,
-        onNavigate
+    updateDocumentTitle(
+        currentRoute
     );
 
-    bindObjectSelection(
-        appElement,
-        onSelectObject
-    );
+    const renderCurrentView =
+        () => {
 
-    bindLoginForm(
-        onLogin
-    );
+            if (
+                !safeState.currentUser
+            ) {
 
-    bindActionEvents(
-        appElement,
-        "logout",
-        onLogout
-    );
+                root.innerHTML =
+                    renderLoginPage(
+                        safeState
+                    );
+            }
+            else {
 
-    bindActionEvents(
-        appElement,
-        "checkin",
-        onCheckin
-    );
+                root.innerHTML =
+                    renderAuthenticatedApp({
+                        route:
+                            currentRoute,
 
-    bindActionEvents(
-        appElement,
-        "checkout",
-        onCheckout
-    );
+                        state:
+                            safeState,
+
+                        onSelectObject
+                    });
+            }
+
+            root.insertAdjacentHTML(
+                "beforeend",
+                renderDialog()
+            );
+
+            root.insertAdjacentHTML(
+                "beforeend",
+                renderToast()
+            );
+
+            bindEvents(
+                root,
+                {
+                    root,
+                    route:
+                        currentRoute,
+                    state:
+                        safeState,
+                    onNavigate,
+                    onLogin,
+                    onLogout,
+                    onCheckin,
+                    onCheckout,
+                    onSelectObject,
+                    render:
+                        renderCurrentView
+                }
+            );
+        };
+
+    renderCurrentView();
 }
