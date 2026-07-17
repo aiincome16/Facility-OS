@@ -7,29 +7,48 @@
  * - aktuelles Objekt
  * - Schichtstatus
  * - geladene Datenbestände
+ * - lokale Präsentationsdaten
  * - lokale Persistenz
  * - Listener für UI-Aktualisierungen
  * - vorbereitet für spätere API-/Sheets-Anbindung
  ************************************************/
 
 /************************************************
+ * ROUTEN
+ ************************************************/
+
+const DEFAULT_ROUTES =
+    Object.freeze({
+
+        LOGIN:
+            "/login",
+
+        OVERVIEW:
+            "/overview"
+    });
+
+/************************************************
  * SPEICHERSCHLÜSSEL
  ************************************************/
 
-const STORAGE_KEYS = Object.freeze({
+const STORAGE_KEYS =
+    Object.freeze({
 
-    SESSION:
-        "facility_os_session",
+        SESSION:
+            "facility_os_session",
 
-    CURRENT_OBJECT:
-        "facility_os_current_object",
+        CURRENT_OBJECT:
+            "facility_os_current_object",
 
-    CURRENT_SHIFT:
-        "facility_os_current_shift",
+        CURRENT_SHIFT:
+            "facility_os_current_shift",
 
-    APP_STATE:
-        "facility_os_app_state"
-});
+        APP_STATE:
+            "facility_os_app_state",
+
+        LOCAL_CHANGES:
+            "facility_os_local_changes"
+    });
 
 /************************************************
  * DATENSAMMLUNGEN
@@ -60,7 +79,31 @@ const DATA_COLLECTION_NAMES =
         "userPerformance",
         "help",
         "customerRequests",
-        "workOrders"
+        "workOrders",
+        "reports"
+    ]);
+
+/************************************************
+ * LOKAL VERÄNDERBARE SAMMLUNGEN
+ *
+ * Diese Daten entstehen in der Präsentations-App
+ * und bleiben nach einem Neuladen erhalten.
+ ************************************************/
+
+const PERSISTED_COLLECTION_NAMES =
+    Object.freeze([
+        "shifts",
+        "checkins",
+        "checkouts",
+        "tickets",
+        "messages",
+        "notifications",
+        "customerRequests",
+        "workOrders",
+        "taskLogs",
+        "timeDeviations",
+        "materialStock",
+        "reports"
     ]);
 
 /************************************************
@@ -97,7 +140,7 @@ function createInitialState() {
             false,
 
         currentRoute:
-            "/dashboard",
+            DEFAULT_ROUTES.LOGIN,
 
         currentUser:
             null,
@@ -114,7 +157,13 @@ function createInitialState() {
         sessionRestored:
             false,
 
+        localChangesRestored:
+            false,
+
         lastUpdatedAt:
+            null,
+
+        dataLoadedAt:
             null,
 
         dataSource:
@@ -160,6 +209,30 @@ function asObject(value) {
         : {};
 }
 
+function normalizeId(value) {
+
+    return String(value ?? "")
+        .trim();
+}
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .trim();
+}
+
+function normalizeStatus(value) {
+
+    return normalizeText(value)
+        .toUpperCase();
+}
+
+function getTimestamp() {
+
+    return new Date()
+        .toISOString();
+}
+
 function cloneValue(value) {
 
     if (
@@ -185,10 +258,55 @@ function cloneValue(value) {
     }
 }
 
-function normalizeId(value) {
+function isObject(value) {
 
-    return String(value ?? "")
-        .trim();
+    return (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    );
+}
+
+function isRunningShift(shift) {
+
+    if (!isObject(shift)) {
+
+        return false;
+    }
+
+    const status =
+        normalizeStatus(
+            shift.status
+        );
+
+    if (
+        [
+            "FINISHED",
+            "COMPLETED",
+            "CLOSED",
+            "CANCELLED"
+        ].includes(status)
+    ) {
+
+        return false;
+    }
+
+    return (
+        [
+            "RUNNING",
+            "ACTIVE"
+        ].includes(status) ||
+        (
+            Boolean(
+                shift.startTime ??
+                shift.checkinTime
+            ) &&
+            !(
+                shift.endTime ??
+                shift.checkoutTime
+            )
+        )
+    );
 }
 
 /************************************************
@@ -205,6 +323,7 @@ function readStorage(key) {
             );
 
         if (!rawValue) {
+
             return null;
         }
 
@@ -280,7 +399,7 @@ function removeStorage(key) {
 }
 
 /************************************************
- * PERSISTIERBARE SITZUNG
+ * SITZUNG SPEICHERN
  ************************************************/
 
 function persistSession() {
@@ -293,10 +412,12 @@ function persistSession() {
             STORAGE_KEYS.SESSION,
             {
                 currentUser:
-                    appState.currentUser,
+                    cloneValue(
+                        appState.currentUser
+                    ),
 
                 savedAt:
-                    new Date().toISOString()
+                    getTimestamp()
             }
         );
     }
@@ -313,7 +434,9 @@ function persistSession() {
 
         writeStorage(
             STORAGE_KEYS.CURRENT_OBJECT,
-            appState.currentObject
+            cloneValue(
+                appState.currentObject
+            )
         );
     }
     else {
@@ -325,12 +448,17 @@ function persistSession() {
 
     if (
         appState.currentShift &&
-        appState.shiftStarted === true
+        appState.shiftStarted === true &&
+        isRunningShift(
+            appState.currentShift
+        )
     ) {
 
         writeStorage(
             STORAGE_KEYS.CURRENT_SHIFT,
-            appState.currentShift
+            cloneValue(
+                appState.currentShift
+            )
         );
     }
     else {
@@ -340,6 +468,74 @@ function persistSession() {
         );
     }
 }
+
+/************************************************
+ * LOKALE ÄNDERUNGEN SPEICHERN
+ ************************************************/
+
+function createPersistedCollectionsSnapshot() {
+
+    return PERSISTED_COLLECTION_NAMES.reduce(
+        (
+            result,
+            collectionName
+        ) => {
+
+            result[
+                collectionName
+            ] =
+                cloneValue(
+                    asArray(
+                        appState[
+                            collectionName
+                        ]
+                    )
+                );
+
+            return result;
+        },
+        {}
+    );
+}
+
+function persistLocalChanges() {
+
+    writeStorage(
+        STORAGE_KEYS.LOCAL_CHANGES,
+        {
+            collections:
+                createPersistedCollectionsSnapshot(),
+
+            savedAt:
+                getTimestamp()
+        }
+    );
+}
+
+/************************************************
+ * ALLGEMEINEN STATUS SPEICHERN
+ ************************************************/
+
+function persistAppMetadata() {
+
+    writeStorage(
+        STORAGE_KEYS.APP_STATE,
+        {
+            currentRoute:
+                appState.currentRoute,
+
+            dataSource:
+                appState.dataSource,
+
+            savedAt:
+                getTimestamp()
+        }
+    );
+}
+
+/************************************************
+ * SITZUNG WIEDERHERSTELLEN
+ ************************************************/
 
 function restoreSession() {
 
@@ -360,8 +556,17 @@ function restoreSession() {
             STORAGE_KEYS.CURRENT_SHIFT
         );
 
+    const storedMetadata =
+        asObject(
+            readStorage(
+                STORAGE_KEYS.APP_STATE
+            )
+        );
+
     if (
-        storedSession.currentUser
+        isObject(
+            storedSession.currentUser
+        )
     ) {
 
         appState.currentUser =
@@ -371,8 +576,9 @@ function restoreSession() {
     }
 
     if (
-        storedObject &&
-        typeof storedObject === "object"
+        isObject(
+            storedObject
+        )
     ) {
 
         appState.currentObject =
@@ -382,8 +588,12 @@ function restoreSession() {
     }
 
     if (
-        storedShift &&
-        typeof storedShift === "object"
+        isObject(
+            storedShift
+        ) &&
+        isRunningShift(
+            storedShift
+        )
     ) {
 
         appState.currentShift =
@@ -394,9 +604,197 @@ function restoreSession() {
         appState.shiftStarted =
             true;
     }
+    else {
+
+        appState.currentShift =
+            null;
+
+        appState.shiftStarted =
+            false;
+
+        removeStorage(
+            STORAGE_KEYS.CURRENT_SHIFT
+        );
+    }
+
+    if (
+        appState.currentUser
+    ) {
+
+        appState.currentRoute =
+            normalizeText(
+                storedMetadata.currentRoute
+            ) ||
+            DEFAULT_ROUTES.OVERVIEW;
+    }
+    else {
+
+        appState.currentRoute =
+            DEFAULT_ROUTES.LOGIN;
+
+        appState.currentObject =
+            null;
+
+        appState.currentShift =
+            null;
+
+        appState.shiftStarted =
+            false;
+    }
 
     appState.sessionRestored =
         true;
+}
+
+/************************************************
+ * LOKALE ÄNDERUNGEN WIEDERHERSTELLEN
+ ************************************************/
+
+function getStoredLocalCollections() {
+
+    const storedChanges =
+        asObject(
+            readStorage(
+                STORAGE_KEYS.LOCAL_CHANGES
+            )
+        );
+
+    return asObject(
+        storedChanges.collections
+    );
+}
+
+function restoreLocalChanges() {
+
+    const storedCollections =
+        getStoredLocalCollections();
+
+    PERSISTED_COLLECTION_NAMES.forEach(
+        (collectionName) => {
+
+            const storedValues =
+                storedCollections[
+                    collectionName
+                ];
+
+            if (
+                Array.isArray(
+                    storedValues
+                )
+            ) {
+
+                appState[
+                    collectionName
+                ] =
+                    cloneValue(
+                        storedValues
+                    );
+            }
+        }
+    );
+
+    appState.localChangesRestored =
+        true;
+}
+
+/************************************************
+ * SAMMLUNGEN ZUSAMMENFÜHREN
+ ************************************************/
+
+function mergeCollectionsById(
+    loadedValues,
+    localValues
+) {
+
+    const loaded =
+        asArray(
+            loadedValues
+        );
+
+    const local =
+        asArray(
+            localValues
+        );
+
+    const result = [];
+    const positions =
+        new Map();
+
+    loaded.forEach(
+        (entry) => {
+
+            const clonedEntry =
+                cloneValue(
+                    entry
+                );
+
+            const entryId =
+                normalizeId(
+                    clonedEntry?.id
+                );
+
+            if (entryId) {
+
+                positions.set(
+                    entryId,
+                    result.length
+                );
+            }
+
+            result.push(
+                clonedEntry
+            );
+        }
+    );
+
+    local.forEach(
+        (entry) => {
+
+            const clonedEntry =
+                cloneValue(
+                    entry
+                );
+
+            const entryId =
+                normalizeId(
+                    clonedEntry?.id
+                );
+
+            if (
+                entryId &&
+                positions.has(
+                    entryId
+                )
+            ) {
+
+                const position =
+                    positions.get(
+                        entryId
+                    );
+
+                result[position] = {
+                    ...result[position],
+                    ...clonedEntry
+                };
+
+                return;
+            }
+
+            if (entryId) {
+
+                positions.set(
+                    entryId,
+                    result.length
+                );
+            }
+
+            result.push(
+                clonedEntry
+            );
+        }
+    );
+
+    return result;
 }
 
 /************************************************
@@ -406,7 +804,10 @@ function restoreSession() {
 function notifySubscribers() {
 
     appState.lastUpdatedAt =
-        new Date().toISOString();
+        getTimestamp();
+
+    const snapshot =
+        getAppState();
 
     subscribers.forEach(
         (subscriber) => {
@@ -414,7 +815,7 @@ function notifySubscribers() {
             try {
 
                 subscriber(
-                    getAppState()
+                    snapshot
                 );
             }
             catch (error) {
@@ -442,12 +843,13 @@ export function initializeAppState() {
     }
 
     restoreSession();
+    restoreLocalChanges();
 
     appState.initialized =
         true;
 
     appState.lastUpdatedAt =
-        new Date().toISOString();
+        getTimestamp();
 
     return getAppState();
 }
@@ -521,11 +923,18 @@ export function updateAppState(
     if (persist) {
 
         persistSession();
+        persistLocalChanges();
+        persistAppMetadata();
     }
 
     if (notify) {
 
         notifySubscribers();
+    }
+    else {
+
+        appState.lastUpdatedAt =
+            getTimestamp();
     }
 
     return getAppState();
@@ -547,24 +956,56 @@ export function setDataCollections(
             collections
         );
 
+    const storedLocalCollections =
+        getStoredLocalCollections();
+
     DATA_COLLECTION_NAMES.forEach(
         (collectionName) => {
 
-            appState[
-                collectionName
-            ] =
+            const loadedValues =
                 asArray(
                     normalizedCollections[
                         collectionName
                     ]
+                );
+
+            if (
+                PERSISTED_COLLECTION_NAMES.includes(
+                    collectionName
+                )
+            ) {
+
+                appState[
+                    collectionName
+                ] =
+                    mergeCollectionsById(
+                        loadedValues,
+                        storedLocalCollections[
+                            collectionName
+                        ]
+                    );
+
+                return;
+            }
+
+            appState[
+                collectionName
+            ] =
+                cloneValue(
+                    loadedValues
                 );
         }
     );
 
     reconcilePersistedEntities();
 
+    appState.dataLoadedAt =
+        getTimestamp();
+
     appState.lastUpdatedAt =
-        new Date().toISOString();
+        getTimestamp();
+
+    persistLocalChanges();
 
     if (notify) {
 
@@ -575,8 +1016,7 @@ export function setDataCollections(
 }
 
 /************************************************
- * PERSISTIERTE ENTITÄTEN MIT GELADENEN DATEN
- * ABGLEICHEN
+ * PERSISTIERTE ENTITÄTEN ABGLEICHEN
  ************************************************/
 
 function reconcilePersistedEntities() {
@@ -596,9 +1036,25 @@ function reconcilePersistedEntities() {
 
             appState.currentUser = {
                 ...matchingUser,
-
                 ...appState.currentUser
             };
+        }
+        else {
+
+            appState.currentUser =
+                null;
+
+            appState.currentObject =
+                null;
+
+            appState.currentShift =
+                null;
+
+            appState.shiftStarted =
+                false;
+
+            appState.currentRoute =
+                DEFAULT_ROUTES.LOGIN;
         }
     }
 
@@ -613,16 +1069,12 @@ function reconcilePersistedEntities() {
                     appState.currentObject.id
             );
 
-        if (matchingObject) {
-
-            appState.currentObject =
-                matchingObject;
-        }
-        else {
-
-            appState.currentObject =
-                null;
-        }
+        appState.currentObject =
+            matchingObject
+                ? cloneValue(
+                    matchingObject
+                )
+                : null;
     }
 
     if (
@@ -640,13 +1092,43 @@ function reconcilePersistedEntities() {
 
             appState.currentShift = {
                 ...matchingShift,
-
                 ...appState.currentShift
             };
         }
+
+        if (
+            !isRunningShift(
+                appState.currentShift
+            )
+        ) {
+
+            appState.currentShift =
+                null;
+
+            appState.shiftStarted =
+                false;
+        }
+    }
+
+    if (
+        !appState.currentUser
+    ) {
+
+        appState.currentObject =
+            null;
+
+        appState.currentShift =
+            null;
+
+        appState.shiftStarted =
+            false;
+
+        appState.currentRoute =
+            DEFAULT_ROUTES.LOGIN;
     }
 
     persistSession();
+    persistAppMetadata();
 }
 
 /************************************************
@@ -657,7 +1139,8 @@ export function setCollection(
     collectionName,
     values,
     {
-        notify = true
+        notify = true,
+        persist = true
     } = {}
 ) {
 
@@ -675,9 +1158,21 @@ export function setCollection(
     appState[
         collectionName
     ] =
-        asArray(
-            values
+        cloneValue(
+            asArray(
+                values
+            )
         );
+
+    if (
+        persist &&
+        PERSISTED_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        persistLocalChanges();
+    }
 
     if (notify) {
 
@@ -697,7 +1192,8 @@ export function addCollectionEntry(
     collectionName,
     entry,
     {
-        notify = true
+        notify = true,
+        persist = true
     } = {}
 ) {
 
@@ -713,8 +1209,10 @@ export function addCollectionEntry(
     }
 
     const normalizedEntry =
-        asObject(
-            entry
+        cloneValue(
+            asObject(
+                entry
+            )
         );
 
     appState[
@@ -725,9 +1223,18 @@ export function addCollectionEntry(
                 collectionName
             ]
         ),
-
         normalizedEntry
     ];
+
+    if (
+        persist &&
+        PERSISTED_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        persistLocalChanges();
+    }
 
     if (notify) {
 
@@ -746,7 +1253,8 @@ export function updateCollectionEntry(
     entryId,
     changes,
     {
-        notify = true
+        notify = true,
+        persist = true
     } = {}
 ) {
 
@@ -785,7 +1293,9 @@ export function updateCollectionEntry(
             (entry) => {
 
                 if (
-                    entry.id !==
+                    normalizeId(
+                        entry?.id
+                    ) !==
                     normalizedId
                 ) {
 
@@ -794,15 +1304,30 @@ export function updateCollectionEntry(
 
                 updatedEntry = {
                     ...entry,
-
-                    ...normalizedChanges
+                    ...cloneValue(
+                        normalizedChanges
+                    )
                 };
 
                 return updatedEntry;
             }
         );
 
-    if (notify) {
+    if (
+        updatedEntry &&
+        persist &&
+        PERSISTED_COLLECTION_NAMES.includes(
+            collectionName
+        )
+    ) {
+
+        persistLocalChanges();
+    }
+
+    if (
+        updatedEntry &&
+        notify
+    ) {
 
         notifySubscribers();
     }
@@ -818,7 +1343,8 @@ export function removeCollectionEntry(
     collectionName,
     entryId,
     {
-        notify = true
+        notify = true,
+        persist = true
     } = {}
 ) {
 
@@ -838,39 +1364,52 @@ export function removeCollectionEntry(
             entryId
         );
 
-    const previousLength =
-        appState[
-            collectionName
-        ].length;
-
-    appState[
-        collectionName
-    ] =
+    const previousValues =
         asArray(
             appState[
                 collectionName
             ]
-        ).filter(
+        );
+
+    const filteredValues =
+        previousValues.filter(
             (entry) =>
-                entry.id !==
+                normalizeId(
+                    entry?.id
+                ) !==
                 normalizedId
         );
 
     const removed =
-        appState[
-            collectionName
-        ].length <
-        previousLength;
+        filteredValues.length <
+        previousValues.length;
+
+    if (!removed) {
+
+        return false;
+    }
+
+    appState[
+        collectionName
+    ] =
+        filteredValues;
 
     if (
-        removed &&
-        notify
+        persist &&
+        PERSISTED_COLLECTION_NAMES.includes(
+            collectionName
+        )
     ) {
+
+        persistLocalChanges();
+    }
+
+    if (notify) {
 
         notifySubscribers();
     }
 
-    return removed;
+    return true;
 }
 
 /************************************************
@@ -886,8 +1425,7 @@ export function setCurrentUser(
 ) {
 
     appState.currentUser =
-        user &&
-        typeof user === "object"
+        isObject(user)
             ? cloneValue(
                 user
             )
@@ -903,11 +1441,23 @@ export function setCurrentUser(
 
         appState.shiftStarted =
             false;
+
+        appState.currentRoute =
+            DEFAULT_ROUTES.LOGIN;
+    }
+    else if (
+        appState.currentRoute ===
+        DEFAULT_ROUTES.LOGIN
+    ) {
+
+        appState.currentRoute =
+            DEFAULT_ROUTES.OVERVIEW;
     }
 
     if (persist) {
 
         persistSession();
+        persistAppMetadata();
     }
 
     if (notify) {
@@ -931,8 +1481,7 @@ export function setCurrentObject(
 ) {
 
     appState.currentObject =
-        object &&
-        typeof object === "object"
+        isObject(object)
             ? cloneValue(
                 object
             )
@@ -958,19 +1507,37 @@ export function setCurrentObject(
 export function setCurrentRoute(
     route,
     {
-        notify = false
+        notify = false,
+        persist = true
     } = {}
 ) {
 
+    const fallbackRoute =
+        appState.currentUser
+            ? DEFAULT_ROUTES.OVERVIEW
+            : DEFAULT_ROUTES.LOGIN;
+
     const normalizedRoute =
-        String(
-            route ??
-            "/dashboard"
-        ).trim() ||
-        "/dashboard";
+        normalizeText(
+            route
+        ) ||
+        fallbackRoute;
+
+    if (
+        appState.currentRoute ===
+        normalizedRoute
+    ) {
+
+        return appState.currentRoute;
+    }
 
     appState.currentRoute =
         normalizedRoute;
+
+    if (persist) {
+
+        persistAppMetadata();
+    }
 
     if (notify) {
 
@@ -1044,9 +1611,11 @@ export function startShift(
     const stateObject =
         appState.currentObject;
 
+    const timestamp =
+        getTimestamp();
+
     const normalizedShift =
-        shift &&
-        typeof shift === "object"
+        isObject(shift)
             ? cloneValue(
                 shift
             )
@@ -1067,17 +1636,45 @@ export function startShift(
                     null,
 
                 startTime:
-                    new Date().toISOString(),
+                    timestamp,
+
+                checkinTime:
+                    timestamp,
 
                 endTime:
+                    null,
+
+                checkoutTime:
                     null,
 
                 status:
                     "RUNNING",
 
                 source:
-                    "LOCAL_TEST"
+                    "LOCAL_TEST",
+
+                createdAt:
+                    timestamp,
+
+                updatedAt:
+                    timestamp
             };
+
+    if (
+        !isRunningShift(
+            normalizedShift
+        )
+    ) {
+
+        normalizedShift.status =
+            "RUNNING";
+
+        normalizedShift.endTime =
+            null;
+
+        normalizedShift.checkoutTime =
+            null;
+    }
 
     appState.currentShift =
         normalizedShift;
@@ -1085,9 +1682,41 @@ export function startShift(
     appState.shiftStarted =
         true;
 
+    const existingShiftIndex =
+        appState.shifts.findIndex(
+            (entry) =>
+                entry.id ===
+                normalizedShift.id
+        );
+
+    if (
+        existingShiftIndex >= 0
+    ) {
+
+        appState.shifts =
+            appState.shifts.map(
+                (entry) =>
+                    entry.id ===
+                    normalizedShift.id
+                        ? {
+                            ...entry,
+                            ...normalizedShift
+                        }
+                        : entry
+            );
+    }
+    else {
+
+        appState.shifts = [
+            ...appState.shifts,
+            normalizedShift
+        ];
+    }
+
     if (persist) {
 
         persistSession();
+        persistLocalChanges();
     }
 
     if (notify) {
@@ -1110,9 +1739,13 @@ export function stopShift(
     } = {}
 ) {
 
+    const timestamp =
+        getTimestamp();
+
     const finalShift =
-        completedShift &&
-        typeof completedShift === "object"
+        isObject(
+            completedShift
+        )
             ? cloneValue(
                 completedShift
             )
@@ -1122,13 +1755,55 @@ export function stopShift(
                         ...appState.currentShift,
 
                         endTime:
-                            new Date().toISOString(),
+                            timestamp,
+
+                        checkoutTime:
+                            timestamp,
 
                         status:
-                            "FINISHED"
+                            "FINISHED",
+
+                        updatedAt:
+                            timestamp
                     }
                     : null
             );
+
+    if (
+        finalShift?.id
+    ) {
+
+        const existingShiftIndex =
+            appState.shifts.findIndex(
+                (entry) =>
+                    entry.id ===
+                    finalShift.id
+            );
+
+        if (
+            existingShiftIndex >= 0
+        ) {
+
+            appState.shifts =
+                appState.shifts.map(
+                    (entry) =>
+                        entry.id ===
+                        finalShift.id
+                            ? {
+                                ...entry,
+                                ...finalShift
+                            }
+                            : entry
+                );
+        }
+        else {
+
+            appState.shifts = [
+                ...appState.shifts,
+                finalShift
+            ];
+        }
+    }
 
     appState.currentShift =
         null;
@@ -1139,6 +1814,7 @@ export function stopShift(
     if (persist) {
 
         persistSession();
+        persistLocalChanges();
     }
 
     if (notify) {
@@ -1170,7 +1846,7 @@ export function logoutCurrentUser({
         false;
 
     appState.currentRoute =
-        "/login";
+        DEFAULT_ROUTES.LOGIN;
 
     removeStorage(
         STORAGE_KEYS.SESSION
@@ -1183,6 +1859,8 @@ export function logoutCurrentUser({
     removeStorage(
         STORAGE_KEYS.CURRENT_SHIFT
     );
+
+    persistAppMetadata();
 
     if (notify) {
 
@@ -1222,7 +1900,9 @@ export function findById(
             ]
         ).find(
             (entry) =>
-                entry.id ===
+                normalizeId(
+                    entry?.id
+                ) ===
                 normalizedId
         ) ??
         null
@@ -1356,12 +2036,52 @@ export function subscribeToAppState(
 }
 
 /************************************************
+ * LOKALE PRÄSENTATIONSDATEN LÖSCHEN
+ ************************************************/
+
+export function clearLocalChanges({
+    notify = true
+} = {}) {
+
+    removeStorage(
+        STORAGE_KEYS.LOCAL_CHANGES
+    );
+
+    PERSISTED_COLLECTION_NAMES.forEach(
+        (collectionName) => {
+
+            appState[
+                collectionName
+            ] = [];
+        }
+    );
+
+    appState.currentShift =
+        null;
+
+    appState.shiftStarted =
+        false;
+
+    removeStorage(
+        STORAGE_KEYS.CURRENT_SHIFT
+    );
+
+    if (notify) {
+
+        notifySubscribers();
+    }
+
+    return true;
+}
+
+/************************************************
  * STATUS ZURÜCKSETZEN
  ************************************************/
 
 export function resetAppState({
     preserveData = false,
     preserveSession = false,
+    preserveLocalChanges = false,
     notify = true
 } = {}) {
 
@@ -1376,9 +2096,11 @@ export function resetAppState({
                     result[
                         collectionName
                     ] =
-                        appState[
-                            collectionName
-                        ];
+                        cloneValue(
+                            appState[
+                                collectionName
+                            ]
+                        );
 
                     return result;
                 },
@@ -1388,17 +2110,26 @@ export function resetAppState({
 
     const preservedUser =
         preserveSession
-            ? appState.currentUser
+            ? cloneValue(
+                appState.currentUser
+            )
             : null;
 
     const preservedObject =
         preserveSession
-            ? appState.currentObject
+            ? cloneValue(
+                appState.currentObject
+            )
             : null;
 
     const preservedShift =
-        preserveSession
-            ? appState.currentShift
+        preserveSession &&
+        isRunningShift(
+            appState.currentShift
+        )
+            ? cloneValue(
+                appState.currentShift
+            )
             : null;
 
     const newState =
@@ -1421,7 +2152,12 @@ export function resetAppState({
             shiftStarted:
                 Boolean(
                     preservedShift
-                )
+                ),
+
+            currentRoute:
+                preservedUser
+                    ? DEFAULT_ROUTES.OVERVIEW
+                    : DEFAULT_ROUTES.LOGIN
         }
     );
 
@@ -1439,6 +2175,23 @@ export function resetAppState({
             STORAGE_KEYS.CURRENT_SHIFT
         );
     }
+    else {
+
+        persistSession();
+    }
+
+    if (!preserveLocalChanges) {
+
+        removeStorage(
+            STORAGE_KEYS.LOCAL_CHANGES
+        );
+    }
+    else {
+
+        persistLocalChanges();
+    }
+
+    persistAppMetadata();
 
     if (notify) {
 
@@ -1459,6 +2212,9 @@ export function resetApp() {
             false,
 
         preserveSession:
+            false,
+
+        preserveLocalChanges:
             false,
 
         notify:
