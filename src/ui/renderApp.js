@@ -2,125 +2,105 @@
  * Facility OS
  * renderApp.js
  *
- * Zentrale Benutzeroberfläche
- * - bindet alle neuen App-Seiten ein
- * - mobile App-Struktur
- * - gemeinsamer Header
- * - rollenabhängige Navigation
- * - Login
- * - zentrale Ereignissteuerung
- * - Check-in und Check-out
- * - Objektauswahl
- * - vorbereitete Dialogaktionen
+ * Zentrale UI-Darstellung
+ * - Loginansicht
+ * - rollenabhängige App-Hülle
+ * - Seitenrouting
+ * - zentrale Event-Delegation
+ * - Dialoge und Rückmeldungen
+ * - genau einmal registrierte Listener
  ************************************************/
 
 import {
-    APP_CONFIG,
-    USER_ROLES
-} from "../config/appConfig.js";
-
-import {
-    ROUTES,
-    getRouteTitle
+    ROUTES
 } from "../router.js";
 
-import {
-    renderAppHeader
-} from "./components/appHeader.js";
+import * as AppHeader
+    from "./components/appHeader.js";
 
-import {
-    renderBottomNavigation
-} from "./components/bottomNavigation.js";
+import * as BottomNavigation
+    from "./components/bottomNavigation.js";
 
-import {
-    renderOverviewPage
-} from "./pages/overviewPage.js";
+import * as OverviewPage
+    from "./pages/overviewPage.js";
 
-import {
-    renderObjectsPage
-} from "./pages/objectsPage.js";
+import * as ObjectsPage
+    from "./pages/objectsPage.js";
 
-import {
-    renderObjectDetailPage
-} from "./pages/objectDetailPage.js";
+import * as ObjectDetailPage
+    from "./pages/objectDetailPage.js";
 
-import {
-    renderPersonnelPage
-} from "./pages/personnelPage.js";
+import * as PersonnelPage
+    from "./pages/personnelPage.js";
 
-import {
-    renderCommunicationPage
-} from "./pages/communicationPage.js";
+import * as CommunicationPage
+    from "./pages/communicationPage.js";
 
-import {
-    renderMaterialsPage
-} from "./pages/materialsPage.js";
+import * as MaterialsPage
+    from "./pages/materialsPage.js";
 
-import {
-    renderTasksPage
-} from "./pages/tasksPage.js";
+import * as TasksPage
+    from "./pages/tasksPage.js";
 
-import {
-    renderTimesPage
-} from "./pages/timesPage.js";
+import * as TimesPage
+    from "./pages/timesPage.js";
 
-import {
-    renderAnalysisPage
-} from "./pages/analysisPage.js";
+import * as AnalysisPage
+    from "./pages/analysisPage.js";
 
-import {
-    renderReportsPage
-} from "./pages/reportsPage.js";
+import * as ReportsPage
+    from "./pages/reportsPage.js";
 
-import {
-    renderMorePage
-} from "./pages/morePage.js";
+import * as MorePage
+    from "./pages/morePage.js";
 
-import {
-    renderSettingsPage
-} from "./pages/settingsPage.js";
+import * as SettingsPage
+    from "./pages/settingsPage.js";
 
-import {
-    renderHelpPage
-} from "./pages/helpPage.js";
+import * as HelpPage
+    from "./pages/helpPage.js";
 
-import {
-    renderPrivacyPage
-} from "./pages/privacyPage.js";
+import * as PrivacyPage
+    from "./pages/privacyPage.js";
 
-import {
-    renderImprintPage
-} from "./pages/imprintPage.js";
+import * as ImprintPage
+    from "./pages/imprintPage.js";
 
 /************************************************
- * LOKALER UI-ZUSTAND
+ * LAUFZEITKONTEXT
  ************************************************/
 
-const uiState = {
+let currentContext = {
+    route:
+        ROUTES.LOGIN,
 
-    dialog:
+    state:
         null,
 
-    toast:
+    onNavigate:
         null,
 
-    toastTimer:
+    onLogin:
+        null,
+
+    onLogout:
+        null,
+
+    onCheckin:
+        null,
+
+    onCheckout:
+        null,
+
+    onSelectObject:
         null
 };
 
-/************************************************
- * HTML-SICHERHEIT
- ************************************************/
+let activeDialogElement =
+    null;
 
-function escapeHtml(value) {
-
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
+let toastTimeoutId =
+    null;
 
 /************************************************
  * BASISHELFER
@@ -133,351 +113,529 @@ function asArray(value) {
         : [];
 }
 
+function asObject(value) {
+
+    return (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    )
+        ? value
+        : {};
+}
+
 function normalizeText(value) {
 
     return String(value ?? "")
         .trim();
 }
 
-function normalizeStatus(value) {
+function normalizeRole(value) {
 
     return normalizeText(value)
         .toUpperCase();
 }
 
-function getAppName() {
+function escapeHtml(value) {
 
-    return (
-        APP_CONFIG.APP_NAME ??
-        APP_CONFIG.NAME ??
-        "Facility OS"
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function getAppRoot() {
+
+    return document.getElementById(
+        "app"
     );
+}
+
+function getUserDisplayName(user) {
+
+    return normalizeText(
+        user?.displayName ??
+        user?.fullName ??
+        user?.name ??
+        user?.username ??
+        user?.email
+    ) ||
+    "Benutzer";
 }
 
 function getRoleLabel(role) {
 
     const labels = {
 
-        [USER_ROLES.SUPER_ADMIN]:
-            "Super-Administration",
+        SUPER_ADMIN:
+            "Super-Admin",
 
-        [USER_ROLES.ADMIN]:
+        ADMIN:
             "Administration",
 
-        [USER_ROLES.OBJEKTLEITER]:
+        OBJEKTLEITER:
             "Objektleitung",
 
-        [USER_ROLES.MITARBEITER]:
+        MITARBEITER:
             "Mitarbeiter",
 
-        [USER_ROLES.BUCHHALTUNG]:
+        BUCHHALTUNG:
             "Buchhaltung",
 
-        [USER_ROLES.KUNDE]:
-            "Kundenportal"
+        KUNDE:
+            "Kunde"
     };
 
     return (
         labels[
-            normalizeStatus(role)
+            normalizeRole(role)
         ] ??
         "Benutzer"
     );
 }
 
+function getObjectDisplayName(object) {
+
+    return normalizeText(
+        object?.name ??
+        object?.objectName ??
+        object?.Name ??
+        object?.Objekt_Name
+    ) ||
+    "Kein Objekt ausgewählt";
+}
+
 /************************************************
- * LOGIN-DATEN
+ * MODULFUNKTION ERMITTELN
+ ************************************************/
+
+function resolveModuleFunction(
+    moduleNamespace,
+    candidateNames
+) {
+
+    for (
+        const candidateName
+        of candidateNames
+    ) {
+
+        if (
+            typeof moduleNamespace?.[
+                candidateName
+            ] ===
+            "function"
+        ) {
+
+            return moduleNamespace[
+                candidateName
+            ];
+        }
+    }
+
+    const firstFunction =
+        Object.values(
+            moduleNamespace ??
+            {}
+        ).find(
+            (value) =>
+                typeof value ===
+                "function"
+        );
+
+    return (
+        firstFunction ??
+        null
+    );
+}
+
+function callPageRenderer(
+    moduleNamespace,
+    candidateNames,
+    payload,
+    fallback
+) {
+
+    const renderer =
+        resolveModuleFunction(
+            moduleNamespace,
+            candidateNames
+        );
+
+    if (!renderer) {
+
+        return fallback;
+    }
+
+    try {
+
+        const renderedContent =
+            renderer(
+                payload
+            );
+
+        return (
+            typeof renderedContent ===
+            "string"
+                ? renderedContent
+                : fallback
+        );
+    }
+    catch (error) {
+
+        console.error(
+            "Eine Seite konnte nicht dargestellt werden.",
+            error
+        );
+
+        return renderPageError(
+            "Diese Seite konnte nicht geladen werden.",
+            error
+        );
+    }
+}
+
+/************************************************
+ * STANDARDSEITEN
+ ************************************************/
+
+function renderPageError(
+    message,
+    error = null
+) {
+
+    const technicalMessage =
+        error instanceof Error
+            ? error.message
+            : normalizeText(error);
+
+    return `
+        <section class="page-shell">
+
+            <div class="page-heading">
+
+                <div>
+                    <span class="page-eyebrow">
+                        Facility OS
+                    </span>
+
+                    <h1 class="page-title">
+                        Darstellungsfehler
+                    </h1>
+                </div>
+
+            </div>
+
+            <div class="alert-card alert-error">
+
+                <strong>
+                    ${escapeHtml(message)}
+                </strong>
+
+                ${
+                    technicalMessage
+                        ? `
+                            <p>
+                                ${escapeHtml(
+                                    technicalMessage
+                                )}
+                            </p>
+                        `
+                        : ""
+                }
+
+                <button
+                    type="button"
+                    class="button button-secondary"
+                    data-route="${escapeHtml(
+                        ROUTES.OVERVIEW
+                    )}"
+                >
+                    Zur Startseite
+                </button>
+
+            </div>
+
+        </section>
+    `;
+}
+
+function renderUnknownRoute(route) {
+
+    return `
+        <section class="page-shell">
+
+            <div class="page-heading">
+
+                <div>
+                    <span class="page-eyebrow">
+                        Facility OS
+                    </span>
+
+                    <h1 class="page-title">
+                        Seite nicht gefunden
+                    </h1>
+
+                    <p class="page-subtitle">
+                        Die angeforderte Ansicht ist nicht vorhanden.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="section-card">
+
+                <p>
+                    Unbekannte Route:
+                    <strong>
+                        ${escapeHtml(route)}
+                    </strong>
+                </p>
+
+                <button
+                    type="button"
+                    class="button button-primary button-full"
+                    data-route="${escapeHtml(
+                        ROUTES.OVERVIEW
+                    )}"
+                >
+                    Zur Startseite
+                </button>
+
+            </div>
+
+        </section>
+    `;
+}
+
+/************************************************
+ * LOGIN
  ************************************************/
 
 function getLoginUsers(state) {
 
     return asArray(
-        state.users
-    ).filter(
-        (user) =>
-            user.active !== false
-    );
+        state?.users
+    )
+        .filter(
+            (user) =>
+                user?.active !== false
+        )
+        .sort(
+            (
+                firstUser,
+                secondUser
+            ) =>
+                getUserDisplayName(
+                    firstUser
+                ).localeCompare(
+                    getUserDisplayName(
+                        secondUser
+                    ),
+                    "de"
+                )
+        );
 }
 
 function getLoginIdentifier(user) {
 
-    return (
-        user.username ??
-        user.email ??
-        user.employeeNumber ??
-        user.id ??
-        ""
+    return normalizeText(
+        user?.username ??
+        user?.email ??
+        user?.employeeNumber ??
+        user?.login ??
+        user?.id ??
+        user?.name
     );
-}
-
-function getLoginDisplayName(user) {
-
-    return (
-        user.name ??
-        user.fullName ??
-        user.displayName ??
-        user.email ??
-        user.id ??
-        "Benutzer"
-    );
-}
-
-/************************************************
- * LOGIN-SEITE
- ************************************************/
-
-function renderLoginUserOptions(state) {
-
-    const users =
-        getLoginUsers(state);
-
-    if (
-        users.length === 0
-    ) {
-
-        return `
-            <option value="">
-                Keine Benutzer verfügbar
-            </option>
-        `;
-    }
-
-    return users
-        .map(
-            (user) => {
-
-                const identifier =
-                    getLoginIdentifier(
-                        user
-                    );
-
-                return `
-                    <option
-                        value="${escapeHtml(
-                            identifier
-                        )}"
-                    >
-                        ${escapeHtml(
-                            getLoginDisplayName(
-                                user
-                            )
-                        )}
-                        ·
-                        ${escapeHtml(
-                            getRoleLabel(
-                                user.role
-                            )
-                        )}
-                    </option>
-                `;
-            }
-        )
-        .join("");
 }
 
 function renderLoginPage(state) {
 
-    const testMode =
-        APP_CONFIG.TEST_MODE ===
-        true;
+    const users =
+        getLoginUsers(
+            state
+        );
+
+    const userOptions =
+        users
+            .map(
+                (user) => {
+
+                    const identifier =
+                        getLoginIdentifier(
+                            user
+                        );
+
+                    const label =
+                        `${getUserDisplayName(
+                            user
+                        )} · ${getRoleLabel(
+                            user?.role
+                        )}`;
+
+                    return `
+                        <option
+                            value="${escapeHtml(
+                                identifier
+                            )}"
+                        >
+                            ${escapeHtml(label)}
+                        </option>
+                    `;
+                }
+            )
+            .join("");
 
     return `
-        <main class="facility-login-page">
+        <main class="login-page">
 
-            <section class="facility-login-shell">
+            <section class="login-card">
 
-                <div class="facility-login-brand">
+                <div class="login-brand">
 
-                    <div class="facility-login-logo">
+                    <div
+                        class="login-logo"
+                        aria-hidden="true"
+                    >
                         FO
                     </div>
 
                     <div>
-
-                        <span class="facility-login-eyebrow">
-                            Digitale Objektsteuerung
+                        <span class="login-brand-name">
+                            Facility OS
                         </span>
 
-                        <h1>
-                            ${escapeHtml(
-                                getAppName()
-                            )}
-                        </h1>
-
-                        <p>
-                            Objekte, Personal, Aufgaben und Meldungen
-                            in einer mobilen Anwendung.
-                        </p>
-
+                        <span class="login-version">
+                            Version 2.0
+                        </span>
                     </div>
 
                 </div>
 
+                <div class="login-introduction">
+
+                    <span class="login-badge">
+                        Präsentationsmodus
+                    </span>
+
+                    <h1>
+                        Anmelden
+                    </h1>
+
+                    <p>
+                        Wähle einen Testbenutzer und öffne die passende Arbeitsansicht.
+                    </p>
+
+                </div>
+
+                ${
+                    state?.error
+                        ? `
+                            <div class="alert-card alert-error">
+                                ${escapeHtml(
+                                    state.error
+                                )}
+                            </div>
+                        `
+                        : ""
+                }
+
                 <form
-                    class="facility-login-card"
-                    data-login-form
+                    id="login-form"
+                    class="login-form"
                     novalidate
                 >
 
-                    <header>
+                    <div class="form-group">
 
-                        <span class="facility-login-card-label">
-                            Willkommen
-                        </span>
+                        <label for="login-identifier">
+                            Benutzer
+                        </label>
 
-                        <h2>
-                            Anmelden
-                        </h2>
-
-                        <p>
-                            Melde dich mit deinem Facility-OS-Zugang an.
-                        </p>
-
-                    </header>
-
-                    ${
-                        testMode
-                            ? `
-                                <div class="facility-login-test-notice">
-
-                                    <strong>
-                                        Präsentationsmodus
-                                    </strong>
-
-                                    <span>
-                                        Wähle einen Testbenutzer aus.
-                                    </span>
-
-                                </div>
-
-                                <label class="facility-form-field">
-
-                                    <span>
-                                        Benutzer
-                                    </span>
-
+                        ${
+                            users.length > 0
+                                ? `
                                     <select
+                                        id="login-identifier"
                                         name="identifier"
                                         required
-                                        autocomplete="username"
                                     >
-                                        ${renderLoginUserOptions(
-                                            state
-                                        )}
+                                        <option value="">
+                                            Benutzer auswählen
+                                        </option>
+
+                                        ${userOptions}
                                     </select>
-
-                                </label>
-                            `
-                            : `
-                                <label class="facility-form-field">
-
-                                    <span>
-                                        E-Mail oder Benutzername
-                                    </span>
-
+                                `
+                                : `
                                     <input
-                                        type="text"
+                                        id="login-identifier"
                                         name="identifier"
-                                        placeholder="Benutzername"
+                                        type="text"
                                         autocomplete="username"
+                                        placeholder="Benutzername oder E-Mail"
                                         required
                                     >
+                                `
+                        }
 
-                                </label>
-                            `
-                    }
+                    </div>
 
-                    <label class="facility-form-field">
+                    <div class="form-group">
 
-                        <span>
+                        <label for="login-password">
                             Passwort
-                        </span>
+                        </label>
 
-                        <div class="facility-password-field">
+                        <input
+                            id="login-password"
+                            name="password"
+                            type="password"
+                            autocomplete="current-password"
+                            placeholder="Im Testmodus gegebenenfalls leer lassen"
+                        >
 
-                            <input
-                                type="password"
-                                name="password"
-                                placeholder="${
-                                    testMode
-                                        ? "Im Testmodus optional"
-                                        : "Passwort"
-                                }"
-                                autocomplete="current-password"
-                                ${
-                                    testMode
-                                        ? ""
-                                        : "required"
-                                }
-                            >
+                    </div>
 
-                            <button
-                                type="button"
-                                class="facility-password-toggle"
-                                data-action="toggle-password"
-                                aria-label="Passwort anzeigen"
-                            >
-                                Anzeigen
-                            </button>
-
-                        </div>
-
-                    </label>
-
-                    <p
-                        class="facility-login-error"
-                        data-login-error
-                        hidden
-                    ></p>
+                    <div
+                        id="login-message"
+                        class="form-message"
+                        role="alert"
+                        aria-live="polite"
+                    ></div>
 
                     <button
                         type="submit"
-                        class="facility-login-submit"
+                        class="button button-primary button-full button-large"
                     >
-                        <span>
-                            Anmelden
-                        </span>
-
-                        <span aria-hidden="true">
-                            →
-                        </span>
+                        Anmelden
                     </button>
-
-                    <footer class="facility-login-footer">
-
-                        <span>
-                            Sichere rollenbasierte Anmeldung
-                        </span>
-
-                        <span>
-                            Version
-                            ${escapeHtml(
-                                APP_CONFIG.VERSION ??
-                                APP_CONFIG.APP_VERSION ??
-                                "2.0.0"
-                            )}
-                        </span>
-
-                    </footer>
 
                 </form>
 
-                <div class="facility-login-legal">
+                <div class="login-footer">
 
                     <button
                         type="button"
-                        data-route="${ROUTES.PRIVACY}"
+                        class="text-button"
+                        data-route="${escapeHtml(
+                            ROUTES.PRIVACY
+                        )}"
                     >
                         Datenschutz
                     </button>
 
-                    <span>
+                    <span aria-hidden="true">
                         ·
                     </span>
 
                     <button
                         type="button"
-                        data-route="${ROUTES.IMPRINT}"
+                        class="text-button"
+                        data-route="${escapeHtml(
+                            ROUTES.IMPRINT
+                        )}"
                     >
                         Impressum
                     </button>
@@ -491,1150 +649,492 @@ function renderLoginPage(state) {
 }
 
 /************************************************
- * SEITEN RENDERN
+ * ÖFFENTLICHE SEITEN
+ ************************************************/
+
+function renderPublicPage(
+    moduleNamespace,
+    candidateNames,
+    title
+) {
+
+    const content =
+        callPageRenderer(
+            moduleNamespace,
+            candidateNames,
+            {
+                route:
+                    currentContext.route,
+
+                state:
+                    currentContext.state
+            },
+            `
+                <section class="page-shell">
+
+                    <div class="page-heading">
+
+                        <div>
+                            <h1 class="page-title">
+                                ${escapeHtml(title)}
+                            </h1>
+                        </div>
+
+                    </div>
+
+                    <div class="section-card">
+                        <p>
+                            Für diese Seite sind derzeit keine Inhalte hinterlegt.
+                        </p>
+                    </div>
+
+                </section>
+            `
+        );
+
+    return `
+        <main class="public-page">
+
+            <div class="public-page-toolbar">
+
+                <button
+                    type="button"
+                    class="button button-secondary"
+                    data-action="return-login"
+                >
+                    Zurück zur Anmeldung
+                </button>
+
+            </div>
+
+            ${content}
+
+        </main>
+    `;
+}
+
+/************************************************
+ * HEADER UND NAVIGATION
+ ************************************************/
+
+function renderHeader(state) {
+
+    const renderer =
+        resolveModuleFunction(
+            AppHeader,
+            [
+                "renderAppHeader",
+                "renderHeader"
+            ]
+        );
+
+    if (renderer) {
+
+        try {
+
+            const renderedHeader =
+                renderer(
+                    state
+                );
+
+            if (
+                typeof renderedHeader ===
+                "string"
+            ) {
+
+                return renderedHeader;
+            }
+        }
+        catch (error) {
+
+            console.error(
+                "Der App-Header konnte nicht dargestellt werden.",
+                error
+            );
+        }
+    }
+
+    return `
+        <header class="app-header">
+
+            <div class="app-header-main">
+
+                <div class="app-header-brand">
+                    Facility OS
+                </div>
+
+                <button
+                    type="button"
+                    class="app-header-user"
+                    data-route="${escapeHtml(
+                        ROUTES.MORE
+                    )}"
+                >
+                    <span class="app-header-user-name">
+                        ${escapeHtml(
+                            getUserDisplayName(
+                                state?.currentUser
+                            )
+                        )}
+                    </span>
+
+                    <span class="app-header-user-role">
+                        ${escapeHtml(
+                            getRoleLabel(
+                                state?.currentUser?.role
+                            )
+                        )}
+                    </span>
+                </button>
+
+            </div>
+
+            <div class="app-header-context">
+                ${escapeHtml(
+                    getObjectDisplayName(
+                        state?.currentObject
+                    )
+                )}
+            </div>
+
+        </header>
+    `;
+}
+
+function renderNavigation(
+    state,
+    route
+) {
+
+    const renderer =
+        resolveModuleFunction(
+            BottomNavigation,
+            [
+                "renderBottomNavigation",
+                "renderNavigation"
+            ]
+        );
+
+    if (!renderer) {
+
+        return "";
+    }
+
+    try {
+
+        return (
+            renderer({
+                state,
+                route
+            }) ??
+            ""
+        );
+    }
+    catch (error) {
+
+        console.error(
+            "Die Hauptnavigation konnte nicht dargestellt werden.",
+            error
+        );
+
+        return "";
+    }
+}
+
+/************************************************
+ * SEITENAUSWAHL
  ************************************************/
 
 function renderRouteContent(
     route,
-    state,
-    {
-        onSelectObject
-    }
+    state
 ) {
+
+    const payload = {
+        route,
+        state,
+
+        currentUser:
+            state?.currentUser,
+
+        currentObject:
+            state?.currentObject,
+
+        currentShift:
+            state?.currentShift,
+
+        onNavigate:
+            currentContext.onNavigate,
+
+        onCheckin:
+            currentContext.onCheckin,
+
+        onCheckout:
+            currentContext.onCheckout,
+
+        onSelectObject:
+            currentContext.onSelectObject
+    };
 
     switch (route) {
 
         case ROUTES.OVERVIEW:
 
-            return renderOverviewPage(
-                state
+            return callPageRenderer(
+                OverviewPage,
+                [
+                    "renderOverviewPage",
+                    "renderOverview",
+                    "renderEmployeeDashboard"
+                ],
+                payload,
+                renderPageError(
+                    "Die Startseite ist nicht verfügbar."
+                )
             );
 
         case ROUTES.OBJECTS:
 
-            return renderObjectsPage(
-                state,
-                {
-                    onSelectObject
-                }
+            return callPageRenderer(
+                ObjectsPage,
+                [
+                    "renderObjectsPage",
+                    "renderObjectSelection",
+                    "renderObjects"
+                ],
+                payload,
+                renderPageError(
+                    "Die Objektübersicht ist nicht verfügbar."
+                )
             );
 
         case ROUTES.OBJECT_DETAIL:
 
-            return renderObjectDetailPage(
-                state
-            );
-
-        case ROUTES.MATERIALS:
-
-            return renderMaterialsPage(
-                state
-            );
-
-        case ROUTES.TASKS:
-
-            return renderTasksPage(
-                state
+            return callPageRenderer(
+                ObjectDetailPage,
+                [
+                    "renderObjectDetailPage",
+                    "renderObjectDetail"
+                ],
+                payload,
+                renderPageError(
+                    "Die Objektdetails sind nicht verfügbar."
+                )
             );
 
         case ROUTES.PERSONNEL:
 
-            return renderPersonnelPage(
-                state
+            return callPageRenderer(
+                PersonnelPage,
+                [
+                    "renderPersonnelPage",
+                    "renderPersonnel"
+                ],
+                payload,
+                renderPageError(
+                    "Die Personalansicht ist nicht verfügbar."
+                )
             );
 
         case ROUTES.COMMUNICATION:
 
-            return renderCommunicationPage(
-                state
+            return callPageRenderer(
+                CommunicationPage,
+                [
+                    "renderCommunicationPage",
+                    "renderCommunication"
+                ],
+                payload,
+                renderPageError(
+                    "Die Kommunikationsansicht ist nicht verfügbar."
+                )
+            );
+
+        case ROUTES.MATERIALS:
+
+            return callPageRenderer(
+                MaterialsPage,
+                [
+                    "renderMaterialsPage",
+                    "renderMaterials"
+                ],
+                payload,
+                renderPageError(
+                    "Die Materialansicht ist nicht verfügbar."
+                )
+            );
+
+        case ROUTES.TASKS:
+
+            return callPageRenderer(
+                TasksPage,
+                [
+                    "renderTasksPage",
+                    "renderTasks"
+                ],
+                payload,
+                renderPageError(
+                    "Die Aufgabenansicht ist nicht verfügbar."
+                )
             );
 
         case ROUTES.TIMES:
 
-            return renderTimesPage(
-                state
+            return callPageRenderer(
+                TimesPage,
+                [
+                    "renderTimesPage",
+                    "renderTimes"
+                ],
+                payload,
+                renderPageError(
+                    "Die Zeitenansicht ist nicht verfügbar."
+                )
             );
 
         case ROUTES.ANALYSIS:
 
-            return renderAnalysisPage(
-                state
+            return callPageRenderer(
+                AnalysisPage,
+                [
+                    "renderAnalysisPage",
+                    "renderAnalysis"
+                ],
+                payload,
+                renderPageError(
+                    "Die Auswertung ist nicht verfügbar."
+                )
             );
 
         case ROUTES.REPORTS:
 
-            return renderReportsPage(
-                state
+            return callPageRenderer(
+                ReportsPage,
+                [
+                    "renderReportsPage",
+                    "renderReports"
+                ],
+                payload,
+                renderPageError(
+                    "Die Berichtsansicht ist nicht verfügbar."
+                )
             );
 
         case ROUTES.MORE:
 
-            return renderMorePage(
-                state
+            return callPageRenderer(
+                MorePage,
+                [
+                    "renderMorePage",
+                    "renderMore"
+                ],
+                payload,
+                renderPageError(
+                    "Das Menü ist nicht verfügbar."
+                )
             );
 
         case ROUTES.SETTINGS:
 
-            return renderSettingsPage(
-                state
+            return callPageRenderer(
+                SettingsPage,
+                [
+                    "renderSettingsPage",
+                    "renderSettings"
+                ],
+                payload,
+                renderPageError(
+                    "Die Einstellungen sind nicht verfügbar."
+                )
             );
 
         case ROUTES.HELP:
 
-            return renderHelpPage(
-                state
+            return callPageRenderer(
+                HelpPage,
+                [
+                    "renderHelpPage",
+                    "renderHelp"
+                ],
+                payload,
+                renderPageError(
+                    "Die Hilfe ist nicht verfügbar."
+                )
             );
 
         case ROUTES.PRIVACY:
 
-            return renderPrivacyPage(
-                state
+            return callPageRenderer(
+                PrivacyPage,
+                [
+                    "renderPrivacyPage",
+                    "renderPrivacy"
+                ],
+                payload,
+                renderPageError(
+                    "Die Datenschutzhinweise sind nicht verfügbar."
+                )
             );
 
         case ROUTES.IMPRINT:
 
-            return renderImprintPage(
-                state
+            return callPageRenderer(
+                ImprintPage,
+                [
+                    "renderImprintPage",
+                    "renderImprint"
+                ],
+                payload,
+                renderPageError(
+                    "Das Impressum ist nicht verfügbar."
+                )
             );
 
         default:
 
-            return renderOverviewPage(
-                state
+            return renderUnknownRoute(
+                route
             );
     }
 }
 
 /************************************************
- * APP-ANSICHT
+ * AUTHENTIFIZIERTE APP
  ************************************************/
 
-function renderAuthenticatedApp({
+function renderAuthenticatedApp(
     route,
-    state,
-    onSelectObject
-}) {
-
-    const content =
-        renderRouteContent(
-            route,
-            state,
-            {
-                onSelectObject
-            }
-        );
+    state
+) {
 
     return `
-        <div class="facility-app">
+        <div class="app-layout">
 
-            <div class="facility-app-background"></div>
+            ${renderHeader(state)}
 
-            <div class="facility-app-shell">
-
-                ${renderAppHeader(
+            <main
+                id="app-main-content"
+                class="app-main-content"
+                tabindex="-1"
+            >
+                ${renderRouteContent(
+                    route,
                     state
                 )}
+            </main>
 
-                <main
-                    class="facility-app-content"
-                    aria-label="${escapeHtml(
-                        getRouteTitle(
-                            route
-                        )
-                    )}"
-                >
-
-                    ${content}
-
-                </main>
-
-                ${renderBottomNavigation({
-                    state,
-                    route
-                })}
-
-            </div>
-
-            <div
-                class="facility-live-region"
-                aria-live="polite"
-                aria-atomic="true"
-            ></div>
+            ${renderNavigation(
+                state,
+                route
+            )}
 
         </div>
-    `;
-}
 
-/************************************************
- * DIALOGDATEN
- ************************************************/
-
-const ACTION_DIALOGS =
-    Object.freeze({
-
-        "create-ticket":
-            {
-                title:
-                    "Neue Meldung",
-
-                text:
-                    "Erfasse ein Problem, einen Schaden oder einen wichtigen Hinweis.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "title",
-
-                            label:
-                                "Betreff",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "description",
-
-                            label:
-                                "Beschreibung",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Meldung speichern"
-            },
-
-        "create-problem-ticket":
-            {
-                title:
-                    "Problem melden",
-
-                text:
-                    "Dokumentiere ein Hindernis, einen Schaden oder eine nicht mögliche Aufgabe.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "title",
-
-                            label:
-                                "Problem",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "description",
-
-                            label:
-                                "Beschreibung",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Problem melden"
-            },
-
-        "create-material-ticket":
-            {
-                title:
-                    "Materialmangel",
-
-                text:
-                    "Melde fehlendes oder leeres Material am aktuellen Objekt.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "material",
-
-                            label:
-                                "Material",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "description",
-
-                            label:
-                                "Hinweis",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Materialmangel melden"
-            },
-
-        "create-message":
-            {
-                title:
-                    "Nachricht senden",
-
-                text:
-                    "Erstelle eine interne Nachricht oder eine Mitteilung an die zuständige Stelle.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "subject",
-
-                            label:
-                                "Betreff",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "message",
-
-                            label:
-                                "Nachricht",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Nachricht senden"
-            },
-
-        "create-quick-note":
-            {
-                title:
-                    "Sofort-Notiz",
-
-                text:
-                    "Speichere einen kurzen internen Hinweis.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "message",
-
-                            label:
-                                "Notiz",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Notiz speichern"
-            },
-
-        "create-customer-request":
-            {
-                title:
-                    "Neue Kundenanfrage",
-
-                text:
-                    "Erfasse eine Frage, einen Wunsch oder eine Serviceanfrage.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "subject",
-
-                            label:
-                                "Betreff",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "message",
-
-                            label:
-                                "Anfrage",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Anfrage senden"
-            },
-
-        "create-customer-complaint":
-            {
-                title:
-                    "Reklamation",
-
-                text:
-                    "Beschreibe das festgestellte Problem möglichst genau.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "subject",
-
-                            label:
-                                "Betreff",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "message",
-
-                            label:
-                                "Beschreibung",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Reklamation senden"
-            },
-
-        "create-absence":
-            {
-                title:
-                    "Abwesenheit melden",
-
-                text:
-                    "Erfasse Krankheit, Urlaub oder eine sonstige Abwesenheit.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "type",
-
-                            label:
-                                "Art",
-
-                            type:
-                                "select",
-
-                            options:
-                                [
-                                    "Krankheit",
-                                    "Urlaub",
-                                    "Sonstige Abwesenheit"
-                                ],
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "startDate",
-
-                            label:
-                                "Beginn",
-
-                            type:
-                                "date",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "endDate",
-
-                            label:
-                                "Ende",
-
-                            type:
-                                "date",
-
-                            required:
-                                false
-                        },
-                        {
-                            name:
-                                "note",
-
-                            label:
-                                "Hinweis",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Abwesenheit melden"
-            },
-
-        "create-employee":
-            {
-                title:
-                    "Mitarbeiter anlegen",
-
-                text:
-                    "Erfasse die grundlegenden Benutzerdaten.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "name",
-
-                            label:
-                                "Name",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "email",
-
-                            label:
-                                "E-Mail",
-
-                            type:
-                                "email",
-
-                            required:
-                                false
-                        },
-                        {
-                            name:
-                                "phone",
-
-                            label:
-                                "Telefon",
-
-                            type:
-                                "tel",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Mitarbeiter speichern"
-            },
-
-        "create-shift":
-            {
-                title:
-                    "Schicht anlegen",
-
-                text:
-                    "Plane einen neuen Arbeitseinsatz.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "date",
-
-                            label:
-                                "Datum",
-
-                            type:
-                                "date",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "start",
-
-                            label:
-                                "Beginn",
-
-                            type:
-                                "time",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "end",
-
-                            label:
-                                "Ende",
-
-                            type:
-                                "time",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Schicht speichern"
-            },
-
-        "create-material-order":
-            {
-                title:
-                    "Material bestellen",
-
-                text:
-                    "Bereite eine Materialnachbestellung vor.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "material",
-
-                            label:
-                                "Material",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "quantity",
-
-                            label:
-                                "Menge",
-
-                            type:
-                                "number",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "note",
-
-                            label:
-                                "Hinweis",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Bestellung vormerken"
-            },
-
-        "create-material":
-            {
-                title:
-                    "Material anlegen",
-
-                text:
-                    "Erfasse einen neuen Artikel im Materialstamm.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "name",
-
-                            label:
-                                "Bezeichnung",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "unit",
-
-                            label:
-                                "Einheit",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "dosage",
-
-                            label:
-                                "Dosierung",
-
-                            type:
-                                "text",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Material speichern"
-            },
-
-        "create-task":
-            {
-                title:
-                    "Aufgabe anlegen",
-
-                text:
-                    "Erstelle eine neue Aufgabe für das gewählte Objekt.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "title",
-
-                            label:
-                                "Aufgabe",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "minutes",
-
-                            label:
-                                "Sollzeit in Minuten",
-
-                            type:
-                                "number",
-
-                            required:
-                                false
-                        },
-                        {
-                            name:
-                                "description",
-
-                            label:
-                                "Beschreibung",
-
-                            type:
-                                "textarea",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Aufgabe speichern"
-            },
-
-        "edit-profile":
-            {
-                title:
-                    "Profil bearbeiten",
-
-                text:
-                    "Aktualisiere deine persönlichen Kontaktdaten.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "name",
-
-                            label:
-                                "Name",
-
-                            type:
-                                "text",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "email",
-
-                            label:
-                                "E-Mail",
-
-                            type:
-                                "email",
-
-                            required:
-                                false
-                        },
-                        {
-                            name:
-                                "phone",
-
-                            label:
-                                "Telefon",
-
-                            type:
-                                "tel",
-
-                            required:
-                                false
-                        }
-                    ],
-
-                submitLabel:
-                    "Änderungen speichern"
-            },
-
-        "change-password":
-            {
-                title:
-                    "Passwort ändern",
-
-                text:
-                    "Lege ein neues Passwort für dein Benutzerkonto fest.",
-
-                fields:
-                    [
-                        {
-                            name:
-                                "currentPassword",
-
-                            label:
-                                "Aktuelles Passwort",
-
-                            type:
-                                "password",
-
-                            required:
-                                true
-                        },
-                        {
-                            name:
-                                "newPassword",
-
-                            label:
-                                "Neues Passwort",
-
-                            type:
-                                "password",
-
-                            required:
-                                true
-                        }
-                    ],
-
-                submitLabel:
-                    "Passwort ändern"
-            }
-    });
-
-/************************************************
- * DIALOGFELDER
- ************************************************/
-
-function renderDialogField(field) {
-
-    const requiredAttribute =
-        field.required
-            ? "required"
-            : "";
-
-    if (
-        field.type ===
-        "textarea"
-    ) {
-
-        return `
-            <label class="facility-dialog-field">
-
-                <span>
-                    ${escapeHtml(
-                        field.label
-                    )}
-                </span>
-
-                <textarea
-                    name="${escapeHtml(
-                        field.name
-                    )}"
-                    rows="4"
-                    ${requiredAttribute}
-                ></textarea>
-
-            </label>
-        `;
-    }
-
-    if (
-        field.type ===
-        "select"
-    ) {
-
-        return `
-            <label class="facility-dialog-field">
-
-                <span>
-                    ${escapeHtml(
-                        field.label
-                    )}
-                </span>
-
-                <select
-                    name="${escapeHtml(
-                        field.name
-                    )}"
-                    ${requiredAttribute}
-                >
-
-                    ${asArray(
-                        field.options
-                    )
-                        .map(
-                            (option) => `
-                                <option
-                                    value="${escapeHtml(
-                                        option
-                                    )}"
-                                >
-                                    ${escapeHtml(
-                                        option
-                                    )}
-                                </option>
-                            `
-                        )
-                        .join("")}
-
-                </select>
-
-            </label>
-        `;
-    }
-
-    return `
-        <label class="facility-dialog-field">
-
-            <span>
-                ${escapeHtml(
-                    field.label
-                )}
-            </span>
-
-            <input
-                type="${escapeHtml(
-                    field.type ??
-                    "text"
-                )}"
-                name="${escapeHtml(
-                    field.name
-                )}"
-                ${requiredAttribute}
-            >
-
-        </label>
-    `;
-}
-
-/************************************************
- * DIALOG
- ************************************************/
-
-function renderDialog() {
-
-    const dialog =
-        uiState.dialog;
-
-    if (!dialog) {
-
-        return "";
-    }
-
-    return `
         <div
-            class="facility-dialog-backdrop"
-            data-dialog-backdrop
-        >
-
-            <section
-                class="facility-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="facility-dialog-title"
-            >
-
-                <header class="facility-dialog-header">
-
-                    <div>
-
-                        <span>
-                            Facility OS
-                        </span>
-
-                        <h2 id="facility-dialog-title">
-                            ${escapeHtml(
-                                dialog.title
-                            )}
-                        </h2>
-
-                    </div>
-
-                    <button
-                        type="button"
-                        class="facility-dialog-close"
-                        data-action="close-dialog"
-                        aria-label="Dialog schließen"
-                    >
-                        ×
-                    </button>
-
-                </header>
-
-                ${
-                    dialog.text
-                        ? `
-                            <p class="facility-dialog-description">
-                                ${escapeHtml(
-                                    dialog.text
-                                )}
-                            </p>
-                        `
-                        : ""
-                }
-
-                ${
-                    asArray(
-                        dialog.fields
-                    ).length > 0
-                        ? `
-                            <form
-                                class="facility-dialog-form"
-                                data-dialog-form
-                            >
-
-                                <div class="facility-dialog-fields">
-
-                                    ${dialog.fields
-                                        .map(
-                                            renderDialogField
-                                        )
-                                        .join("")}
-
-                                </div>
-
-                                <div class="facility-dialog-actions">
-
-                                    <button
-                                        type="button"
-                                        class="facility-dialog-secondary"
-                                        data-action="close-dialog"
-                                    >
-                                        Abbrechen
-                                    </button>
-
-                                    <button
-                                        type="submit"
-                                        class="facility-dialog-primary"
-                                    >
-                                        ${escapeHtml(
-                                            dialog.submitLabel ??
-                                            "Speichern"
-                                        )}
-                                    </button>
-
-                                </div>
-
-                            </form>
-                        `
-                        : `
-                            <div class="facility-dialog-actions">
-
-                                <button
-                                    type="button"
-                                    class="facility-dialog-primary"
-                                    data-action="close-dialog"
-                                >
-                                    Schließen
-                                </button>
-
-                            </div>
-                        `
-                }
-
-            </section>
-
-        </div>
+            id="app-overlay-root"
+            class="app-overlay-root"
+            aria-live="polite"
+        ></div>
     `;
 }
 
@@ -1642,110 +1142,76 @@ function renderDialog() {
  * TOAST
  ************************************************/
 
-function renderToast() {
-
-    if (!uiState.toast) {
-
-        return "";
-    }
-
-    return `
-        <div
-            class="
-                facility-toast
-                facility-toast-${escapeHtml(
-                    uiState.toast.type ??
-                    "info"
-                )}
-            "
-            role="status"
-        >
-
-            <strong>
-                ${escapeHtml(
-                    uiState.toast.title ??
-                    "Facility OS"
-                )}
-            </strong>
-
-            <span>
-                ${escapeHtml(
-                    uiState.toast.message
-                )}
-            </span>
-
-        </div>
-    `;
-}
-
-/************************************************
- * OVERLAYS AKTUALISIEREN
- ************************************************/
-
-function updateOverlays(root) {
-
-    root
-        .querySelectorAll(
-            ".facility-dialog-backdrop, .facility-toast"
-        )
-        .forEach(
-            (element) =>
-                element.remove()
-        );
-
-    root.insertAdjacentHTML(
-        "beforeend",
-        renderDialog()
-    );
-
-    root.insertAdjacentHTML(
-        "beforeend",
-        renderToast()
-    );
-}
-
-/************************************************
- * TOAST ANZEIGEN
- ************************************************/
-
 function showToast(
-    root,
-    {
-        title = "Facility OS",
-        message,
-        type = "info"
-    }
+    message,
+    type =
+        "info"
 ) {
 
-    if (
-        uiState.toastTimer
-    ) {
+    const text =
+        normalizeText(
+            message
+        );
 
-        clearTimeout(
-            uiState.toastTimer
+    if (!text) {
+
+        return;
+    }
+
+    let toast =
+        document.getElementById(
+            "app-toast"
+        );
+
+    if (!toast) {
+
+        toast =
+            document.createElement(
+                "div"
+            );
+
+        toast.id =
+            "app-toast";
+
+        toast.className =
+            "app-toast";
+
+        toast.setAttribute(
+            "role",
+            "status"
+        );
+
+        toast.setAttribute(
+            "aria-live",
+            "polite"
+        );
+
+        document.body.appendChild(
+            toast
         );
     }
 
-    uiState.toast = {
+    toast.className =
+        `app-toast app-toast-${normalizeText(
+            type
+        ) || "info"} is-visible`;
 
-        title,
-        message,
-        type
-    };
+    toast.textContent =
+        text;
 
-    updateOverlays(
-        root
-    );
+    if (toastTimeoutId) {
 
-    uiState.toastTimer =
+        window.clearTimeout(
+            toastTimeoutId
+        );
+    }
+
+    toastTimeoutId =
         window.setTimeout(
             () => {
 
-                uiState.toast =
-                    null;
-
-                updateOverlays(
-                    root
+                toast.classList.remove(
+                    "is-visible"
                 );
             },
             3200
@@ -1753,952 +1219,38 @@ function showToast(
 }
 
 /************************************************
- * DIALOG ÖFFNEN
+ * DIALOG
  ************************************************/
 
-function openDialog(
-    root,
-    action
-) {
+function closeDialog() {
 
-    const definition =
-        ACTION_DIALOGS[
-            action
-        ];
+    if (!activeDialogElement) {
 
-    if (definition) {
-
-        uiState.dialog = {
-
-            action,
-            ...definition
-        };
-    }
-    else {
-
-        uiState.dialog = {
-
-            action,
-
-            title:
-                "Funktion vorbereitet",
-
-            text:
-                "Dieser Bereich ist bereits in der Benutzeroberfläche vorgesehen. Die dauerhafte Speicherung wird mit der zentralen Datenanbindung aktiviert.",
-
-            fields:
-                []
-        };
+        return;
     }
 
-    updateOverlays(
-        root
-    );
+    activeDialogElement.remove();
 
-    window.setTimeout(
-        () => {
-
-            const firstField =
-                root.querySelector(
-                    ".facility-dialog input, .facility-dialog textarea, .facility-dialog select"
-                );
-
-            firstField?.focus();
-        },
-        0
-    );
-}
-
-function closeDialog(root) {
-
-    uiState.dialog =
+    activeDialogElement =
         null;
 
-    updateOverlays(
-        root
+    document.body.classList.remove(
+        "dialog-open"
     );
 }
 
-/************************************************
- * LOGIN-EREIGNIS
- ************************************************/
-
-async function handleLoginSubmit(
-    event,
-    {
-        root,
-        onLogin
-    }
-) {
-
-    event.preventDefault();
-
-    const form =
-        event.currentTarget;
-
-    const formData =
-        new FormData(
-            form
-        );
-
-    const identifier =
-        normalizeText(
-            formData.get(
-                "identifier"
-            )
-        );
-
-    const password =
-        String(
-            formData.get(
-                "password"
-            ) ??
-            ""
-        );
-
-    const errorElement =
-        form.querySelector(
-            "[data-login-error]"
-        );
-
-    if (!identifier) {
-
-        if (errorElement) {
-
-            errorElement.textContent =
-                "Bitte wähle einen Benutzer oder gib einen Benutzernamen ein.";
-
-            errorElement.hidden =
-                false;
-        }
-
-        return;
-    }
-
-    const submitButton =
-        form.querySelector(
-            "button[type='submit']"
-        );
-
-    submitButton?.setAttribute(
-        "disabled",
-        "disabled"
-    );
-
-    try {
-
-        const result =
-            await onLogin?.({
-                identifier,
-                password
-            });
-
-        if (
-            result === false
-        ) {
-
-            throw new Error(
-                "Anmeldung nicht möglich."
-            );
-        }
-    }
-    catch (error) {
-
-        if (errorElement) {
-
-            errorElement.textContent =
-                error?.message ??
-                "Die Anmeldung ist fehlgeschlagen.";
-
-            errorElement.hidden =
-                false;
-        }
-
-        submitButton?.removeAttribute(
-            "disabled"
-        );
-
-        showToast(
-            root,
-            {
-                title:
-                    "Anmeldung fehlgeschlagen",
-
-                message:
-                    error?.message ??
-                    "Bitte überprüfe deine Zugangsdaten.",
-
-                type:
-                    "error"
-            }
-        );
-    }
-}
-
-/************************************************
- * OBJEKTAUSWAHL
- ************************************************/
-
-function getObjectIdFromElement(element) {
-
-    return (
-        element.dataset.objectId ??
-        element.dataset.selectObject ??
-        element.dataset.id ??
-        ""
-    );
-}
-
-async function handleObjectSelection(
-    element,
-    {
-        state,
-        onSelectObject,
-        onNavigate,
-        root
-    }
-) {
-
-    const objectId =
-        getObjectIdFromElement(
-            element
-        );
-
-    if (!objectId) {
-
-        return;
-    }
-
-    const object =
-        asArray(state.objects)
-            .find(
-                (entry) =>
-                    entry.id ===
-                    objectId
-            ) ??
-        null;
-
-    try {
-
-        await onSelectObject?.(
-            objectId,
-            object
-        );
-
-        const shouldOpenDetail =
-            element.dataset.openObject ===
-                "true" ||
-            element.dataset.route ===
-                ROUTES.OBJECT_DETAIL ||
-            element.hasAttribute(
-                "data-object-detail"
-            );
-
-        if (shouldOpenDetail) {
-
-            onNavigate?.(
-                ROUTES.OBJECT_DETAIL
-            );
-        }
-    }
-    catch (error) {
-
-        showToast(
-            root,
-            {
-                title:
-                    "Objekt konnte nicht geöffnet werden",
-
-                message:
-                    error?.message ??
-                    "Die Objektauswahl ist fehlgeschlagen.",
-
-                type:
-                    "error"
-            }
-        );
-    }
-}
-
-/************************************************
- * CHECK-IN UND CHECK-OUT
- ************************************************/
-
-async function handleShiftAction(
-    action,
-    {
-        state,
-        onCheckin,
-        onCheckout,
-        root
-    }
-) {
-
-    if (
-        action ===
-        "checkin"
-    ) {
-
-        if (
-            !state.currentObject
-        ) {
-
-            showToast(
-                root,
-                {
-                    title:
-                        "Objekt erforderlich",
-
-                    message:
-                        "Wähle zuerst ein Objekt aus.",
-
-                    type:
-                        "warning"
-                }
-            );
-
-            return;
-        }
-
-        try {
-
-            await onCheckin?.();
-
-            showToast(
-                root,
-                {
-                    title:
-                        "Schicht gestartet",
-
-                    message:
-                        `Check-in für ${
-                            state.currentObject.name ??
-                            state.currentObject.id ??
-                            "das Objekt"
-                        } wurde ausgeführt.`,
-
-                    type:
-                        "success"
-                }
-            );
-        }
-        catch (error) {
-
-            showToast(
-                root,
-                {
-                    title:
-                        "Check-in fehlgeschlagen",
-
-                    message:
-                        error?.message ??
-                        "Die Schicht konnte nicht gestartet werden.",
-
-                    type:
-                        "error"
-                }
-            );
-        }
-
-        return;
-    }
-
-    if (
-        action ===
-        "checkout"
-    ) {
-
-        try {
-
-            await onCheckout?.();
-
-            showToast(
-                root,
-                {
-                    title:
-                        "Schicht beendet",
-
-                    message:
-                        "Der Check-out wurde ausgeführt.",
-
-                    type:
-                        "success"
-                }
-            );
-        }
-        catch (error) {
-
-            showToast(
-                root,
-                {
-                    title:
-                        "Check-out fehlgeschlagen",
-
-                    message:
-                        error?.message ??
-                        "Die Schicht konnte nicht beendet werden.",
-
-                    type:
-                        "error"
-                }
-            );
-        }
-    }
-}
-
-/************************************************
- * SONSTIGE AKTIONEN
- ************************************************/
-
-async function handleUtilityAction(
-    action,
-    {
-        root,
-        onLogout
-    }
-) {
-
-    switch (action) {
-
-        case "logout":
-
-            await onLogout?.();
-
-            return true;
-
-        case "reload-app":
-
-            window.location.reload();
-
-            return true;
-
-        case "close-dialog":
-
-            closeDialog(
-                root
-            );
-
-            return true;
-
-        case "toggle-password": {
-
-            const input =
-                root.querySelector(
-                    ".facility-password-field input"
-                );
-
-            const button =
-                root.querySelector(
-                    "[data-action='toggle-password']"
-                );
-
-            if (!input) {
-
-                return true;
-            }
-
-            const showPassword =
-                input.type ===
-                "password";
-
-            input.type =
-                showPassword
-                    ? "text"
-                    : "password";
-
-            if (button) {
-
-                button.textContent =
-                    showPassword
-                        ? "Ausblenden"
-                        : "Anzeigen";
-            }
-
-            return true;
-        }
-
-        case "reset-test-data":
-
-            if (
-                APP_CONFIG.TEST_MODE !==
-                true
-            ) {
-
-                return true;
-            }
-
-            if (
-                window.confirm(
-                    "Lokale Testdaten wirklich zurücksetzen?"
-                )
-            ) {
-
-                localStorage.clear();
-
-                window.location.reload();
-            }
-
-            return true;
-
-        default:
-
-            return false;
-    }
-}
-
-/************************************************
- * ZENTRALES KLICKEREIGNIS
- ************************************************/
-
-async function handleRootClick(
-    event,
-    context
-) {
-
-    const {
-        root,
-        route,
-        state,
-        onNavigate,
-        onLogout,
-        onCheckin,
-        onCheckout,
-        onSelectObject
-    } = context;
-
-    const routeElement =
-        event.target.closest(
-            "[data-route]"
-        );
-
-    const actionElement =
-        event.target.closest(
-            "[data-action]"
-        );
-
-    const objectElement =
-        event.target.closest(
-            "[data-object-id], [data-select-object], [data-object-detail]"
-        );
-
-    if (
-        event.target ===
-        root.querySelector(
-            "[data-dialog-backdrop]"
-        )
-    ) {
-
-        closeDialog(
-            root
-        );
-
-        return;
-    }
-
-    if (
-        objectElement
-    ) {
-
-        await handleObjectSelection(
-            objectElement,
-            {
-                state,
-                onSelectObject,
-                onNavigate,
-                root
-            }
-        );
-
-        const objectRoute =
-            objectElement.dataset.route;
-
-        if (
-            objectRoute
-        ) {
-
-            onNavigate?.(
-                objectRoute
-            );
-        }
-
-        return;
-    }
-
-    if (
-        actionElement
-    ) {
-
-        const action =
-            normalizeText(
-                actionElement.dataset.action
-            );
-
-        if (!action) {
-
-            return;
-        }
-
-        const handledUtility =
-            await handleUtilityAction(
-                action,
-                {
-                    root,
-                    onLogout
-                }
-            );
-
-        if (handledUtility) {
-
-            return;
-        }
-
-        if (
-            [
-                "checkin",
-                "checkout"
-            ].includes(action)
-        ) {
-
-            await handleShiftAction(
-                action,
-                {
-                    state,
-                    onCheckin,
-                    onCheckout,
-                    root
-                }
-            );
-
-            return;
-        }
-
-        openDialog(
-            root,
-            action
-        );
-
-        return;
-    }
-
-    if (
-        routeElement
-    ) {
-
-        const targetRoute =
-            normalizeText(
-                routeElement.dataset.route
-            );
-
-        if (!targetRoute) {
-
-            return;
-        }
-
-        if (
-            !state.currentUser &&
-            [
-                ROUTES.PRIVACY,
-                ROUTES.IMPRINT
-            ].includes(targetRoute)
-        ) {
-
-            root.innerHTML = `
-                <div class="facility-public-legal-view">
-
-                    <button
-                        type="button"
-                        class="facility-public-back-button"
-                        data-action="return-login"
-                    >
-                        ‹ Zur Anmeldung
-                    </button>
-
-                    ${
-                        targetRoute ===
-                        ROUTES.PRIVACY
-                            ? renderPrivacyPage(
-                                state
-                            )
-                            : renderImprintPage(
-                                state
-                            )
-                    }
-
-                </div>
-            `;
-
-            bindEvents(
-                root,
-                {
-                    ...context,
-                    route
-                }
-            );
-
-            return;
-        }
-
-        onNavigate?.(
-            targetRoute
-        );
-    }
-}
-
-/************************************************
- * DIALOG SPEICHERN
- ************************************************/
-
-function handleDialogSubmit(
-    event,
-    {
-        root
-    }
-) {
-
-    event.preventDefault();
-
-    const form =
-        event.currentTarget;
-
-    if (
-        !form.checkValidity()
-    ) {
-
-        form.reportValidity();
-
-        return;
-    }
-
-    const action =
-        uiState.dialog?.action ??
-        "save";
-
-    uiState.dialog =
-        null;
-
-    updateOverlays(
-        root
-    );
-
-    showToast(
-        root,
-        {
-            title:
-                "Eingabe übernommen",
-
-            message:
-                action.includes(
-                    "message"
-                )
-                    ? "Die Nachricht wurde für die spätere Datenanbindung vorbereitet."
-                    : "Die Eingabe wurde in der Präsentationsansicht bestätigt.",
-
-            type:
-                "success"
-        }
-    );
-}
-
-/************************************************
- * EREIGNISSE BINDEN
- ************************************************/
-
-function bindEvents(
-    root,
-    context
-) {
-
-    root
-        .querySelectorAll(
-            "[data-login-form]"
-        )
-        .forEach(
-            (form) => {
-
-                form.addEventListener(
-                    "submit",
-                    (event) =>
-                        handleLoginSubmit(
-                            event,
-                            {
-                                root,
-                                onLogin:
-                                    context.onLogin
-                            }
-                        )
-                );
-            }
-        );
-
-    root
-        .querySelectorAll(
-            "[data-dialog-form]"
-        )
-        .forEach(
-            (form) => {
-
-                form.addEventListener(
-                    "submit",
-                    (event) =>
-                        handleDialogSubmit(
-                            event,
-                            {
-                                root
-                            }
-                        )
-                );
-            }
-        );
-
-    root.addEventListener(
-        "click",
-        (event) =>
-            handleRootClick(
-                event,
-                context
-            ),
-        {
-            once:
-                true
-        }
-    );
-
-    root.addEventListener(
-        "click",
-        (event) => {
-
-            if (
-                event.target.closest(
-                    "[data-action='return-login']"
-                )
-            ) {
-
-                context.render?.();
-            }
-        },
-        {
-            once:
-                true
-        }
-    );
-}
-
-/************************************************
- * DOKUMENTTITEL
- ************************************************/
-
-function updateDocumentTitle(route) {
-
-    const routeTitle =
-        getRouteTitle(
-            route
-        );
-
-    document.title =
-        `${routeTitle} · ${getAppName()}`;
-}
-
-/************************************************
- * HAUPTFUNKTION
- ************************************************/
-
-export function renderApp({
-    route,
-    state,
-    onNavigate,
-    onLogin,
-    onLogout,
-    onCheckin,
-    onCheckout,
-    onSelectObject
+function openConfirmDialog({
+    title,
+    message,
+    confirmLabel =
+        "Bestätigen",
+    cancelLabel =
+        "Abbrechen",
+    destructive =
+        false,
+    onConfirm
 }) {
 
-    const root =
-        document.getElementById(
-            "app"
-        );
+    closeDialog();
 
-    if (!root) {
-
-        throw new Error(
-            "Das App-Element mit der ID „app“ wurde nicht gefunden."
-        );
-    }
-
-    const safeState =
-        state &&
-        typeof state ===
-        "object"
-            ? state
-            : {};
-
-    const currentRoute =
-        route ??
-        (
-            safeState.currentUser
-                ? ROUTES.OVERVIEW
-                : ROUTES.LOGIN
-        );
-
-    updateDocumentTitle(
-        currentRoute
-    );
-
-    const renderCurrentView =
-        () => {
-
-            if (
-                !safeState.currentUser
-            ) {
-
-                root.innerHTML =
-                    renderLoginPage(
-                        safeState
-                    );
-            }
-            else {
-
-                root.innerHTML =
-                    renderAuthenticatedApp({
-                        route:
-                            currentRoute,
-
-                        state:
-                            safeState,
-
-                        onSelectObject
-                    });
-            }
-
-            root.insertAdjacentHTML(
-                "beforeend",
-                renderDialog()
-            );
-
-            root.insertAdjacentHTML(
-                "beforeend",
-                renderToast()
-            );
-
-            bindEvents(
-                root,
-                {
-                    root,
-                    route:
-                        currentRoute,
-                    state:
-                        safeState,
-                    onNavigate,
-                    onLogin,
-                    onLogout,
-                    onCheckin,
-                    onCheckout,
-                    onSelectObject,
-                    render:
-                        renderCurrentView
-                }
-            );
-        };
-
-    renderCurrentView();
-}
+   
