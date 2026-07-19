@@ -3,11 +3,11 @@
  * overviewPage.js
  *
  * Rollenabhängige Startseite
- * Schwerpunkt:
+ * - kompatibel mit renderOverviewPage(state)
+ * - kompatibel mit renderOverviewPage({ state })
  * - Mitarbeiter-Dashboard
- * - kompakte Schichtkarte
- * - farbiges Funktionsraster
- * - genau ein Icon pro Kachel
+ * - Schichtkarte
+ * - kompaktes Funktionsraster
  ************************************************/
 
 import {
@@ -23,67 +23,143 @@ import {
  ************************************************/
 
 function asArray(value) {
-    return Array.isArray(value) ? value : [];
+
+    return Array.isArray(value)
+        ? value
+        : [];
 }
 
 function normalizeText(value) {
-    return String(value ?? "").trim();
+
+    return String(value ?? "")
+        .trim();
 }
 
 function normalizeRole(value) {
-    return normalizeText(value).toUpperCase();
+
+    return normalizeText(value)
+        .toUpperCase();
 }
 
 function escapeHtml(value) {
+
+    const ampersand =
+        String.fromCharCode(38);
+
+    const replacements = {
+
+        [ampersand]:
+            `${ampersand}amp;`,
+
+        "<":
+            `${ampersand}lt;`,
+
+        ">":
+            `${ampersand}gt;`,
+
+        '"':
+            `${ampersand}quot;`,
+
+        "'":
+            `${ampersand}#039;`
+    };
+
     return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replace(
+            /[&<>"']/g,
+            (character) =>
+                replacements[
+                    character
+                ] ??
+                character
+        );
+}
+
+/*
+ * Das vorhandene renderApp.js übergibt den State
+ * direkt. Andere Versionen können { state } senden.
+ * Diese Funktion unterstützt beide Varianten.
+ */
+function resolveState(payload) {
+
+    if (
+        payload &&
+        typeof payload === "object" &&
+        payload.state &&
+        typeof payload.state === "object"
+    ) {
+
+        return payload.state;
+    }
+
+    if (
+        payload &&
+        typeof payload === "object"
+    ) {
+
+        return payload;
+    }
+
+    return {};
 }
 
 function getUserName(user) {
+
     return normalizeText(
         user?.firstName ??
         user?.displayName ??
         user?.fullName ??
-        user?.name
-    ) || "Benutzer";
+        user?.name ??
+        user?.username
+    ) ||
+    "Benutzer";
 }
 
 function getFirstName(user) {
+
     const name =
-        getUserName(user);
+        getUserName(
+            user
+        );
 
     return (
-        name.split(/\s+/)[0] ||
+        name
+            .split(
+                /\s+/
+            )[0] ||
         name
     );
 }
 
 function getObjectName(object) {
+
     return normalizeText(
         object?.name ??
         object?.objectName ??
         object?.Name ??
         object?.Objekt_Name
-    ) || "Kein Objekt ausgewählt";
+    ) ||
+    "Kein Objekt ausgewählt";
 }
 
 function formatTime(value) {
+
     if (!value) {
+
         return "--:--";
     }
 
     const date =
-        new Date(value);
+        new Date(
+            value
+        );
 
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
+
         return "--:--";
     }
 
@@ -96,20 +172,26 @@ function formatTime(value) {
             minute:
                 "2-digit"
         }
-    ).format(date);
+    ).format(
+        date
+    );
 }
 
 function formatDate(value = new Date()) {
+
     const date =
         value instanceof Date
             ? value
-            : new Date(value);
+            : new Date(
+                value
+            );
 
     if (
         Number.isNaN(
             date.getTime()
         )
     ) {
+
         return "";
     }
 
@@ -125,7 +207,9 @@ function formatDate(value = new Date()) {
             month:
                 "long"
         }
-    ).format(date);
+    ).format(
+        date
+    );
 }
 
 /************************************************
@@ -133,6 +217,7 @@ function formatDate(value = new Date()) {
  ************************************************/
 
 function getOpenTasks(state) {
+
     const currentObjectId =
         state?.currentObject?.id;
 
@@ -140,6 +225,7 @@ function getOpenTasks(state) {
         state?.tasks
     ).filter(
         (task) => {
+
             const status =
                 normalizeRole(
                     task?.status
@@ -150,57 +236,26 @@ function getOpenTasks(state) {
                 task?.objectId ===
                     currentObjectId;
 
-            const isOpen =
+            const open =
                 ![
                     "DONE",
                     "COMPLETED",
                     "FINISHED",
                     "CANCELLED"
-                ].includes(status);
-
-            return (
-                matchesObject &&
-                isOpen
-            );
-        }
-    );
-}
-
-function getOpenMessages(state) {
-    const currentObjectId =
-        state?.currentObject?.id;
-
-    return asArray(
-        state?.tickets
-    ).filter(
-        (ticket) => {
-            const status =
-                normalizeRole(
-                    ticket?.status
+                ].includes(
+                    status
                 );
 
-            const matchesObject =
-                !currentObjectId ||
-                ticket?.objectId ===
-                    currentObjectId;
-
-            const isOpen =
-                ![
-                    "DONE",
-                    "COMPLETED",
-                    "CLOSED",
-                    "CANCELLED"
-                ].includes(status);
-
             return (
                 matchesObject &&
-                isOpen
+                open
             );
         }
     );
 }
 
 function getCompletedTasks(state) {
+
     const currentObjectId =
         state?.currentObject?.id;
 
@@ -208,6 +263,7 @@ function getCompletedTasks(state) {
         state?.tasks
     ).filter(
         (task) => {
+
             const status =
                 normalizeRole(
                     task?.status
@@ -224,7 +280,47 @@ function getCompletedTasks(state) {
                     "DONE",
                     "COMPLETED",
                     "FINISHED"
-                ].includes(status)
+                ].includes(
+                    status
+                )
+            );
+        }
+    );
+}
+
+function getOpenMessages(state) {
+
+    const currentObjectId =
+        state?.currentObject?.id;
+
+    return asArray(
+        state?.tickets
+    ).filter(
+        (ticket) => {
+
+            const status =
+                normalizeRole(
+                    ticket?.status
+                );
+
+            const matchesObject =
+                !currentObjectId ||
+                ticket?.objectId ===
+                    currentObjectId;
+
+            const open =
+                ![
+                    "DONE",
+                    "COMPLETED",
+                    "CLOSED",
+                    "CANCELLED"
+                ].includes(
+                    status
+                );
+
+            return (
+                matchesObject &&
+                open
             );
         }
     );
@@ -235,6 +331,7 @@ function getCompletedTasks(state) {
  ************************************************/
 
 function renderShiftCard(state) {
+
     const running =
         state?.shiftStarted === true &&
         Boolean(
@@ -247,14 +344,21 @@ function renderShiftCard(state) {
         );
 
     if (running) {
+
         return `
             <section class="fo-shift-card fo-shift-card-running">
 
                 <div class="fo-shift-card-header">
 
                     <span class="fo-shift-status">
-                        <span class="fo-shift-status-dot"></span>
+
+                        <span
+                            class="fo-shift-status-dot"
+                            aria-hidden="true"
+                        ></span>
+
                         Schicht läuft
+
                     </span>
 
                     <span class="fo-shift-time">
@@ -270,11 +374,12 @@ function renderShiftCard(state) {
 
                 <div class="fo-shift-card-body">
 
-                    <div class="fo-shift-icon">
-                        <svg
-                            viewBox="0 0 24 24"
-                            aria-hidden="true"
-                        >
+                    <div
+                        class="fo-shift-icon"
+                        aria-hidden="true"
+                    >
+                        <svg viewBox="0 0 24 24">
+
                             <circle
                                 cx="12"
                                 cy="12"
@@ -284,6 +389,7 @@ function renderShiftCard(state) {
                             <path
                                 d="M12 7.5V12l3.2 2"
                             ></path>
+
                         </svg>
                     </div>
 
@@ -336,11 +442,12 @@ function renderShiftCard(state) {
 
             <div class="fo-shift-card-body">
 
-                <div class="fo-shift-icon">
-                    <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                    >
+                <div
+                    class="fo-shift-icon"
+                    aria-hidden="true"
+                >
+                    <svg viewBox="0 0 24 24">
+
                         <circle
                             cx="12"
                             cy="12"
@@ -350,6 +457,7 @@ function renderShiftCard(state) {
                         <path
                             d="M12 7.5V12l3.2 2"
                         ></path>
+
                     </svg>
                 </div>
 
@@ -408,21 +516,28 @@ function renderShiftCard(state) {
 }
 
 /************************************************
- * MITARBEITER-DASHBOARD
+ * MITARBEITER
  ************************************************/
 
 function renderEmployeeOverview(state) {
+
     const user =
         state?.currentUser;
 
     const openTasks =
-        getOpenTasks(state);
+        getOpenTasks(
+            state
+        );
 
     const completedTasks =
-        getCompletedTasks(state);
+        getCompletedTasks(
+            state
+        );
 
     const openMessages =
-        getOpenMessages(state);
+        getOpenMessages(
+            state
+        );
 
     return `
         <section class="fo-overview">
@@ -430,13 +545,16 @@ function renderEmployeeOverview(state) {
             <header class="fo-overview-welcome">
 
                 <div>
+
                     <span class="fo-overview-eyebrow">
                         Mein Arbeitstag
                     </span>
 
                     <h1>
                         Hallo, ${escapeHtml(
-                            getFirstName(user)
+                            getFirstName(
+                                user
+                            )
                         )}
                     </h1>
 
@@ -456,6 +574,7 @@ function renderEmployeeOverview(state) {
                                 : "Wähle dein heutiges Objekt aus."
                         }
                     </p>
+
                 </div>
 
                 <div
@@ -463,8 +582,13 @@ function renderEmployeeOverview(state) {
                     aria-hidden="true"
                 >
                     ${escapeHtml(
-                        getFirstName(user)
-                            .slice(0, 1)
+                        getFirstName(
+                            user
+                        )
+                            .slice(
+                                0,
+                                1
+                            )
                             .toUpperCase()
                     )}
                 </div>
@@ -478,6 +602,7 @@ function renderEmployeeOverview(state) {
                 <div class="fo-section-heading">
 
                     <div>
+
                         <span>
                             Heute
                         </span>
@@ -485,6 +610,7 @@ function renderEmployeeOverview(state) {
                         <h2>
                             Deine Bereiche
                         </h2>
+
                     </div>
 
                     <span class="fo-section-date">
@@ -578,7 +704,9 @@ function renderEmployeeOverview(state) {
                             "purple",
 
                         route:
-                            ROUTES.OBJECT_DETAIL
+                            state?.currentObject
+                                ? ROUTES.OBJECT_DETAIL
+                                : ROUTES.OBJECTS
                     })}
 
                 </div>
@@ -590,6 +718,7 @@ function renderEmployeeOverview(state) {
                 <div class="fo-section-heading">
 
                     <div>
+
                         <span>
                             Direkt öffnen
                         </span>
@@ -597,6 +726,7 @@ function renderEmployeeOverview(state) {
                         <h2>
                             Schnellzugriff
                         </h2>
+
                     </div>
 
                 </div>
@@ -684,10 +814,11 @@ function renderEmployeeOverview(state) {
  ************************************************/
 
 function renderManagementOverview(state) {
-    const role =
-        normalizeRole(
-            state?.currentUser?.role
-        );
+
+    const objectCount =
+        asArray(
+            state?.objects
+        ).length;
 
     return `
         <section class="fo-overview">
@@ -695,6 +826,7 @@ function renderManagementOverview(state) {
             <header class="fo-overview-welcome">
 
                 <div>
+
                     <span class="fo-overview-eyebrow">
                         Facility OS
                     </span>
@@ -708,12 +840,9 @@ function renderManagementOverview(state) {
                     </h1>
 
                     <p>
-                        ${
-                            role === "KUNDE"
-                                ? "Übersicht über deine freigegebenen Objekte."
-                                : "Zentrale Übersicht für deinen Arbeitsbereich."
-                        }
+                        Zentrale Übersicht für deinen Arbeitsbereich.
                     </p>
+
                 </div>
 
                 <div
@@ -724,7 +853,10 @@ function renderManagementOverview(state) {
                         getFirstName(
                             state?.currentUser
                         )
-                            .slice(0, 1)
+                            .slice(
+                                0,
+                                1
+                            )
                             .toUpperCase()
                     )}
                 </div>
@@ -736,6 +868,7 @@ function renderManagementOverview(state) {
                 <div class="fo-section-heading">
 
                     <div>
+
                         <span>
                             Übersicht
                         </span>
@@ -743,6 +876,7 @@ function renderManagementOverview(state) {
                         <h2>
                             Hauptbereiche
                         </h2>
+
                     </div>
 
                 </div>
@@ -754,9 +888,7 @@ function renderManagementOverview(state) {
                             "Objekte",
 
                         description:
-                            `${asArray(
-                                state?.objects
-                            ).length} vorhanden`,
+                            `${objectCount} vorhanden`,
 
                         icon:
                             "building",
@@ -828,12 +960,16 @@ function renderManagementOverview(state) {
 }
 
 /************************************************
- * HAUPTFUNKTION
+ * HAUPTFUNKTIONEN
  ************************************************/
 
-export function renderOverviewPage({
-    state
-}) {
+export function renderOverviewPage(payload) {
+
+    const state =
+        resolveState(
+            payload
+        );
+
     const role =
         normalizeRole(
             state?.currentUser?.role
@@ -843,6 +979,7 @@ export function renderOverviewPage({
         role ===
         "MITARBEITER"
     ) {
+
         return renderEmployeeOverview(
             state
         );
@@ -854,12 +991,14 @@ export function renderOverviewPage({
 }
 
 export function renderOverview(payload) {
+
     return renderOverviewPage(
         payload
     );
 }
 
 export function renderEmployeeDashboard(payload) {
+
     return renderOverviewPage(
         payload
     );
