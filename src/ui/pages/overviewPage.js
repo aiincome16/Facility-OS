@@ -2,12 +2,11 @@
  * Facility OS
  * overviewPage.js
  *
- * Rollenabhängige Startseite
- * - kompatibel mit renderOverviewPage(state)
- * - kompatibel mit renderOverviewPage({ state })
+ * Stabile rollenabhängige Startseite
  * - Mitarbeiter-Dashboard
- * - Schichtkarte
- * - kompaktes Funktionsraster
+ * - Schichtstatus
+ * - kompaktes Kachelraster
+ * - kompatible Aufrufsignaturen
  ************************************************/
 
 import {
@@ -23,72 +22,35 @@ import {
  ************************************************/
 
 function asArray(value) {
-
     return Array.isArray(value)
         ? value
         : [];
 }
 
 function normalizeText(value) {
-
-    return String(value ?? "")
-        .trim();
+    return String(value ?? "").trim();
 }
 
 function normalizeRole(value) {
-
-    return normalizeText(value)
-        .toUpperCase();
+    return normalizeText(value).toUpperCase();
 }
 
 function escapeHtml(value) {
-
-    const ampersand =
-        String.fromCharCode(38);
-
-    const replacements = {
-
-        [ampersand]:
-            `${ampersand}amp;`,
-
-        "<":
-            `${ampersand}lt;`,
-
-        ">":
-            `${ampersand}gt;`,
-
-        '"':
-            `${ampersand}quot;`,
-
-        "'":
-            `${ampersand}#039;`
-    };
-
     return String(value ?? "")
-        .replace(
-            /[&<>"']/g,
-            (character) =>
-                replacements[
-                    character
-                ] ??
-                character
-        );
+        .split("&").join("&amp;")
+        .split("<").join("&lt;")
+        .split(">").join("&gt;")
+        .split('"').join("&quot;")
+        .split("'").join("&#039;");
 }
 
-/*
- * Das vorhandene renderApp.js übergibt den State
- * direkt. Andere Versionen können { state } senden.
- * Diese Funktion unterstützt beide Varianten.
- */
 function resolveState(payload) {
-
     if (
         payload &&
         typeof payload === "object" &&
         payload.state &&
         typeof payload.state === "object"
     ) {
-
         return payload.state;
     }
 
@@ -96,7 +58,6 @@ function resolveState(payload) {
         payload &&
         typeof payload === "object"
     ) {
-
         return payload;
     }
 
@@ -104,225 +65,132 @@ function resolveState(payload) {
 }
 
 function getUserName(user) {
-
     return normalizeText(
-        user?.firstName ??
         user?.displayName ??
         user?.fullName ??
         user?.name ??
-        user?.username
-    ) ||
-    "Benutzer";
+        user?.username ??
+        user?.email
+    ) || "Benutzer";
 }
 
 function getFirstName(user) {
+    const fullName =
+        getUserName(user);
 
-    const name =
-        getUserName(
-            user
-        );
-
-    return (
-        name
-            .split(
-                /\s+/
-            )[0] ||
-        name
-    );
+    return fullName.split(/\s+/)[0] || fullName;
 }
 
 function getObjectName(object) {
-
     return normalizeText(
         object?.name ??
         object?.objectName ??
         object?.Name ??
         object?.Objekt_Name
-    ) ||
-    "Kein Objekt ausgewählt";
+    ) || "Kein Objekt ausgewählt";
 }
 
 function formatTime(value) {
-
     if (!value) {
-
         return "--:--";
     }
 
     const date =
-        new Date(
-            value
-        );
+        new Date(value);
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-
+    if (Number.isNaN(date.getTime())) {
         return "--:--";
     }
 
     return new Intl.DateTimeFormat(
         "de-DE",
         {
-            hour:
-                "2-digit",
-
-            minute:
-                "2-digit"
+            hour: "2-digit",
+            minute: "2-digit"
         }
-    ).format(
-        date
-    );
+    ).format(date);
 }
 
-function formatDate(value = new Date()) {
-
-    const date =
-        value instanceof Date
-            ? value
-            : new Date(
-                value
-            );
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-
-        return "";
-    }
-
+function formatDate() {
     return new Intl.DateTimeFormat(
         "de-DE",
         {
-            weekday:
-                "long",
-
-            day:
-                "2-digit",
-
-            month:
-                "long"
+            weekday: "long",
+            day: "2-digit",
+            month: "long"
         }
-    ).format(
-        date
-    );
+    ).format(new Date());
 }
 
 /************************************************
  * DATEN AUSWERTEN
  ************************************************/
 
-function getOpenTasks(state) {
-
-    const currentObjectId =
+function belongsToCurrentObject(entry, state) {
+    const objectId =
         state?.currentObject?.id;
 
-    return asArray(
-        state?.tasks
-    ).filter(
-        (task) => {
+    if (!objectId) {
+        return true;
+    }
 
-            const status =
-                normalizeRole(
-                    task?.status
-                );
+    return entry?.objectId === objectId;
+}
 
-            const matchesObject =
-                !currentObjectId ||
-                task?.objectId ===
-                    currentObjectId;
+function isFinishedStatus(status) {
+    return [
+        "DONE",
+        "COMPLETED",
+        "FINISHED",
+        "CLOSED",
+        "CANCELLED"
+    ].includes(
+        normalizeRole(status)
+    );
+}
 
-            const open =
-                ![
-                    "DONE",
-                    "COMPLETED",
-                    "FINISHED",
-                    "CANCELLED"
-                ].includes(
-                    status
-                );
-
-            return (
-                matchesObject &&
-                open
-            );
-        }
+function getOpenTasks(state) {
+    return asArray(state?.tasks).filter(
+        (task) =>
+            belongsToCurrentObject(
+                task,
+                state
+            ) &&
+            !isFinishedStatus(
+                task?.status
+            )
     );
 }
 
 function getCompletedTasks(state) {
-
-    const currentObjectId =
-        state?.currentObject?.id;
-
-    return asArray(
-        state?.tasks
-    ).filter(
-        (task) => {
-
-            const status =
+    return asArray(state?.tasks).filter(
+        (task) =>
+            belongsToCurrentObject(
+                task,
+                state
+            ) &&
+            [
+                "DONE",
+                "COMPLETED",
+                "FINISHED"
+            ].includes(
                 normalizeRole(
                     task?.status
-                );
-
-            const matchesObject =
-                !currentObjectId ||
-                task?.objectId ===
-                    currentObjectId;
-
-            return (
-                matchesObject &&
-                [
-                    "DONE",
-                    "COMPLETED",
-                    "FINISHED"
-                ].includes(
-                    status
                 )
-            );
-        }
+            )
     );
 }
 
 function getOpenMessages(state) {
-
-    const currentObjectId =
-        state?.currentObject?.id;
-
-    return asArray(
-        state?.tickets
-    ).filter(
-        (ticket) => {
-
-            const status =
-                normalizeRole(
-                    ticket?.status
-                );
-
-            const matchesObject =
-                !currentObjectId ||
-                ticket?.objectId ===
-                    currentObjectId;
-
-            const open =
-                ![
-                    "DONE",
-                    "COMPLETED",
-                    "CLOSED",
-                    "CANCELLED"
-                ].includes(
-                    status
-                );
-
-            return (
-                matchesObject &&
-                open
-            );
-        }
+    return asArray(state?.tickets).filter(
+        (ticket) =>
+            belongsToCurrentObject(
+                ticket,
+                state
+            ) &&
+            !isFinishedStatus(
+                ticket?.status
+            )
     );
 }
 
@@ -330,42 +198,38 @@ function getOpenMessages(state) {
  * SCHICHTKARTE
  ************************************************/
 
-function renderShiftCard(state) {
+function renderShiftIcon() {
+    return `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5"></circle>
+            <path d="M12 7.5V12l3.2 2"></path>
+        </svg>
+    `;
+}
 
-    const running =
+function renderShiftCard(state) {
+    const shiftRunning =
         state?.shiftStarted === true &&
-        Boolean(
-            state?.currentShift
-        );
+        Boolean(state?.currentShift);
 
     const objectSelected =
-        Boolean(
-            state?.currentObject
-        );
+        Boolean(state?.currentObject);
 
-    if (running) {
-
+    if (shiftRunning) {
         return `
             <section class="fo-shift-card fo-shift-card-running">
 
                 <div class="fo-shift-card-header">
 
                     <span class="fo-shift-status">
-
-                        <span
-                            class="fo-shift-status-dot"
-                            aria-hidden="true"
-                        ></span>
-
+                        <span class="fo-shift-status-dot"></span>
                         Schicht läuft
-
                     </span>
 
                     <span class="fo-shift-time">
                         Seit ${escapeHtml(
                             formatTime(
-                                state.currentShift
-                                    ?.startTime
+                                state.currentShift?.startTime
                             )
                         )}
                     </span>
@@ -374,23 +238,8 @@ function renderShiftCard(state) {
 
                 <div class="fo-shift-card-body">
 
-                    <div
-                        class="fo-shift-icon"
-                        aria-hidden="true"
-                    >
-                        <svg viewBox="0 0 24 24">
-
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="8.5"
-                            ></circle>
-
-                            <path
-                                d="M12 7.5V12l3.2 2"
-                            ></path>
-
-                        </svg>
+                    <div class="fo-shift-icon">
+                        ${renderShiftIcon()}
                     </div>
 
                     <div class="fo-shift-copy">
@@ -433,32 +282,15 @@ function renderShiftCard(state) {
                 </span>
 
                 <span class="fo-shift-time">
-                    ${escapeHtml(
-                        formatDate()
-                    )}
+                    ${escapeHtml(formatDate())}
                 </span>
 
             </div>
 
             <div class="fo-shift-card-body">
 
-                <div
-                    class="fo-shift-icon"
-                    aria-hidden="true"
-                >
-                    <svg viewBox="0 0 24 24">
-
-                        <circle
-                            cx="12"
-                            cy="12"
-                            r="8.5"
-                        ></circle>
-
-                        <path
-                            d="M12 7.5V12l3.2 2"
-                        ></path>
-
-                    </svg>
+                <div class="fo-shift-icon">
+                    ${renderShiftIcon()}
                 </div>
 
                 <div class="fo-shift-copy">
@@ -516,28 +348,18 @@ function renderShiftCard(state) {
 }
 
 /************************************************
- * MITARBEITER
+ * MITARBEITER-DASHBOARD
  ************************************************/
 
 function renderEmployeeOverview(state) {
-
-    const user =
-        state?.currentUser;
-
     const openTasks =
-        getOpenTasks(
-            state
-        );
+        getOpenTasks(state);
 
     const completedTasks =
-        getCompletedTasks(
-            state
-        );
+        getCompletedTasks(state);
 
     const openMessages =
-        getOpenMessages(
-            state
-        );
+        getOpenMessages(state);
 
     return `
         <section class="fo-overview">
@@ -553,14 +375,14 @@ function renderEmployeeOverview(state) {
                     <h1>
                         Hallo, ${escapeHtml(
                             getFirstName(
-                                user
+                                state.currentUser
                             )
                         )}
                     </h1>
 
                     <p>
                         ${
-                            state?.currentObject
+                            state.currentObject
                                 ? `
                                     Einsatz:
                                     <strong>
@@ -577,18 +399,12 @@ function renderEmployeeOverview(state) {
 
                 </div>
 
-                <div
-                    class="fo-user-avatar"
-                    aria-hidden="true"
-                >
+                <div class="fo-user-avatar" aria-hidden="true">
                     ${escapeHtml(
                         getFirstName(
-                            user
+                            state.currentUser
                         )
-                            .slice(
-                                0,
-                                1
-                            )
+                            .slice(0, 1)
                             .toUpperCase()
                     )}
                 </div>
@@ -602,21 +418,12 @@ function renderEmployeeOverview(state) {
                 <div class="fo-section-heading">
 
                     <div>
-
-                        <span>
-                            Heute
-                        </span>
-
-                        <h2>
-                            Deine Bereiche
-                        </h2>
-
+                        <span>Heute</span>
+                        <h2>Deine Bereiche</h2>
                     </div>
 
                     <span class="fo-section-date">
-                        ${escapeHtml(
-                            formatDate()
-                        )}
+                        ${escapeHtml(formatDate())}
                     </span>
 
                 </div>
@@ -624,89 +431,52 @@ function renderEmployeeOverview(state) {
                 <div class="fo-module-grid">
 
                     ${renderModuleCard({
-                        title:
-                            "Mein Objekt",
-
-                        description:
-                            state?.currentObject
-                                ? getObjectName(
-                                    state.currentObject
-                                )
-                                : "Objekt auswählen",
-
-                        icon:
-                            "building",
-
-                        tone:
-                            "blue",
-
-                        route:
-                            ROUTES.OBJECTS
+                        title: "Mein Objekt",
+                        description: state.currentObject
+                            ? getObjectName(
+                                state.currentObject
+                            )
+                            : "Objekt auswählen",
+                        icon: "building",
+                        tone: "blue",
+                        route: ROUTES.OBJECTS
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Aufgaben",
-
+                        title: "Aufgaben",
                         description:
                             `${openTasks.length} offen · ${completedTasks.length} erledigt`,
-
-                        icon:
-                            "tasks",
-
-                        tone:
-                            "green",
-
-                        route:
-                            ROUTES.TASKS,
-
-                        badge:
-                            String(
-                                openTasks.length
-                            )
+                        icon: "tasks",
+                        tone: "green",
+                        route: ROUTES.TASKS,
+                        badge: String(
+                            openTasks.length
+                        )
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Meldungen",
-
+                        title: "Meldungen",
                         description:
                             openMessages.length > 0
                                 ? `${openMessages.length} offen`
                                 : "Keine offenen Meldungen",
-
-                        icon:
-                            "message",
-
-                        tone:
-                            "orange",
-
-                        route:
-                            ROUTES.COMMUNICATION,
-
-                        badge:
-                            String(
-                                openMessages.length
-                            )
+                        icon: "message",
+                        tone: "orange",
+                        route: ROUTES.COMMUNICATION,
+                        badge: String(
+                            openMessages.length
+                        )
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Objekt-Guide",
-
+                        title: "Objekt-Guide",
                         description:
                             "Anleitung und Sicherheit",
-
-                        icon:
-                            "guide",
-
-                        tone:
-                            "purple",
-
-                        route:
-                            state?.currentObject
-                                ? ROUTES.OBJECT_DETAIL
-                                : ROUTES.OBJECTS
+                        icon: "guide",
+                        tone: "purple",
+                        route: state.currentObject
+                            ? ROUTES.OBJECT_DETAIL
+                            : ROUTES.OBJECTS
                     })}
 
                 </div>
@@ -718,15 +488,8 @@ function renderEmployeeOverview(state) {
                 <div class="fo-section-heading">
 
                     <div>
-
-                        <span>
-                            Direkt öffnen
-                        </span>
-
-                        <h2>
-                            Schnellzugriff
-                        </h2>
-
+                        <span>Direkt öffnen</span>
+                        <h2>Schnellzugriff</h2>
                     </div>
 
                 </div>
@@ -734,71 +497,39 @@ function renderEmployeeOverview(state) {
                 <div class="fo-module-grid fo-module-grid-secondary">
 
                     ${renderModuleCard({
-                        title:
-                            "Material",
-
+                        title: "Material",
                         description:
                             "Bestand und Bedarf",
-
-                        icon:
-                            "material",
-
-                        tone:
-                            "yellow",
-
-                        route:
-                            ROUTES.MATERIALS
+                        icon: "material",
+                        tone: "yellow",
+                        route: ROUTES.MATERIALS
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Zeiten",
-
+                        title: "Zeiten",
                         description:
                             "Arbeitszeiten ansehen",
-
-                        icon:
-                            "calendar",
-
-                        tone:
-                            "blue",
-
-                        route:
-                            ROUTES.TIMES
+                        icon: "calendar",
+                        tone: "blue",
+                        route: ROUTES.TIMES
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Hilfe",
-
+                        title: "Hilfe",
                         description:
                             "Anleitung und Kontakt",
-
-                        icon:
-                            "help",
-
-                        tone:
-                            "green",
-
-                        route:
-                            ROUTES.HELP
+                        icon: "help",
+                        tone: "green",
+                        route: ROUTES.HELP
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Mehr",
-
+                        title: "Mehr",
                         description:
                             "Urlaub, Profil und Einstellungen",
-
-                        icon:
-                            "more",
-
-                        tone:
-                            "purple",
-
-                        route:
-                            ROUTES.MORE
+                        icon: "more",
+                        tone: "purple",
+                        route: ROUTES.MORE
                     })}
 
                 </div>
@@ -813,12 +544,9 @@ function renderEmployeeOverview(state) {
  * ANDERE ROLLEN
  ************************************************/
 
-function renderManagementOverview(state) {
-
+function renderGeneralOverview(state) {
     const objectCount =
-        asArray(
-            state?.objects
-        ).length;
+        asArray(state?.objects).length;
 
     return `
         <section class="fo-overview">
@@ -834,7 +562,7 @@ function renderManagementOverview(state) {
                     <h1>
                         Hallo, ${escapeHtml(
                             getFirstName(
-                                state?.currentUser
+                                state.currentUser
                             )
                         )}
                     </h1>
@@ -845,18 +573,12 @@ function renderManagementOverview(state) {
 
                 </div>
 
-                <div
-                    class="fo-user-avatar"
-                    aria-hidden="true"
-                >
+                <div class="fo-user-avatar" aria-hidden="true">
                     ${escapeHtml(
                         getFirstName(
-                            state?.currentUser
+                            state.currentUser
                         )
-                            .slice(
-                                0,
-                                1
-                            )
+                            .slice(0, 1)
                             .toUpperCase()
                     )}
                 </div>
@@ -866,89 +588,48 @@ function renderManagementOverview(state) {
             <section class="fo-dashboard-section">
 
                 <div class="fo-section-heading">
-
                     <div>
-
-                        <span>
-                            Übersicht
-                        </span>
-
-                        <h2>
-                            Hauptbereiche
-                        </h2>
-
+                        <span>Übersicht</span>
+                        <h2>Hauptbereiche</h2>
                     </div>
-
                 </div>
 
                 <div class="fo-module-grid">
 
                     ${renderModuleCard({
-                        title:
-                            "Objekte",
-
+                        title: "Objekte",
                         description:
                             `${objectCount} vorhanden`,
-
-                        icon:
-                            "building",
-
-                        tone:
-                            "blue",
-
-                        route:
-                            ROUTES.OBJECTS
+                        icon: "building",
+                        tone: "blue",
+                        route: ROUTES.OBJECTS
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Meldungen",
-
+                        title: "Meldungen",
                         description:
                             "Tickets und Kommunikation",
-
-                        icon:
-                            "message",
-
-                        tone:
-                            "orange",
-
-                        route:
-                            ROUTES.COMMUNICATION
+                        icon: "message",
+                        tone: "orange",
+                        route: ROUTES.COMMUNICATION
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Berichte",
-
+                        title: "Berichte",
                         description:
                             "Auswertungen öffnen",
-
-                        icon:
-                            "tasks",
-
-                        tone:
-                            "green",
-
-                        route:
-                            ROUTES.REPORTS
+                        icon: "tasks",
+                        tone: "green",
+                        route: ROUTES.REPORTS
                     })}
 
                     ${renderModuleCard({
-                        title:
-                            "Mehr",
-
+                        title: "Mehr",
                         description:
                             "Weitere Funktionen",
-
-                        icon:
-                            "more",
-
-                        tone:
-                            "purple",
-
-                        route:
-                            ROUTES.MORE
+                        icon: "more",
+                        tone: "purple",
+                        route: ROUTES.MORE
                     })}
 
                 </div>
@@ -960,46 +641,29 @@ function renderManagementOverview(state) {
 }
 
 /************************************************
- * HAUPTFUNKTIONEN
+ * EXPORTS
  ************************************************/
 
 export function renderOverviewPage(payload) {
-
     const state =
-        resolveState(
-            payload
-        );
+        resolveState(payload);
 
     const role =
         normalizeRole(
             state?.currentUser?.role
         );
 
-    if (
-        role ===
-        "MITARBEITER"
-    ) {
-
-        return renderEmployeeOverview(
-            state
-        );
+    if (role === "MITARBEITER") {
+        return renderEmployeeOverview(state);
     }
 
-    return renderManagementOverview(
-        state
-    );
+    return renderGeneralOverview(state);
 }
 
 export function renderOverview(payload) {
-
-    return renderOverviewPage(
-        payload
-    );
+    return renderOverviewPage(payload);
 }
 
 export function renderEmployeeDashboard(payload) {
-
-    return renderOverviewPage(
-        payload
-    );
+    return renderOverviewPage(payload);
 }
