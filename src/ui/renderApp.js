@@ -1,428 +1,134 @@
 import { ROUTES } from "../router.js";
+import { renderDashboardPage } from "./pages/dashboardPage.js";
 
-const runtime = {
-    route: ROUTES.LOGIN,
-    state: {},
-    onNavigate: null,
-    onLogin: null,
-    onLogout: null,
-    onSelectObject: null
-};
+const runtime={route:ROUTES.LOGIN,state:{},onNavigate:null,onLogin:null,onLogout:null,onCheckin:null,onCheckout:null,onSelectObject:null};
+let eventsBound=false;
 
-let eventsBound = false;
+const arr=v=>Array.isArray(v)?v:[];
+const txt=v=>String(v??"").trim();
+const esc=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+const root=()=>document.getElementById("app");
+const userName=u=>txt(u?.displayName??u?.fullName??u?.name??u?.email)||"Benutzer";
+const roleLabel=r=>({SUPER_ADMIN:"Super-Admin",ADMIN:"Administrator",OBJEKTLEITER:"Objektleiter",MITARBEITER:"Mitarbeiter",BUCHHALTUNG:"Buchhaltung",KUNDE:"Kunde"}[txt(r).toUpperCase()]??"Benutzer");
+const oid=o=>txt(o?.id??o?.objectId??o?.ID);
+const oname=o=>txt(o?.name??o?.objectName??o?.Name??o?.Objekt_Name)||"Objekt";
 
-const asArray = (value) => Array.isArray(value) ? value : [];
+const svg=n=>({
+logo:'<svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16"/><path d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>',
+home:'<svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+tasks:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m4 6 1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>',
+message:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>',
+more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>',
+arrow:'<svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>',
+rooms:'<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M12 4v16M4 12h16"/></svg>',
+box:'<svg viewBox="0 0 24 24"><path d="M4 7 12 3l8 4-8 4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>',
+guide:'<svg viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M8 8h7M8 12h7"/></svg>',
+shield:'<svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6z"/></svg>'
+}[n]??"");
 
-const escapeHtml = (value) =>
-    String(value ?? "")
-        .split("&").join("&amp;")
-        .split("<").join("&lt;")
-        .split(">").join("&gt;")
-        .split('"').join("&quot;")
-        .split("'").join("&#039;");
-
-function getRoot() {
-    return document.getElementById("app");
+function renderLogin(state){
+  const users=arr(state?.users).filter(u=>u?.active!==false);
+  return `<main class="login-page"><section class="login-card">
+    <div class="brand"><span class="brand-logo">${svg("logo")}</span><div><strong>FACILITY OS</strong><small>Digitale Objektverwaltung</small></div></div>
+    <div class="login-copy"><span>TESTMODUS</span><h1>Anmelden</h1><p>W&auml;hle einen Testbenutzer.</p></div>
+    <form id="login-form"><label>Benutzer<select name="identifier" required><option value="">Benutzer ausw&auml;hlen</option>${users.map(u=>`<option value="${esc(u?.email??u?.id??"")}">${esc(userName(u))} &middot; ${esc(roleLabel(u?.role))}</option>`).join("")}</select></label><label>Passwort<input name="password" type="password" placeholder="Im Testmodus leer lassen"></label><div id="login-message" class="message"></div><button type="submit" class="primary">Anmelden</button></form>
+  </section></main>`;
 }
 
-function getUserName(user) {
-    return String(
-        user?.displayName ??
-        user?.fullName ??
-        user?.name ??
-        user?.email ??
-        "Benutzer"
-    ).trim();
+function renderObjectDetail(state){
+  const o=state?.currentObject;
+  if(!o) return `<section class="content-page"><h1>Objekt</h1><div class="empty-state">Es wurde kein Objekt ausgew&auml;hlt.</div></section>`;
+
+  const items=[
+    ["rooms","R&auml;ume","R&auml;ume und zugeh&ouml;rige Aufgaben",ROUTES.TASKS],
+    ["tasks","Aufgaben","Heutige Aufgaben und Arbeitsstatus",ROUTES.TASKS],
+    ["guide","Objekt-Guide","Abl&auml;ufe, Dosierungen und Arbeitsanweisungen",ROUTES.HELP],
+    ["box","Materialbestand","Bestand pr&uuml;fen und Material melden",ROUTES.MATERIALS],
+    ["message","Meldungen","Sch&auml;den, Hinweise und Kundenw&uuml;nsche",ROUTES.COMMUNICATION],
+    ["shield","Sicherung","Schl&uuml;ssel, M&uuml;ll und Schlie&szlig;zeiten",ROUTES.MORE]
+  ];
+
+  return `<section class="content-page"><header class="dashboard-heading"><div><span class="eyebrow">AKTUELLES OBJEKT</span><h1>${esc(oname(o))}</h1><p>Objektspezifische Arbeitsbereiche</p></div></header><div class="object-function-grid">${items.map(([i,t,d,r])=>`<button class="object-function-card" data-route="${r}" type="button"><span class="card-icon tone-blue">${svg(i)}</span><span><strong>${t}</strong><small>${d}</small></span><span class="arrow-icon">${svg("arrow")}</span></button>`).join("")}</div></section>`;
 }
 
-function getRoleLabel(role) {
-    const labels = {
-        SUPER_ADMIN: "Super-Admin",
-        ADMIN: "Administrator",
-        OBJEKTLEITER: "Objektleitung",
-        MITARBEITER: "Mitarbeiter",
-        BUCHHALTUNG: "Buchhaltung",
-        KUNDE: "Kunde"
-    };
-
-    return labels[String(role ?? "").toUpperCase()] ?? "Benutzer";
+function assignedObjects(state){
+  const u=state?.currentUser??{},uid=txt(u?.id??u?.userId),ids=arr(u?.assignedObjectIds??u?.objectIds).map(String);
+  const all=arr(state?.objects).filter(o=>o?.active!==false);
+  const own=all.filter(o=>ids.includes(oid(o))||arr(o?.assignedEmployeeIds??o?.employeeIds??o?.assignedUserIds).map(String).includes(uid));
+  return own.length?own:all;
 }
 
-function getObjectName(object) {
-    return String(
-        object?.name ??
-        object?.objectName ??
-        object?.Name ??
-        object?.Objekt_Name ??
-        "Objekt"
-    ).trim();
+function renderMaterials(state){
+  const objects=assignedObjects(state);
+  const selected=txt(state?.currentObject?.id);
+  const materials=selected?arr(state?.materials).filter(m=>!m?.objectId||txt(m?.objectId)===selected||arr(m?.objectIds??m?.assignedObjectIds).map(String).includes(selected)):[];
+  return `<section class="content-page"><header class="dashboard-heading"><div><span class="eyebrow">MATERIALMELDUNG</span><h1>Material bestellen</h1><p>Zuerst muss ein zugewiesenes Objekt gew&auml;hlt werden.</p></div></header>
+  <form id="material-order-form" class="material-order-form">
+    <label>Objekt<select id="material-object" name="objectId" required><option value="">Objekt ausw&auml;hlen</option>${objects.map(o=>`<option value="${esc(oid(o))}" ${oid(o)===selected?"selected":""}>${esc(oname(o))}</option>`).join("")}</select></label>
+    <label>Material<select name="materialId" required ${selected?"":"disabled"}><option value="">Material ausw&auml;hlen</option>${materials.map(m=>`<option value="${esc(m?.id??m?.materialId??"")}">${esc(m?.name??m?.Name??"Material")}</option>`).join("")}</select></label>
+    <label>Einheit<select name="unit" required ${selected?"":"disabled"}><option value="">Einheit ausw&auml;hlen</option><option>St&uuml;ck</option><option>Flasche</option><option>Liter</option><option>Packung</option><option>Rolle</option></select></label>
+    <label>Anzahl<input name="quantity" type="number" min="1" required ${selected?"":"disabled"}></label>
+    <button type="submit" class="primary" ${selected?"":"disabled"}>Bestellung absenden</button><div id="material-order-message" class="message"></div>
+  </form></section>`;
 }
 
-function getObjectId(object) {
-    return String(object?.id ?? object?.objectId ?? object?.ID ?? "").trim();
+function generic(route){
+  const title=({[ROUTES.TASKS]:"Aufgaben",[ROUTES.COMMUNICATION]:"Meldungen",[ROUTES.MORE]:"Mehr",[ROUTES.HELP]:"Hilfe",[ROUTES.PERSONNEL]:"Mitarbeiter",[ROUTES.TIMES]:"Zeiten",[ROUTES.REPORTS]:"Berichte"}[route]??"Facility OS");
+  return `<section class="content-page"><header class="dashboard-heading"><div><span class="eyebrow">FACILITY OS</span><h1>${title}</h1><p>Der rollenspezifische Inhalt wird im n&auml;chsten Schritt erg&auml;nzt.</p></div></header></section>`;
 }
 
-function renderLogin(state) {
-    const users = asArray(state?.users).filter((user) => user?.active !== false);
-
-    return `
-        <main class="login-page">
-            <section class="login-card">
-                <div class="brand">
-                    <span class="brand-icon">â¦</span>
-                    <div>
-                        <strong>FACILITY OS</strong>
-                        <small>Digitale Objektverwaltung</small>
-                    </div>
-                </div>
-
-                <div class="login-copy">
-                    <span>PRÃSENTATIONSMODUS</span>
-                    <h1>Anmelden</h1>
-                    <p>WÃ¤hle einen Testbenutzer.</p>
-                </div>
-
-                <form id="login-form">
-                    <label>
-                        Benutzer
-                        <select name="identifier" required>
-                            <option value="">Benutzer auswÃ¤hlen</option>
-                            ${users.map((user) => `
-                                <option value="${escapeHtml(user?.email ?? user?.id ?? "")}">
-                                    ${escapeHtml(getUserName(user))} Â·
-                                    ${escapeHtml(getRoleLabel(user?.role))}
-                                </option>
-                            `).join("")}
-                        </select>
-                    </label>
-
-                    <label>
-                        Passwort
-                        <input
-                            name="password"
-                            type="password"
-                            placeholder="Im Testmodus leer lassen"
-                        >
-                    </label>
-
-                    <div id="login-message" class="message"></div>
-
-                    <button type="submit" class="primary">
-                        Anmelden
-                    </button>
-                </form>
-            </section>
-        </main>
-    `;
+function nav(cls){
+  const items=[[ROUTES.OVERVIEW,"home","Start"],[ROUTES.TASKS,"tasks","Aufgaben"],[ROUTES.COMMUNICATION,"message","Meldungen"],[ROUTES.MORE,"more","Mehr"]];
+  return `<nav class="${cls}">${items.map(([r,i,l])=>`<button data-route="${r}" class="${runtime.route===r?"active":""}" type="button"><span>${svg(i)}</span><small>${l}</small></button>`).join("")}</nav>`;
 }
 
-function icon(symbol, tone) {
-    return `<span class="icon ${tone}">${symbol}</span>`;
+function shell(state){
+  let page=generic(runtime.route);
+  if(runtime.route===ROUTES.OVERVIEW) page=renderDashboardPage(state);
+  if(runtime.route===ROUTES.OBJECT_DETAIL) page=renderObjectDetail(state);
+  if(runtime.route===ROUTES.MATERIALS) page=renderMaterials(state);
+  const u=state?.currentUser;
+  return `<div class="app-shell"><aside class="sidebar"><div class="brand"><span class="brand-logo">${svg("logo")}</span><strong>FACILITY OS</strong></div>${nav("sidebar-nav")}<button class="logout" data-action="logout" type="button">Abmelden</button></aside><div class="app-area"><header class="topbar"><div class="brand mobile-brand"><span class="brand-logo">${svg("logo")}</span><strong>FACILITY OS</strong></div><div class="profile"><span class="profile-avatar">${esc(userName(u).slice(0,2).toUpperCase())}</span><div><strong>${esc(userName(u).split(/\s+/)[0])}</strong><small>${esc(roleLabel(u?.role))}</small></div></div></header><main>${page}</main>${nav("bottom-nav")}</div></div>`;
 }
 
-function renderOverview(state) {
-    const user = state?.currentUser;
-    const firstName = getUserName(user).split(/\s+/)[0];
-    const objects = asArray(state?.objects);
-    const tasks = asArray(state?.tasks);
-    const tickets = asArray(state?.tickets);
-
-    const modules = [
-        ["â¦", "Objekte", "Verwalte alle GebÃ¤ude und Liegenschaften.", ROUTES.OBJECTS, "blue"],
-        ["â", "Wartung", "Plane und verwalte Wartungsarbeiten.", ROUTES.TASKS, "green"],
-        ["!", "Anfragen", "Verwalte Anfragen und Nachrichten.", ROUTES.COMMUNICATION, "orange"],
-        ["â¦", "Reinigung", "Plane und dokumentiere Reinigungsarbeiten.", ROUTES.TASKS, "purple"],
-        ["â", "Kontrollen", "FÃ¼hre Kontrollen durch und dokumentiere.", ROUTES.REPORTS, "purple"],
-        ["â£", "Dokumente", "Verwalte Berichte und Dateien.", ROUTES.REPORTS, "blue"],
-        ["â¤", "Meldungen", "Erstelle und verwalte Meldungen.", ROUTES.COMMUNICATION, "yellow"],
-        ["â", "Benutzer", "Verwalte Benutzer und Berechtigungen.", ROUTES.PERSONNEL, "cyan"]
-    ];
-
-    return `
-        <section class="dashboard">
-            <header class="mobile-title">
-                <h1>Ãbersicht</h1>
-                <p>Willkommen zurÃ¼ck, ${escapeHtml(firstName)}!</p>
-            </header>
-
-            <section class="stats">
-                <article>${icon("â¦", "blue")}<div><span>Objekte</span><strong>${objects.length}</strong><small>Alle Objekte</small></div></article>
-                <article>${icon("â", "green")}<div><span>Wartungen</span><strong>${tasks.length}</strong><small>Diese Woche</small></div></article>
-                <article>${icon("!", "orange")}<div><span>Anfragen</span><strong>${tickets.length}</strong><small>Offen</small></div></article>
-            </section>
-
-            <section class="panel">
-                <h2>Module</h2>
-
-                <div class="module-grid">
-                    ${modules.map(([symbol, title, text, route, tone]) => `
-                        <button class="module-card" data-route="${escapeHtml(route)}">
-                            ${icon(symbol, tone)}
-                            <span>
-                                <strong>${escapeHtml(title)}</strong>
-                                <small>${escapeHtml(text)}</small>
-                            </span>
-                            <b>âº</b>
-                        </button>
-                    `).join("")}
-                </div>
-            </section>
-
-            <section class="panel activities">
-                <h2>Letzte AktivitÃ¤ten</h2>
-                <div><span class="dot green"></span><p><strong>Wartung abgeschlossen</strong><small>Heute, 09:15</small></p></div>
-                <div><span class="dot orange"></span><p><strong>Neue Anfrage</strong><small>Heute, 08:42</small></p></div>
-                <div><span class="dot purple"></span><p><strong>Kontrolle durchgefÃ¼hrt</strong><small>Gestern, 16:30</small></p></div>
-            </section>
-        </section>
-    `;
+async function submit(e){
+  if(e.target?.id==="login-form"){
+    e.preventDefault(); const d=new FormData(e.target);
+    try{await runtime.onLogin?.({identifier:d.get("identifier"),password:d.get("password")});}
+    catch(err){const m=document.getElementById("login-message");if(m)m.textContent=err instanceof Error?err.message:String(err);}
+  }else if(e.target?.id==="material-order-form"){
+    e.preventDefault(); const m=document.getElementById("material-order-message");if(m)m.innerHTML="Materialmeldung vollst&auml;ndig erfasst. Dauerhafte Speicherung folgt.";
+  }
 }
 
-function renderObjects(state) {
-    const objects = asArray(state?.objects);
-
-    return `
-        <section class="content-page">
-            <h1>Objekte</h1>
-            <p>WÃ¤hle ein Objekt aus.</p>
-
-            <div class="object-list">
-                ${objects.map((object) => `
-                    <button data-object-id="${escapeHtml(getObjectId(object))}">
-                        ${icon("â¦", "blue")}
-                        <span>
-                            <strong>${escapeHtml(getObjectName(object))}</strong>
-                            <small>Objekt Ã¶ffnen</small>
-                        </span>
-                        <b>âº</b>
-                    </button>
-                `).join("")}
-            </div>
-        </section>
-    `;
+async function click(e){
+  const r=e.target.closest("[data-route]");
+  if(r){runtime.onNavigate?.(r.getAttribute("data-route"));return;}
+  const o=e.target.closest("[data-object-id]");
+  if(o){try{await runtime.onSelectObject?.(o.getAttribute("data-object-id"));runtime.onNavigate?.(ROUTES.OBJECT_DETAIL);}catch(err){alert(err instanceof Error?err.message:String(err));}return;}
+  const a=e.target.closest("[data-action]")?.getAttribute("data-action");
+  try{
+    if(a==="logout")await runtime.onLogout?.();
+    if(a==="checkin")await runtime.onCheckin?.();
+    if(a==="checkout")await runtime.onCheckout?.();
+  }catch(err){alert(err instanceof Error?err.message:String(err));}
 }
 
-function renderGeneric(route) {
-    const titles = {
-        [ROUTES.TASKS]: "Aufgaben",
-        [ROUTES.COMMUNICATION]: "Meldungen",
-        [ROUTES.PERSONNEL]: "Benutzer",
-        [ROUTES.REPORTS]: "Berichte",
-        [ROUTES.MORE]: "Mehr",
-        [ROUTES.MATERIALS]: "Material",
-        [ROUTES.TIMES]: "Zeiten",
-        [ROUTES.SETTINGS]: "Einstellungen",
-        [ROUTES.HELP]: "Hilfe"
-    };
-
-    const title = titles[route] ?? "Facility OS";
-
-    return `
-        <section class="content-page">
-            <h1>${escapeHtml(title)}</h1>
-            <p>Dieser Bereich ist fÃ¼r die PrÃ¤sentation erreichbar.</p>
-
-            <article class="generic-card">
-                ${icon("â", "green")}
-                <div>
-                    <strong>Bereit</strong>
-                    <small>Die Detailfunktionen werden schrittweise ergÃ¤nzt.</small>
-                </div>
-            </article>
-
-            ${
-                route === ROUTES.MORE
-                    ? `<button class="secondary" data-action="logout">Abmelden</button>`
-                    : ""
-            }
-        </section>
-    `;
+async function change(e){
+  if(e.target?.id!=="material-object"||!e.target.value)return;
+  try{await runtime.onSelectObject?.(e.target.value);runtime.onNavigate?.(ROUTES.MATERIALS);}catch(err){alert(err instanceof Error?err.message:String(err));}
 }
 
-function renderNavigation(desktop = false) {
-    const items = [
-        [ROUTES.OVERVIEW, "â", "Start"],
-        [ROUTES.OBJECTS, "â¦", "Objekte"],
-        [ROUTES.TASKS, "â", "Aufgaben"],
-        [ROUTES.COMMUNICATION, "â¤", "Meldungen"],
-        [ROUTES.MORE, "â¢â¢â¢", "Mehr"]
-    ];
-
-    return `
-        <nav class="${desktop ? "sidebar-nav" : "bottom-nav"}">
-            ${items.map(([route, symbol, label]) => `
-                <button
-                    data-route="${route}"
-                    class="${runtime.route === route ? "active" : ""}"
-                >
-                    <span>${symbol}</span>
-                    <small>${label}</small>
-                </button>
-            `).join("")}
-        </nav>
-    `;
+function bind(){
+  const app=root(); if(!app||eventsBound)return;
+  app.addEventListener("submit",submit);app.addEventListener("click",click);app.addEventListener("change",change);eventsBound=true;
 }
 
-function renderShell(state) {
-    const user = state?.currentUser;
-    let page = renderGeneric(runtime.route);
-
-    if (runtime.route === ROUTES.OVERVIEW) {
-        page = renderOverview(state);
-    }
-
-    if (runtime.route === ROUTES.OBJECTS) {
-        page = renderObjects(state);
-    }
-
-    return `
-        <div class="app-shell">
-            <aside class="sidebar">
-                <div class="brand">
-                    <span class="brand-icon">â¦</span>
-                    <strong>FACILITY OS</strong>
-                </div>
-
-                ${renderNavigation(true)}
-
-                <button class="logout" data-action="logout">
-                    âª Abmelden
-                </button>
-            </aside>
-
-            <div class="app-area">
-                <header class="topbar">
-                    <div class="brand mobile-brand">
-                        <span class="brand-icon">â¦</span>
-                        <strong>FACILITY OS</strong>
-                    </div>
-
-                    <div class="desktop-title">
-                        <h1>Ãbersicht</h1>
-                        <p>Willkommen zurÃ¼ck!</p>
-                    </div>
-
-                    <div class="profile">
-                        <span>${escapeHtml(getUserName(user).slice(0, 2).toUpperCase())}</span>
-                        <div>
-                            <strong>${escapeHtml(getUserName(user).split(/\s+/)[0])}</strong>
-                            <small>${escapeHtml(getRoleLabel(user?.role))}</small>
-                        </div>
-                    </div>
-                </header>
-
-                <main>${page}</main>
-
-                ${renderNavigation()}
-            </div>
-        </div>
-    `;
-}
-
-async function handleSubmit(event) {
-    if (event.target?.id !== "login-form") {
-        return;
-    }
-
-    event.preventDefault();
-    const data = new FormData(event.target);
-
-    try {
-        await runtime.onLogin?.({
-            identifier: data.get("identifier"),
-            password: data.get("password")
-        });
-    }
-    catch (error) {
-        const message = document.getElementById("login-message");
-
-        if (message) {
-            message.textContent =
-                error instanceof Error
-                    ? error.message
-                    : String(error);
-        }
-    }
-}
-
-async function handleClick(event) {
-    const routeButton = event.target.closest("[data-route]");
-
-    if (routeButton) {
-        runtime.onNavigate?.(
-            routeButton.getAttribute("data-route")
-        );
-        return;
-    }
-
-    const objectButton = event.target.closest("[data-object-id]");
-
-    if (objectButton) {
-        await runtime.onSelectObject?.(
-            objectButton.getAttribute("data-object-id")
-        );
-
-        runtime.onNavigate?.(ROUTES.OVERVIEW);
-        return;
-    }
-
-    const actionButton = event.target.closest("[data-action]");
-
-    if (actionButton?.getAttribute("data-action") === "logout") {
-        await runtime.onLogout?.();
-    }
-}
-
-function bindEvents() {
-    const app = getRoot();
-
-    if (!app || eventsBound) {
-        return;
-    }
-
-    app.addEventListener("submit", handleSubmit);
-    app.addEventListener("click", handleClick);
-    eventsBound = true;
-}
-
-export function renderApp(options = {}) {
-    const app = getRoot();
-
-    if (!app) {
-        throw new Error('Das Element "#app" wurde nicht gefunden.');
-    }
-
-    runtime.route = String(options.route ?? ROUTES.LOGIN);
-    runtime.state =
-        options.state && typeof options.state === "object"
-            ? options.state
-            : {};
-
-    runtime.onNavigate =
-        typeof options.onNavigate === "function"
-            ? options.onNavigate
-            : null;
-
-    runtime.onLogin =
-        typeof options.onLogin === "function"
-            ? options.onLogin
-            : null;
-
-    runtime.onLogout =
-        typeof options.onLogout === "function"
-            ? options.onLogout
-            : null;
-
-    runtime.onSelectObject =
-        typeof options.onSelectObject === "function"
-            ? options.onSelectObject
-            : null;
-
-    app.innerHTML =
-        runtime.route === ROUTES.LOGIN ||
-        !runtime.state?.currentUser
-            ? renderLogin(runtime.state)
-            : renderShell(runtime.state);
-
-    bindEvents();
+export function renderApp(options={}){
+  const app=root(); if(!app)throw new Error('Das Element "#app" wurde nicht gefunden.');
+  runtime.route=txt(options.route)||ROUTES.LOGIN;
+  runtime.state=options.state&&typeof options.state==="object"?options.state:{};
+  for(const key of ["onNavigate","onLogin","onLogout","onCheckin","onCheckout","onSelectObject"])runtime[key]=typeof options[key]==="function"?options[key]:null;
+  app.innerHTML=runtime.route===ROUTES.LOGIN||!runtime.state?.currentUser?renderLogin(runtime.state):shell(runtime.state);
+  bind();
 }
