@@ -93,20 +93,20 @@ export function renderObjectDetailPage(state = {}) {
         `;
     }
 
-    const objectId = getObjectId(object);
-    const roomCount = countRooms(state, objectId);
-    const openTasks = countOpenTasks(state, objectId);
-    const openMessages = countOpenMessages(state, objectId);
+    const id = getObjectId(object);
+    const roomCount = countRooms(state, id);
+    const openTasks = countOpenTasks(state, id);
+    const openMessages = countOpenMessages(state, id);
 
     const modules = [
-        ["rooms", "R&auml;ume", "Raumliste, Aufgaben, Intervalle und Fotos", ROUTES.TASKS, `${roomCount} R&auml;ume`],
-        ["tasks", "Aufgaben", "Heute, offen, erledigt und Zeitabweichungen", ROUTES.TASKS, `${openTasks} offen`],
-        ["material", "Material", "Bestand, Bestellung, Verbrauch und Mindestbestand", ROUTES.MATERIALS, "Bestand"],
-        ["message", "Meldungen", "Pflichtmeldungen, Kundenw&uuml;nsche und Sch&auml;den", ROUTES.COMMUNICATION, `${openMessages} offen`],
-        ["guide", "Objekt-Guide", "Arbeitsabl&auml;ufe, Dosierungen, Fotos und Videos", ROUTES.HELP, "Anleitung"],
-        ["key", "Schl&uuml;ssel", "Ausgabe, R&uuml;ckgabe und Historie", ROUTES.MORE, "Schl&uuml;sselbuch"],
-        ["shield", "Objekt sichern", "T&uuml;ren, Fenster, Alarm und Abschlusskontrolle", ROUTES.MORE, "Kontrolle"],
-        ["document", "Dokumente", "Objektinformationen, Ansprechpartner und Notfallplan", ROUTES.REPORTS, "Dokumente"]
+        ["rooms", "rooms", "R&auml;ume", "Raumliste, Aufgaben, Intervalle und Fotos", `${roomCount} R&auml;ume`],
+        ["tasks", "tasks", "Aufgaben", "Heute, offen, erledigt und Zeitabweichungen", `${openTasks} offen`],
+        ["material", "material", "Material", "Bestand, Bestellung, Verbrauch und Mindestbestand", "Bestand"],
+        ["messages", "message", "Meldungen", "Pflichtmeldungen, Kundenw&uuml;nsche und Sch&auml;den", `${openMessages} offen`],
+        ["guide", "guide", "Objekt-Guide", "Arbeitsabl&auml;ufe, Dosierungen, Fotos und Videos", "Anleitung"],
+        ["keys", "key", "Schl&uuml;ssel", "Ausgabe, R&uuml;ckgabe und Historie", "Schl&uuml;sselbuch"],
+        ["security", "shield", "Objekt sichern", "T&uuml;ren, Fenster, Alarm und Abschlusskontrolle", "Kontrolle"],
+        ["documents", "document", "Dokumente", "Objektinformationen, Ansprechpartner und Notfallplan", "Dokumente"]
     ];
 
     return `
@@ -139,8 +139,12 @@ export function renderObjectDetailPage(state = {}) {
                 </div>
 
                 <div class="object-module-grid">
-                    ${modules.map(([iconName, title, description, route, badge]) => `
-                        <button class="object-module-card" data-route="${route}" type="button">
+                    ${modules.map(([section, iconName, title, description, badge]) => `
+                        <button
+                            class="object-module-card"
+                            data-object-section="${section}"
+                            type="button"
+                        >
                             <span class="card-icon tone-blue">${icon(iconName)}</span>
                             <span class="object-module-copy">
                                 <strong>${title}</strong>
