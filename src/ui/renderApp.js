@@ -2,6 +2,11 @@ import { ROUTES } from "../router.js";
 import { renderDashboardPage } from "./pages/dashboardPage.js";
 import { renderObjectDetailPage } from "./pages/objectDetailPage.js";
 import { renderObjectSectionPage } from "./pages/objectSectionPage.js";
+import { renderTimesPage } from "./pages/timesPage.js";
+import {
+    createTimesheetFromShift,
+    updateTimesheetStatus
+} from "../services/timesheetWorkflowService.js";
 
 const runtime = {
     route: ROUTES.LOGIN,
@@ -257,6 +262,11 @@ function renderMorePage(state) {
 
             <section class="dashboard-panel">
                 <div class="section-list">
+                    <button class="settings-row" data-route="${ROUTES.TIMES}" type="button">
+                        <span>Stundenzettel</span>
+                        <small>Arbeitszeit-Workflow und Freigaben</small>
+                    </button>
+
                     <button class="settings-row" data-route="${ROUTES.HELP}" type="button">
                         <span>Hilfe und Support</span>
                         <small>Objekt-Guide und Hilfebereich</small>
@@ -283,7 +293,6 @@ function renderGeneric(route) {
         [ROUTES.COMMUNICATION]: "Meldungen",
         [ROUTES.HELP]: "Hilfe",
         [ROUTES.PERSONNEL]: "Mitarbeiter",
-        [ROUTES.TIMES]: "Zeiten",
         [ROUTES.REPORTS]: "Berichte",
         [ROUTES.ANALYSIS]: "Auswertungen",
         [ROUTES.SETTINGS]: "Einstellungen"
@@ -342,6 +351,10 @@ function renderShell(state) {
 
     if (runtime.route === ROUTES.MATERIALS) {
         page = renderMaterials(state);
+    }
+
+    if (runtime.route === ROUTES.TIMES) {
+        page = renderTimesPage(state);
     }
 
     if (runtime.route === ROUTES.MORE) {
@@ -430,6 +443,30 @@ async function handleSubmit(event) {
 }
 
 async function handleClick(event) {
+    const timesheetButton = event.target.closest("[data-timesheet-action]");
+
+    if (timesheetButton) {
+        try {
+            updateTimesheetStatus(
+                runtime.state,
+                timesheetButton.getAttribute("data-timesheet-id"),
+                timesheetButton.getAttribute("data-timesheet-action"),
+                runtime.state?.currentUser
+            );
+
+            renderApp(runtime);
+        }
+        catch (error) {
+            window.alert(
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            );
+        }
+
+        return;
+    }
+
     const sectionButton = event.target.closest("[data-object-section]");
 
     if (sectionButton) {
@@ -498,7 +535,18 @@ async function handleClick(event) {
         }
 
         if (action === "checkout") {
-            await runtime.onCheckout?.();
+            const completedShift = await runtime.onCheckout?.();
+
+            if (completedShift) {
+                createTimesheetFromShift(
+                    runtime.state,
+                    completedShift
+                );
+
+                runtime.onNavigate?.(
+                    ROUTES.TIMES
+                );
+            }
         }
     }
     catch (error) {
