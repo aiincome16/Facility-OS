@@ -2,9 +2,6 @@ import { ROUTES } from "../../../router.js";
 
 const arr = (value) => Array.isArray(value) ? value : [];
 const txt = (value) => String(value ?? "").trim();
-
-let liveTimerInterval = null;
-
 const esc = (value) => String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -28,25 +25,27 @@ const objectName = (object) => txt(
 function assignedObjects(state) {
     const user = state?.currentUser ?? {};
     const userId = txt(user?.id ?? user?.userId);
-
-    const assignedIds = arr(
+    const ids = arr(
         user?.assignedObjectIds ??
         user?.objectIds
     ).map(String);
 
-    return arr(state?.objects)
-        .filter((object) => object?.active !== false)
-        .filter((object) =>
-            assignedIds.includes(objectId(object)) ||
-            arr(
-                object?.assignedEmployeeIds ??
-                object?.employeeIds ??
-                object?.assignedUserIds
-            ).map(String).includes(userId)
-        );
+    const allObjects = arr(state?.objects)
+        .filter((object) => object?.active !== false);
+
+    const assigned = allObjects.filter((object) =>
+        ids.includes(objectId(object)) ||
+        arr(
+            object?.assignedEmployeeIds ??
+            object?.employeeIds ??
+            object?.assignedUserIds
+        ).map(String).includes(userId)
+    );
+
+    return assigned.length ? assigned : allObjects;
 }
 
-function currentShift(state) {
+function runningShift(state) {
     const userId = txt(
         state?.currentUser?.id ??
         state?.currentUser?.userId
@@ -64,13 +63,12 @@ function currentShift(state) {
 
     return arr(state?.shifts).find((shift) => {
         const status = txt(shift?.status).toUpperCase();
-
         const belongsToUser = [
             shift?.userId,
             shift?.employeeId
         ].map(String).includes(userId);
 
-        const running =
+        const active =
             ["RUNNING", "ACTIVE"].includes(status) ||
             (
                 Boolean(
@@ -88,73 +86,34 @@ function currentShift(state) {
                 ].includes(status)
             );
 
-        return belongsToUser && running;
+        return belongsToUser && active;
     }) ?? null;
 }
 
 function isToday(value) {
     const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return false;
-    }
-
     const today = new Date();
 
     return (
+        !Number.isNaN(date.getTime()) &&
         date.getFullYear() === today.getFullYear() &&
         date.getMonth() === today.getMonth() &&
         date.getDate() === today.getDate()
     );
 }
 
-function employeeShiftsToday(state) {
-    const userId = txt(
-        state?.currentUser?.id ??
-        state?.currentUser?.userId
-    );
-
-    return arr(state?.shifts)
-        .filter((shift) =>
-            [
-                shift?.userId,
-                shift?.employeeId
-            ].map(String).includes(userId)
-        )
-        .filter((shift) =>
-            isToday(
-                shift?.startTime ??
-                shift?.checkinTime
-            )
-        )
-        .sort((a, b) =>
-            String(
-                b?.startTime ??
-                b?.checkinTime ??
-                ""
-            ).localeCompare(
-                String(
-                    a?.startTime ??
-                    a?.checkinTime ??
-                    ""
-                )
-            )
-        );
-}
-
-function durationMilliseconds(shift, endValue = Date.now()) {
+function durationMs(shift) {
     const start = new Date(
         shift?.startTime ??
         shift?.checkinTime ??
         ""
     );
 
-    const end = shift?.endTime || shift?.checkoutTime
-        ? new Date(
-            shift?.endTime ??
-            shift?.checkoutTime
-        )
-        : new Date(endValue);
+    const end = new Date(
+        shift?.endTime ??
+        shift?.checkoutTime ??
+        Date.now()
+    );
 
     if (
         Number.isNaN(start.getTime()) ||
@@ -169,35 +128,14 @@ function durationMilliseconds(shift, endValue = Date.now()) {
     );
 }
 
-function formatClock(milliseconds) {
-    const totalSeconds = Math.floor(
-        Math.max(0, milliseconds) / 1000
-    );
-
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor(
-        (totalSeconds % 3600) / 60
-    );
-    const seconds = totalSeconds % 60;
-
-    return [hours, minutes, seconds]
-        .map((value) => String(value).padStart(2, "0"))
-        .join(":");
-}
-
 function formatDuration(milliseconds) {
-    const totalMinutes = Math.floor(
-        Math.max(0, milliseconds) / 60000
-    );
-
+    const totalMinutes = Math.floor(milliseconds / 60000);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
 
-    if (hours === 0) {
-        return `${minutes} Min.`;
-    }
-
-    return `${hours} Std. ${minutes} Min.`;
+    return hours
+        ? `${hours} Std. ${minutes} Min.`
+        : `${minutes} Min.`;
 }
 
 function formatTime(value) {
@@ -211,53 +149,6 @@ function formatTime(value) {
         hour: "2-digit",
         minute: "2-digit"
     }).format(date);
-}
-
-function totalCompletedToday(shifts) {
-    return shifts
-        .filter((shift) =>
-            Boolean(
-                shift?.endTime ??
-                shift?.checkoutTime
-            )
-        )
-        .reduce(
-            (total, shift) =>
-                total + durationMilliseconds(shift),
-            0
-        );
-}
-
-function startLiveTimer(shift) {
-    if (liveTimerInterval) {
-        window.clearInterval(liveTimerInterval);
-        liveTimerInterval = null;
-    }
-
-    if (!shift) {
-        return;
-    }
-
-    const update = () => {
-        const timer = document.getElementById(
-            "employee-live-timer"
-        );
-
-        if (!timer) {
-            return;
-        }
-
-        timer.textContent = formatClock(
-            durationMilliseconds(shift)
-        );
-    };
-
-    update();
-
-    liveTimerInterval = window.setInterval(
-        update,
-        1000
-    );
 }
 
 function icon(name) {
@@ -275,7 +166,6 @@ function icon(name) {
 
 export function renderEmployeeDashboard(state = {}) {
     const user = state?.currentUser ?? {};
-
     const firstName = txt(
         user?.firstName ??
         user?.name ??
@@ -284,13 +174,53 @@ export function renderEmployeeDashboard(state = {}) {
     ).split(/\s+/)[0] || "Mitarbeiter";
 
     const objects = assignedObjects(state);
-    const runningShift = currentShift(state);
-    const todayShifts = employeeShiftsToday(state);
-    const completedToday = totalCompletedToday(todayShifts);
-    const assignedIds = objects.map(objectId);
+    const shift = runningShift(state);
+    const objectIds = objects.map(objectId);
+
+    const todayShifts = arr(state?.shifts)
+        .filter((entry) =>
+            [
+                entry?.userId,
+                entry?.employeeId
+            ].map(String).includes(
+                txt(user?.id ?? user?.userId)
+            )
+        )
+        .filter((entry) =>
+            isToday(
+                entry?.startTime ??
+                entry?.checkinTime
+            )
+        )
+        .sort((a, b) =>
+            String(
+                b?.startTime ??
+                b?.checkinTime ??
+                ""
+            ).localeCompare(
+                String(
+                    a?.startTime ??
+                    a?.checkinTime ??
+                    ""
+                )
+            )
+        );
+
+    const completedTodayMs = todayShifts
+        .filter((entry) =>
+            Boolean(
+                entry?.endTime ??
+                entry?.checkoutTime
+            )
+        )
+        .reduce(
+            (total, entry) =>
+                total + durationMs(entry),
+            0
+        );
 
     const openTasks = arr(state?.tasks).filter((task) =>
-        assignedIds.includes(txt(task?.objectId)) &&
+        objectIds.includes(txt(task?.objectId)) &&
         ![
             "DONE",
             "COMPLETED",
@@ -302,72 +232,20 @@ export function renderEmployeeDashboard(state = {}) {
         ...arr(state?.tickets),
         ...arr(state?.notifications),
         ...arr(state?.messages)
-    ].filter((message) =>
+    ].filter((entry) =>
         (
-            !message?.objectId ||
-            assignedIds.includes(txt(message?.objectId))
+            !entry?.objectId ||
+            objectIds.includes(txt(entry?.objectId))
         ) &&
         ![
             "DONE",
             "CLOSED",
             "COMPLETED",
             "ERLEDIGT"
-        ].includes(txt(message?.status).toUpperCase())
+        ].includes(txt(entry?.status).toUpperCase())
     ).length;
 
-    window.setTimeout(
-        () => startLiveTimer(runningShift),
-        0
-    );
-
     return `
-        <style>
-            .employee-live-time {
-                margin-top: 5px;
-                font-size: clamp(28px, 8vw, 42px);
-                font-weight: 900;
-                letter-spacing: .04em;
-                line-height: 1;
-            }
-
-            .employee-shift-meta {
-                display: grid;
-                gap: 3px;
-                margin-top: 8px;
-            }
-
-            .employee-time-history {
-                display: grid;
-                gap: 10px;
-            }
-
-            .employee-time-entry {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
-                gap: 12px;
-                align-items: center;
-                padding: 12px;
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                background: rgba(20, 39, 65, .66);
-            }
-
-            .employee-time-entry strong,
-            .employee-time-entry small {
-                display: block;
-            }
-
-            .employee-time-entry small {
-                margin-top: 4px;
-                color: var(--soft);
-            }
-
-            .employee-time-entry-duration {
-                font-weight: 900;
-                white-space: nowrap;
-            }
-        </style>
-
         <section class="role-dashboard">
             <header class="dashboard-heading">
                 <div>
@@ -385,49 +263,49 @@ export function renderEmployeeDashboard(state = {}) {
 
                     <div>
                         <small>
-                            ${runningShift
+                            ${shift
                                 ? "Laufende Arbeitszeit"
                                 : "Heute gearbeitet"
                             }
                         </small>
 
-                        ${runningShift
+                        ${shift
                             ? `
-                                <div
+                                <strong
                                     id="employee-live-timer"
-                                    class="employee-live-time"
+                                    data-start-time="${esc(
+                                        shift?.startTime ??
+                                        shift?.checkinTime ??
+                                        ""
+                                    )}"
                                 >
-                                    ${formatClock(
-                                        durationMilliseconds(
-                                            runningShift
+                                    00:00:00
+                                </strong>
+
+                                <span>
+                                    Beginn:
+                                    ${formatTime(
+                                        shift?.startTime ??
+                                        shift?.checkinTime
+                                    )} Uhr
+                                    &middot;
+                                    ${esc(
+                                        shift?.objectName ??
+                                        objectName(
+                                            state?.currentObject
                                         )
                                     )}
-                                </div>
-
-                                <span class="employee-shift-meta">
-                                    <span>
-                                        Beginn:
-                                        ${formatTime(
-                                            runningShift?.startTime ??
-                                            runningShift?.checkinTime
-                                        )} Uhr
-                                    </span>
-                                    <span>
-                                        ${esc(
-                                            runningShift?.objectName ??
-                                            objectName(
-                                                state?.currentObject
-                                            )
-                                        )}
-                                    </span>
                                 </span>
                             `
                             : `
                                 <strong>
-                                    ${formatDuration(completedToday)}
+                                    ${formatDuration(completedTodayMs)}
                                 </strong>
                                 <span>
-                                    Noch keine Schicht gestartet
+                                    ${todayShifts.length
+                                        ? "Arbeitszeit f&uuml;r heute erfasst"
+                                        : "Noch keine Schicht gestartet"
+                                    }
                                 </span>
                             `
                         }
@@ -435,19 +313,15 @@ export function renderEmployeeDashboard(state = {}) {
                 </div>
 
                 <button
-                    class="shift-button ${runningShift ? "danger" : "success"}"
-                    data-action="${runningShift ? "checkout" : "checkin"}"
+                    class="shift-button ${shift ? "danger" : "success"}"
+                    data-action="${shift ? "checkout" : "checkin"}"
                     type="button"
                 >
                     <span>
-                        ${icon(
-                            runningShift
-                                ? "stop"
-                                : "play"
-                        )}
+                        ${icon(shift ? "stop" : "play")}
                     </span>
 
-                    ${runningShift
+                    ${shift
                         ? "Schicht beenden"
                         : "Schicht starten"
                     }
@@ -502,32 +376,34 @@ export function renderEmployeeDashboard(state = {}) {
                 <div class="panel-heading">
                     <div>
                         <h2>Heutige Arbeitszeiten</h2>
-                        <p>
-                            Abgeschlossene und laufende Schichten des heutigen Tages.
-                        </p>
+                        <p>Alle heute erfassten Schichten.</p>
                     </div>
                 </div>
 
-                <div class="employee-time-history">
+                <div class="activity-list">
                     ${todayShifts.length
-                        ? todayShifts.map((shift) => {
-                            const isRunning =
-                                !Boolean(
-                                    shift?.endTime ??
-                                    shift?.checkoutTime
-                                );
+                        ? todayShifts.map((entry) => {
+                            const isRunning = !Boolean(
+                                entry?.endTime ??
+                                entry?.checkoutTime
+                            );
 
                             return `
-                                <article class="employee-time-entry">
+                                <article>
+                                    <span class="activity-dot ${isRunning
+                                        ? "tone-orange"
+                                        : "tone-green"
+                                    }"></span>
+
                                     <div>
                                         <strong>
                                             ${esc(
-                                                shift?.objectName ??
+                                                entry?.objectName ??
                                                 objectName(
                                                     arr(state?.objects)
                                                         .find((object) =>
                                                             objectId(object) ===
-                                                            txt(shift?.objectId)
+                                                            txt(entry?.objectId)
                                                         )
                                                 )
                                             )}
@@ -535,30 +411,26 @@ export function renderEmployeeDashboard(state = {}) {
 
                                         <small>
                                             ${formatTime(
-                                                shift?.startTime ??
-                                                shift?.checkinTime
+                                                entry?.startTime ??
+                                                entry?.checkinTime
                                             )}
                                             bis
                                             ${isRunning
                                                 ? "l&auml;uft"
                                                 : formatTime(
-                                                    shift?.endTime ??
-                                                    shift?.checkoutTime
+                                                    entry?.endTime ??
+                                                    entry?.checkoutTime
+                                                )
+                                            }
+                                            &middot;
+                                            ${isRunning
+                                                ? "laufend"
+                                                : formatDuration(
+                                                    durationMs(entry)
                                                 )
                                             }
                                         </small>
                                     </div>
-
-                                    <span class="employee-time-entry-duration">
-                                        ${isRunning
-                                            ? "L&auml;uft"
-                                            : formatDuration(
-                                                durationMilliseconds(
-                                                    shift
-                                                )
-                                            )
-                                        }
-                                    </span>
                                 </article>
                             `;
                         }).join("")
@@ -575,9 +447,7 @@ export function renderEmployeeDashboard(state = {}) {
                 <div class="panel-heading">
                     <div>
                         <h2>Heutige Objekte</h2>
-                        <p>
-                            Objekt antippen und Unterpunkte &ouml;ffnen.
-                        </p>
+                        <p>Objekt antippen und Unterpunkte &ouml;ffnen.</p>
                     </div>
                 </div>
 
@@ -613,9 +483,7 @@ export function renderEmployeeDashboard(state = {}) {
                 <div class="panel-heading">
                     <div>
                         <h2>Letzte Aktivit&auml;ten</h2>
-                        <p>
-                            Deine zuletzt ausgef&uuml;hrten Aktionen.
-                        </p>
+                        <p>Deine zuletzt ausgef&uuml;hrten Aktionen.</p>
                     </div>
                 </div>
 
@@ -625,16 +493,6 @@ export function renderEmployeeDashboard(state = {}) {
                         <div>
                             <strong>Dashboard ge&ouml;ffnet</strong>
                             <small>Gerade eben</small>
-                        </div>
-                    </article>
-
-                    <article>
-                        <span class="activity-dot tone-blue"></span>
-                        <div>
-                            <strong>
-                                ${objects.length} Objekte zugewiesen
-                            </strong>
-                            <small>Heute</small>
                         </div>
                     </article>
                 </div>
