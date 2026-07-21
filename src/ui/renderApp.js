@@ -283,7 +283,7 @@ function renderMaterials(state) {
                         id="material-select"
                         name="materialId"
                         required
-                        ${selectedObjectId ? "" : "disabled"}
+                        
                     >
                         <option value="">Material ausw&auml;hlen</option>
 
@@ -306,7 +306,7 @@ function renderMaterials(state) {
                         type="text"
                         readonly
                         placeholder="Wird automatisch gesetzt"
-                        ${selectedObjectId ? "" : "disabled"}
+                        
                     >
                 </label>
 
@@ -319,7 +319,7 @@ function renderMaterials(state) {
                         min="1"
                         step="1"
                         required
-                        ${selectedObjectId ? "" : "disabled"}
+                        
                     >
                 </label>
 
@@ -569,7 +569,12 @@ function updateMaterialFormState() {
 
     unitInput.value = unit;
 
+    const objectSelect = document.getElementById(
+        "material-object"
+    );
+
     const valid =
+        Boolean(objectSelect?.value) &&
         Boolean(materialSelect.value) &&
         Boolean(unit) &&
         Number(quantityInput.value) > 0;
@@ -808,17 +813,31 @@ async function handleClick(event) {
 
 async function handleChange(event) {
     if (event.target?.id === "material-object") {
-        if (!event.target.value) {
+        const selectedId =
+            txt(event.target.value);
+
+        if (!selectedId) {
+            runtime.state.currentObject = null;
+            updateMaterialFormState();
             return;
         }
 
         try {
-            await runtime.onSelectObject?.(
-                event.target.value
-            );
+            const selectedObject =
+                await runtime.onSelectObject?.(
+                    selectedId
+                );
 
-            runtime.objectSection = "";
-            renderApp(runtime);
+            runtime.state.currentObject =
+                selectedObject ??
+                assignedObjects(runtime.state)
+                    .find((object) =>
+                        objectId(object) ===
+                        selectedId
+                    ) ??
+                null;
+
+            updateMaterialFormState();
         }
         catch (error) {
             window.alert(
