@@ -2,6 +2,87 @@ import { ROUTES } from "../../../router.js";
 
 const arr = (value) => Array.isArray(value) ? value : [];
 const txt = (value) => String(value ?? "").trim();
+
+class LiveShiftTimer extends HTMLElement {
+    constructor() {
+        super();
+        this.timerId = null;
+    }
+
+    connectedCallback() {
+        this.updateTime();
+
+        this.timerId = window.setInterval(
+            () => this.updateTime(),
+            1000
+        );
+    }
+
+    disconnectedCallback() {
+        if (this.timerId) {
+            window.clearInterval(this.timerId);
+            this.timerId = null;
+        }
+    }
+
+    updateTime() {
+        const startTime = this.getAttribute(
+            "start-time"
+        );
+
+        const start = new Date(startTime);
+
+        if (Number.isNaN(start.getTime())) {
+            this.textContent = "00:00:00";
+            return;
+        }
+
+        const totalSeconds = Math.max(
+            0,
+            Math.floor(
+                (
+                    Date.now() -
+                    start.getTime()
+                ) /
+                1000
+            )
+        );
+
+        const hours = Math.floor(
+            totalSeconds / 3600
+        );
+
+        const minutes = Math.floor(
+            (totalSeconds % 3600) / 60
+        );
+
+        const seconds =
+            totalSeconds % 60;
+
+        this.textContent = [
+            hours,
+            minutes,
+            seconds
+        ]
+            .map((value) =>
+                String(value)
+                    .padStart(2, "0")
+            )
+            .join(":");
+    }
+}
+
+if (
+    !window.customElements.get(
+        "live-shift-timer"
+    )
+) {
+    window.customElements.define(
+        "live-shift-timer",
+        LiveShiftTimer
+    );
+}
+
 const esc = (value) => String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -271,16 +352,23 @@ export function renderEmployeeDashboard(state = {}) {
 
                         ${shift
                             ? `
-                                <strong
-                                    id="employee-live-timer"
-                                    data-start-time="${esc(
+                                <live-shift-timer
+                                    start-time="${esc(
                                         shift?.startTime ??
                                         shift?.checkinTime ??
                                         ""
                                     )}"
+                                    aria-label="Laufende Arbeitszeit"
+                                    style="
+                                        display: block;
+                                        margin-top: 4px;
+                                        font-size: 32px;
+                                        font-weight: 900;
+                                        letter-spacing: 0.04em;
+                                    "
                                 >
                                     00:00:00
-                                </strong>
+                                </live-shift-timer>
 
                                 <span>
                                     Beginn:
