@@ -1,5 +1,6 @@
 import { renderEmployeeDashboard } from "./dashboards/employeeDashboard.js";
 import { renderManagerDashboard } from "./dashboards/managerDashboard.js";
+import { renderAccountingDashboard } from "./dashboards/accountingDashboard.js";
 
 function normalizeRole(value) {
     return String(value ?? "").trim().toUpperCase();
@@ -9,7 +10,6 @@ function renderPlannedDashboard(state, role) {
     const labels = {
         SUPER_ADMIN: "Super-Admin",
         ADMIN: "Administrator",
-        BUCHHALTUNG: "Buchhaltung",
         KUNDE: "Kunde"
     };
 
@@ -56,6 +56,10 @@ export function renderDashboardPage(state = {}) {
 
     if (role === "OBJEKTLEITER") {
         return renderManagerDashboard(state);
+    }
+
+    if (role === "BUCHHALTUNG") {
+        return renderAccountingDashboard(state);
     }
 
     return renderPlannedDashboard(state, role);
