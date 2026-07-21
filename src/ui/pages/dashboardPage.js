@@ -3,48 +3,10 @@ import { renderManagerDashboard } from "./dashboards/managerDashboard.js";
 import { renderAccountingDashboard } from "./dashboards/accountingDashboard.js";
 import { renderAdminDashboard } from "./dashboards/adminDashboard.js";
 import { renderSuperAdminDashboard } from "./dashboards/superAdminDashboard.js";
+import { renderCustomerDashboard } from "./dashboards/customerDashboard.js";
 
 function normalizeRole(value) {
     return String(value ?? "").trim().toUpperCase();
-}
-
-function renderPlannedDashboard(state, role) {
-    const labels = {
-        KUNDE: "Kunde"
-    };
-
-    const label = labels[role] ?? "Benutzer";
-
-    return `
-        <section class="role-dashboard">
-            <header class="dashboard-heading">
-                <div>
-                    <span class="eyebrow">${label.toUpperCase()}</span>
-                    <h1>&Uuml;bersicht</h1>
-                    <p>Das rollenspezifische Dashboard wird als n&auml;chster Schritt umgesetzt.</p>
-                </div>
-            </header>
-
-            <section class="dashboard-panel">
-                <div class="panel-heading">
-                    <div>
-                        <h2>Letzte Aktivit&auml;ten</h2>
-                        <p>Dieser Bereich bleibt auf jedem Dashboard erhalten.</p>
-                    </div>
-                </div>
-
-                <div class="activity-list">
-                    <article>
-                        <span class="activity-dot tone-blue"></span>
-                        <div>
-                            <strong>Dashboard ge&ouml;ffnet</strong>
-                            <small>Gerade eben</small>
-                        </div>
-                    </article>
-                </div>
-            </section>
-        </section>
-    `;
 }
 
 export function renderDashboardPage(state = {}) {
@@ -70,5 +32,19 @@ export function renderDashboardPage(state = {}) {
         return renderSuperAdminDashboard(state);
     }
 
-    return renderPlannedDashboard(state, role);
+    if (role === "KUNDE") {
+        return renderCustomerDashboard(state);
+    }
+
+    return `
+        <section class="role-dashboard">
+            <header class="dashboard-heading">
+                <div>
+                    <span class="eyebrow">BENUTZER</span>
+                    <h1>&Uuml;bersicht</h1>
+                    <p>F&uuml;r diese Rolle wurde kein Dashboard gefunden.</p>
+                </div>
+            </header>
+        </section>
+    `;
 }
