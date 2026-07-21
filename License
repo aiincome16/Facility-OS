@@ -1,0 +1,115 @@
+Facility OS – Proprietary Software License
+
+Copyright (c) 2026 aiincome16
+All rights reserved.
+
+1. Ownership
+
+Facility OS, including its source code, object code, user interface,
+documentation, database structures, workflows, concepts, designs and all
+related materials, is proprietary software owned by aiincome16, unless a
+different rightsholder is expressly identified in writing.
+
+No ownership rights are transferred by publication, access, download,
+possession, testing or use of this repository.
+
+2. No Open-Source License
+
+This software is not open-source software. Availability of the source code in
+a public or private repository does not grant permission beyond the limited
+rights expressly stated in this license.
+
+3. Permitted Evaluation Use
+
+The software may be viewed and tested solely for internal evaluation, provided
+that it is not used in production, not used to provide services to third
+parties, not used commercially, not redistributed and all ownership notices
+remain unchanged.
+
+Any other use requires a separate written license agreement from the
+rightsholder.
+
+4. Prohibited Uses
+
+Without prior written permission, you may not:
+
+a) copy, reproduce, publish, distribute, sell, rent, lease, sublicense or
+   transfer the software or substantial parts of it;
+b) use it commercially or in a production environment;
+c) offer it, or a modified version, as SaaS, hosted software, an application,
+   a platform or any other product or service;
+d) modify, adapt, translate, merge, derive from or create competing products
+   based on the software;
+e) remove or alter copyright, authorship or ownership notices;
+f) publish the source code in another repository or distribution;
+g) use the software or documentation to train or improve a competing software
+   product or machine-learning system;
+h) claim authorship or ownership; or
+i) assist another party in performing a prohibited act.
+
+5. Contributions
+
+No contribution, pull request, issue, suggestion or code submission transfers
+ownership of Facility OS. Submitted material is not automatically accepted,
+incorporated or licensed.
+
+6. Third-Party Components
+
+Third-party libraries and assets remain subject to their respective licenses.
+This license applies only to parts of Facility OS for which aiincome16 holds
+the necessary rights.
+
+7. Confidential and Business Information
+
+Non-public business logic, pricing, customer information, credentials,
+security information, personal data and operational data must not be
+disclosed, copied or used without authorization.
+
+8. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF
+ANY KIND, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+NON-INFRINGEMENT, AVAILABILITY, SECURITY, ACCURACY OR ERROR-FREE OPERATION.
+
+The software is under development and may contain incomplete functions,
+defects or breaking changes.
+
+9. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE RIGHTSHOLDER SHALL NOT BE LIABLE
+FOR DIRECT, INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES,
+LOSS OF DATA, LOSS OF PROFITS OR BUSINESS INTERRUPTION ARISING FROM ACCESS TO
+OR USE OF THE SOFTWARE.
+
+Nothing excludes liability where exclusion is prohibited by law, including
+liability for intent, gross negligence, injury to life, body or health, or
+mandatory product-liability obligations.
+
+10. Termination
+
+Permission terminates automatically if this license is violated. After
+termination, all use must stop and all copies must be deleted unless retention
+is legally required.
+
+11. Commercial Licensing
+
+Commercial, production, customer, white-label, reseller, hosting and SaaS
+rights require a separate written agreement.
+
+Licensing inquiries must be directed to the repository owner through the
+official GitHub account or another expressly designated contact channel.
+
+12. Governing Law and Severability
+
+Unless a separate written agreement states otherwise, this license is governed
+by the laws of the Federal Republic of Germany, excluding conflict-of-law rules
+and the UN Convention on Contracts for the International Sale of Goods.
+
+If a provision is invalid or unenforceable, the remaining provisions remain
+effective.
+
+13. Entire License
+
+This document contains the complete permission granted for access to and
+evaluation of Facility OS. Broader permission requires a separate written
+agreement approved by the rightsholder.
