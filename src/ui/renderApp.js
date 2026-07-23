@@ -11,7 +11,8 @@ const runtime = {
     materialDraft: {
         objectId: "",
         materialId: "",
-        unit: ""
+        unit: "",
+        quantity: ""
     },
     onNavigate: null,
     onLogin: null,
@@ -24,23 +25,32 @@ const runtime = {
 let eventsBound = false;
 let liveTimerId = null;
 
-const arr = (value) => Array.isArray(value) ? value : [];
-const txt = (value) => String(value ?? "").trim();
-const esc = (value) => String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+const arr = (value) =>
+    Array.isArray(value)
+        ? value
+        : [];
 
-const root = () => document.getElementById("app");
+const txt = (value) =>
+    String(value ?? "").trim();
 
-const userName = (user) => txt(
-    user?.displayName ??
-    user?.fullName ??
-    user?.name ??
-    user?.email
-) || "Benutzer";
+const esc = (value) =>
+    String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+const root = () =>
+    document.getElementById("app");
+
+const userName = (user) =>
+    txt(
+        user?.displayName ??
+        user?.fullName ??
+        user?.name ??
+        user?.email
+    ) || "Benutzer";
 
 const roleLabel = (role) => ({
     SUPER_ADMIN: "Super-Admin",
@@ -51,28 +61,32 @@ const roleLabel = (role) => ({
     KUNDE: "Kunde"
 }[txt(role).toUpperCase()] ?? "Benutzer");
 
-const objectId = (object) => txt(
-    object?.id ??
-    object?.objectId ??
-    object?.ID
-);
+const objectId = (object) =>
+    txt(
+        object?.id ??
+        object?.objectId ??
+        object?.ID
+    );
 
-const objectName = (object) => txt(
-    object?.name ??
-    object?.objectName ??
-    object?.Name ??
-    object?.Objekt_Name
-) || "Objekt";
+const objectName = (object) =>
+    txt(
+        object?.name ??
+        object?.objectName ??
+        object?.Name ??
+        object?.Objekt_Name
+    ) || "Objekt";
 
-const materialId = (material) => txt(
-    material?.id ??
-    material?.materialId
-);
+const materialId = (material) =>
+    txt(
+        material?.id ??
+        material?.materialId
+    );
 
-const materialName = (material) => txt(
-    material?.name ??
-    material?.Name
-) || "Material";
+const materialName = (material) =>
+    txt(
+        material?.name ??
+        material?.Name
+    ) || "Material";
 
 const icon = (name) => ({
     logo: '<svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16"/><path d="M8 8h2M14 8h2M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>',
@@ -91,50 +105,81 @@ function createId(prefix) {
 }
 
 function formatClock(startTime) {
-    const start = new Date(startTime);
+    const start =
+        new Date(startTime);
 
-    if (Number.isNaN(start.getTime())) {
+    if (
+        Number.isNaN(
+            start.getTime()
+        )
+    ) {
         return "00:00:00";
     }
 
-    const totalSeconds = Math.max(
-        0,
+    const totalSeconds =
+        Math.max(
+            0,
+            Math.floor(
+                (
+                    Date.now() -
+                    start.getTime()
+                ) / 1000
+            )
+        );
+
+    const hours =
         Math.floor(
-            (Date.now() - start.getTime()) / 1000
-        )
-    );
+            totalSeconds / 3600
+        );
 
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor(
-        (totalSeconds % 3600) / 60
-    );
-    const seconds = totalSeconds % 60;
+    const minutes =
+        Math.floor(
+            (
+                totalSeconds %
+                3600
+            ) / 60
+        );
 
-    return [hours, minutes, seconds]
+    const seconds =
+        totalSeconds % 60;
+
+    return [
+        hours,
+        minutes,
+        seconds
+    ]
         .map((value) =>
-            String(value).padStart(2, "0")
+            String(value)
+                .padStart(2, "0")
         )
         .join(":");
 }
 
 function syncLiveTimer() {
     if (liveTimerId) {
-        window.clearInterval(liveTimerId);
+        window.clearInterval(
+            liveTimerId
+        );
+
         liveTimerId = null;
     }
 
     const update = () => {
-        const timer = document.getElementById(
-            "employee-live-timer"
-        );
+        const timer =
+            document.getElementById(
+                "employee-live-timer"
+            );
 
         if (!timer) {
             return;
         }
 
-        timer.textContent = formatClock(
-            timer.getAttribute("data-start-time")
-        );
+        timer.textContent =
+            formatClock(
+                timer.getAttribute(
+                    "data-start-time"
+                )
+            );
     };
 
     update();
@@ -144,51 +189,94 @@ function syncLiveTimer() {
             "employee-live-timer"
         )
     ) {
-        liveTimerId = window.setInterval(
-            update,
-            1000
-        );
+        liveTimerId =
+            window.setInterval(
+                update,
+                1000
+            );
     }
 }
 
 function renderLogin(state) {
-    const users = arr(state?.users)
-        .filter((user) => user?.active !== false);
+    const users =
+        arr(state?.users)
+            .filter(
+                (user) =>
+                    user?.active !== false
+            );
 
     return `
         <main class="login-page">
             <section class="login-card">
                 <div class="brand">
-                    <span class="brand-logo">${icon("logo")}</span>
+                    <span class="brand-logo">
+                        ${icon("logo")}
+                    </span>
+
                     <div>
-                        <strong>FACILITY OS</strong>
-                        <small>Digitale Objektverwaltung</small>
+                        <strong>
+                            FACILITY OS
+                        </strong>
+
+                        <small>
+                            Digitale Objektverwaltung
+                        </small>
                     </div>
                 </div>
 
                 <div class="login-copy">
-                    <span>TESTMODUS</span>
-                    <h1>Anmelden</h1>
-                    <p>W&auml;hle einen Testbenutzer.</p>
+                    <span>
+                        TESTMODUS
+                    </span>
+
+                    <h1>
+                        Anmelden
+                    </h1>
+
+                    <p>
+                        W&auml;hle einen Testbenutzer.
+                    </p>
                 </div>
 
                 <form id="login-form">
                     <label>
                         Benutzer
-                        <select name="identifier" required>
-                            <option value="">Benutzer ausw&auml;hlen</option>
-                            ${users.map((user) => `
-                                <option value="${esc(user?.email ?? user?.id ?? "")}">
-                                    ${esc(userName(user))}
-                                    &middot;
-                                    ${esc(roleLabel(user?.role))}
-                                </option>
-                            `).join("")}
+
+                        <select
+                            name="identifier"
+                            required
+                        >
+                            <option value="">
+                                Benutzer ausw&auml;hlen
+                            </option>
+
+                            ${users.map(
+                                (user) => `
+                                    <option
+                                        value="${esc(
+                                            user?.email ??
+                                            user?.id ??
+                                            ""
+                                        )}"
+                                    >
+                                        ${esc(
+                                            userName(user)
+                                        )}
+                                        &middot;
+                                        ${esc(
+                                            roleLabel(
+                                                user?.role
+                                            )
+                                        )}
+                                    </option>
+                                `
+                            ).join("")}
                         </select>
                     </label>
 
                     <label>
                         Passwort
+
                         <input
                             name="password"
                             type="password"
@@ -196,9 +284,15 @@ function renderLogin(state) {
                         >
                     </label>
 
-                    <div id="login-message" class="message"></div>
+                    <div
+                        id="login-message"
+                        class="message"
+                    ></div>
 
-                    <button type="submit" class="primary">
+                    <button
+                        type="submit"
+                        class="primary"
+                    >
                         Anmelden
                     </button>
                 </form>
@@ -208,52 +302,89 @@ function renderLogin(state) {
 }
 
 function assignedObjects(state) {
-    const user = state?.currentUser ?? {};
-    const userId = txt(user?.id ?? user?.userId);
-    const ids = arr(
-        user?.assignedObjectIds ??
-        user?.objectIds
-    ).map(String);
+    const user =
+        state?.currentUser ?? {};
 
-    const allObjects = arr(state?.objects)
-        .filter((object) => object?.active !== false);
+    const userId =
+        txt(
+            user?.id ??
+            user?.userId
+        );
 
-    const assigned = allObjects.filter((object) =>
-        ids.includes(objectId(object)) ||
+    const ids =
         arr(
-            object?.assignedEmployeeIds ??
-            object?.employeeIds ??
-            object?.assignedUserIds
-        ).map(String).includes(userId)
-    );
+            user?.assignedObjectIds ??
+            user?.objectIds
+        ).map(String);
 
-    return assigned.length ? assigned : allObjects;
+    const allObjects =
+        arr(state?.objects)
+            .filter(
+                (object) =>
+                    object?.active !== false
+            );
+
+    const assigned =
+        allObjects.filter(
+            (object) =>
+                ids.includes(
+                    objectId(object)
+                ) ||
+                arr(
+                    object?.assignedEmployeeIds ??
+                    object?.employeeIds ??
+                    object?.assignedUserIds
+                )
+                    .map(String)
+                    .includes(userId)
+        );
+
+    return assigned.length
+        ? assigned
+        : allObjects;
 }
 
 function activeMaterials(state) {
     return arr(state?.materials)
-        .filter((material) => material?.active !== false);
+        .filter(
+            (material) =>
+                material?.active !== false
+        );
 }
 
 function renderMaterials(state) {
-    const objects = assignedObjects(state);
-    const materials = activeMaterials(state);
+    const objects =
+        assignedObjects(state);
+
+    const materials =
+        activeMaterials(state);
 
     const selectedObjectId =
         runtime.materialDraft.objectId ||
-        objectId(state?.currentObject);
+        objectId(
+            state?.currentObject
+        );
 
     const selectedMaterialId =
         runtime.materialDraft.materialId;
 
     const selectedMaterial =
-        materials.find((material) =>
-            materialId(material) === selectedMaterialId
+        materials.find(
+            (material) =>
+                materialId(material) ===
+                selectedMaterialId
         );
 
     const unit =
         runtime.materialDraft.unit ||
-        txt(selectedMaterial?.unit);
+        txt(
+            selectedMaterial?.unit
+        );
+
+    const quantity =
+        txt(
+            runtime.materialDraft.quantity
+        );
 
     runtime.materialDraft.objectId =
         selectedObjectId;
@@ -265,11 +396,18 @@ function renderMaterials(state) {
         <section class="content-page">
             <header class="dashboard-heading">
                 <div>
-                    <span class="eyebrow">MATERIALMELDUNG</span>
-                    <h1>Material bestellen</h1>
+                    <span class="eyebrow">
+                        MATERIALMELDUNG
+                    </span>
+
+                    <h1>
+                        Material bestellen
+                    </h1>
+
                     <p>
                         Objekt und Material direkt antippen.
-                        Die Einheit wird automatisch &uuml;bernommen.
+                        Die Einheit wird automatisch
+                        &uuml;bernommen.
                     </p>
                 </div>
             </header>
@@ -282,14 +420,18 @@ function renderMaterials(state) {
                     id="material-object"
                     name="objectId"
                     type="hidden"
-                    value="${esc(selectedObjectId)}"
+                    value="${esc(
+                        selectedObjectId
+                    )}"
                 >
 
                 <input
                     id="material-select"
                     name="materialId"
                     type="hidden"
-                    value="${esc(selectedMaterialId)}"
+                    value="${esc(
+                        selectedMaterialId
+                    )}"
                 >
 
                 <input
@@ -299,57 +441,96 @@ function renderMaterials(state) {
                     value="${esc(unit)}"
                 >
 
-                <section class="material-choice-section">
-                    <strong>1. Objekt ausw&auml;hlen</strong>
+                <section
+                    class="material-choice-section"
+                >
+                    <strong>
+                        1. Objekt ausw&auml;hlen
+                    </strong>
 
-                    <div class="material-choice-grid">
-                        ${objects.map((object) => {
-                            const id = objectId(object);
-                            const selected =
-                                id === selectedObjectId;
+                    <div
+                        class="material-choice-grid"
+                    >
+                        ${objects.map(
+                            (object) => {
+                                const id =
+                                    objectId(object);
 
-                            return `
-                                <button
-                                    type="button"
-                                    class="material-choice-button ${selected ? "selected" : ""}"
-                                    data-material-object-id="${esc(id)}"
-                                    aria-pressed="${selected ? "true" : "false"}"
-                                >
-                                    ${esc(objectName(object))}
-                                </button>
-                            `;
-                        }).join("") || `
-                            <div class="material-choice-empty">
+                                const selected =
+                                    id ===
+                                    selectedObjectId;
+
+                                return `
+                                    <button
+                                        type="button"
+                                        class="material-choice-button ${selected ? "selected" : ""}"
+                                        data-material-object-id="${esc(id)}"
+                                        aria-pressed="${selected ? "true" : "false"}"
+                                    >
+                                        ${esc(
+                                            objectName(
+                                                object
+                                            )
+                                        )}
+                                    </button>
+                                `;
+                            }
+                        ).join("") || `
+                            <div
+                                class="material-choice-empty"
+                            >
                                 Keine Objekte verf&uuml;gbar.
                             </div>
                         `}
                     </div>
                 </section>
 
-                <section class="material-choice-section">
-                    <strong>2. Material ausw&auml;hlen</strong>
+                <section
+                    class="material-choice-section"
+                >
+                    <strong>
+                        2. Material ausw&auml;hlen
+                    </strong>
 
-                    <div class="material-choice-grid">
+                    <div
+                        class="material-choice-grid"
+                    >
                         ${selectedObjectId
-                            ? materials.map((material) => {
-                                const id = materialId(material);
-                                const selected =
-                                    id === selectedMaterialId;
+                            ? materials.map(
+                                (material) => {
+                                    const id =
+                                        materialId(
+                                            material
+                                        );
 
-                                return `
-                                    <button
-                                        type="button"
-                                        class="material-choice-button ${selected ? "selected" : ""}"
-                                        data-material-id="${esc(id)}"
-                                        data-material-unit="${esc(material?.unit ?? "")}"
-                                        aria-pressed="${selected ? "true" : "false"}"
-                                    >
-                                        ${esc(materialName(material))}
-                                    </button>
-                                `;
-                            }).join("")
+                                    const selected =
+                                        id ===
+                                        selectedMaterialId;
+
+                                    return `
+                                        <button
+                                            type="button"
+                                            class="material-choice-button ${selected ? "selected" : ""}"
+                                            data-material-id="${esc(id)}"
+                                            data-material-unit="${esc(
+                                                material?.unit ??
+                                                ""
+                                            )}"
+                                            aria-pressed="${selected ? "true" : "false"}"
+                                        >
+                                            ${esc(
+                                                materialName(
+                                                    material
+                                                )
+                                            )}
+                                        </button>
+                                    `;
+                                }
+                            ).join("")
                             : `
-                                <div class="material-choice-empty">
+                                <div
+                                    class="material-choice-empty"
+                                >
                                     Zuerst ein Objekt ausw&auml;hlen.
                                 </div>
                             `
@@ -359,6 +540,7 @@ function renderMaterials(state) {
 
                 <label>
                     Einheit
+
                     <input
                         id="material-unit-display"
                         type="text"
@@ -368,116 +550,39 @@ function renderMaterials(state) {
                     >
                 </label>
 
-                <section
-                    class="material-quantity-section"
-                    style="
-                        display: grid;
-                        gap: 10px;
-                    "
-                >
-                    <strong>Anzahl</strong>
+                <label>
+                    Anzahl
 
-                    <div
-                        class="material-quantity-presets"
-                        style="
-                            display: grid;
-                            grid-template-columns:
-                                repeat(5, minmax(0, 1fr));
-                            gap: 8px;
-                        "
+                    <select
+                        id="material-quantity"
+                        name="quantity"
+                        required
                     >
-                        ${[1, 2, 3, 4, 5].map((value) => `
-                            <button
-                                type="button"
-                                class="secondary"
-                                data-quantity-value="${value}"
-                                style="
-                                    min-height: 48px;
-                                    padding: 0;
-                                    font-weight: 800;
-                                "
-                            >
-                                ${value}
-                            </button>
-                        `).join("")}
-                    </div>
+                        <option value="">
+                            Anzahl ausw&auml;hlen
+                        </option>
 
-                    <div
-                        class="material-quantity-control"
-                        style="
-                            display: grid;
-                            grid-template-columns:
-                                52px minmax(0, 1fr) 52px;
-                            gap: 8px;
-                            align-items: center;
-                        "
-                    >
-                        <button
-                            type="button"
-                            class="secondary"
-                            data-quantity-action="decrease"
-                            aria-label="Anzahl verringern"
-                            style="
-                                min-width: 52px;
-                                min-height: 52px;
-                                padding: 0;
-                                font-size: 26px;
-                            "
-                        >
-                            &minus;
-                        </button>
-
-                        <input
-                            id="material-quantity"
-                            name="quantity"
-                            type="tel"
-                            inputmode="numeric"
-                            pattern="[0-9]*"
-                            autocomplete="off"
-                            placeholder="Anzahl"
-                            required
-                            style="
-                                min-height: 52px;
-                                width: 100%;
-                                padding: 0 12px;
-                                border: 1px solid var(--border);
-                                border-radius: 12px;
-                                background: #08172b;
-                                color: var(--text);
-                                text-align: center;
-                                font-size: 18px;
-                                font-weight: 800;
-                                opacity: 1;
-                                pointer-events: auto;
-                                touch-action: manipulation;
-                            "
-                        >
-
-                        <button
-                            type="button"
-                            class="secondary"
-                            data-quantity-action="increase"
-                            aria-label="Anzahl erhöhen"
-                            style="
-                                min-width: 52px;
-                                min-height: 52px;
-                                padding: 0;
-                                font-size: 26px;
-                            "
-                        >
-                            +
-                        </button>
-                    </div>
-
-                    <small
-                        id="material-quantity-hint"
-                        style="
-                            color: var(--soft);
-                        "
-                    >
-                        Zahl antippen, eingeben oder eine Schnellauswahl verwenden.
-                    </small>
-                </section>
+                        ${Array.from(
+                            {
+                                length: 50
+                            },
+                            (_, index) =>
+                                index + 1
+                        ).map(
+                            (value) => `
+                                <option
+                                    value="${value}"
+                                    ${String(value) === quantity
+                                        ? "selected"
+                                        : ""
+                                    }
+                                >
+                                    ${value}
+                                </option>
+                            `
+                        ).join("")}
+                    </select>
+                </label>
 
                 <button
                     id="material-submit"
@@ -498,40 +603,83 @@ function renderMaterials(state) {
 }
 
 function renderMorePage(state) {
-    const user = state?.currentUser ?? {};
+    const user =
+        state?.currentUser ?? {};
 
     return `
-        <section class="content-page more-page">
-            <header class="dashboard-heading">
+        <section
+            class="content-page more-page"
+        >
+            <header
+                class="dashboard-heading"
+            >
                 <div>
-                    <span class="eyebrow">BENUTZERKONTO</span>
-                    <h1>Mehr</h1>
-                    <p>Profil, Hilfe und Abmeldung.</p>
+                    <span class="eyebrow">
+                        BENUTZERKONTO
+                    </span>
+
+                    <h1>
+                        Mehr
+                    </h1>
+
+                    <p>
+                        Profil, Hilfe und Abmeldung.
+                    </p>
                 </div>
             </header>
 
-            <section class="dashboard-panel">
-                <div class="account-summary">
-                    <span class="profile-avatar">
-                        ${esc(userName(user).slice(0, 2).toUpperCase())}
+            <section
+                class="dashboard-panel"
+            >
+                <div
+                    class="account-summary"
+                >
+                    <span
+                        class="profile-avatar"
+                    >
+                        ${esc(
+                            userName(user)
+                                .slice(0, 2)
+                                .toUpperCase()
+                        )}
                     </span>
 
                     <div>
-                        <strong>${esc(userName(user))}</strong>
-                        <small>${esc(roleLabel(user?.role))}</small>
+                        <strong>
+                            ${esc(
+                                userName(user)
+                            )}
+                        </strong>
+
+                        <small>
+                            ${esc(
+                                roleLabel(
+                                    user?.role
+                                )
+                            )}
+                        </small>
                     </div>
                 </div>
             </section>
 
-            <section class="dashboard-panel">
-                <div class="section-list">
+            <section
+                class="dashboard-panel"
+            >
+                <div
+                    class="section-list"
+                >
                     <button
                         class="settings-row"
                         data-route="${ROUTES.HELP}"
                         type="button"
                     >
-                        <span>Hilfe und Support</span>
-                        <small>Objekt-Guide und Hilfebereich</small>
+                        <span>
+                            Hilfe und Support
+                        </span>
+
+                        <small>
+                            Objekt-Guide und Hilfebereich
+                        </small>
                     </button>
 
                     <button
@@ -539,8 +687,13 @@ function renderMorePage(state) {
                         data-route="${ROUTES.SETTINGS}"
                         type="button"
                     >
-                        <span>Einstellungen</span>
-                        <small>Benutzer- und App-Einstellungen</small>
+                        <span>
+                            Einstellungen
+                        </span>
+
+                        <small>
+                            Benutzer- und App-Einstellungen
+                        </small>
                     </button>
                 </div>
             </section>
@@ -550,7 +703,10 @@ function renderMorePage(state) {
                 data-action="logout"
                 type="button"
             >
-                <span>${icon("logout")}</span>
+                <span>
+                    ${icon("logout")}
+                </span>
+
                 Abmelden
             </button>
         </section>
@@ -559,23 +715,48 @@ function renderMorePage(state) {
 
 function renderGeneric(route) {
     const title = ({
-        [ROUTES.TASKS]: "Aufgaben",
-        [ROUTES.COMMUNICATION]: "Meldungen",
-        [ROUTES.HELP]: "Hilfe",
-        [ROUTES.PERSONNEL]: "Mitarbeiter",
-        [ROUTES.TIMES]: "Zeiten",
-        [ROUTES.REPORTS]: "Berichte",
-        [ROUTES.ANALYSIS]: "Auswertungen",
-        [ROUTES.SETTINGS]: "Einstellungen"
+        [ROUTES.TASKS]:
+            "Aufgaben",
+
+        [ROUTES.COMMUNICATION]:
+            "Meldungen",
+
+        [ROUTES.HELP]:
+            "Hilfe",
+
+        [ROUTES.PERSONNEL]:
+            "Mitarbeiter",
+
+        [ROUTES.TIMES]:
+            "Zeiten",
+
+        [ROUTES.REPORTS]:
+            "Berichte",
+
+        [ROUTES.ANALYSIS]:
+            "Auswertungen",
+
+        [ROUTES.SETTINGS]:
+            "Einstellungen"
     }[route] ?? "Facility OS");
 
     return `
         <section class="content-page">
             <header class="dashboard-heading">
                 <div>
-                    <span class="eyebrow">FACILITY OS</span>
-                    <h1>${title}</h1>
-                    <p>Der Inhalt wird im n&auml;chsten Schritt erg&auml;nzt.</p>
+                    <span class="eyebrow">
+                        FACILITY OS
+                    </span>
+
+                    <h1>
+                        ${title}
+                    </h1>
+
+                    <p>
+                        Der Inhalt wird im
+                        n&auml;chsten Schritt
+                        erg&auml;nzt.
+                    </p>
                 </div>
             </header>
         </section>
@@ -584,84 +765,163 @@ function renderGeneric(route) {
 
 function renderNavigation(className) {
     const items = [
-        [ROUTES.OVERVIEW, "home", "Start"],
-        [ROUTES.TASKS, "tasks", "Aufgaben"],
-        [ROUTES.COMMUNICATION, "message", "Meldungen"],
-        [ROUTES.MORE, "more", "Mehr"]
+        [
+            ROUTES.OVERVIEW,
+            "home",
+            "Start"
+        ],
+        [
+            ROUTES.TASKS,
+            "tasks",
+            "Aufgaben"
+        ],
+        [
+            ROUTES.COMMUNICATION,
+            "message",
+            "Meldungen"
+        ],
+        [
+            ROUTES.MORE,
+            "more",
+            "Mehr"
+        ]
     ];
 
     return `
         <nav class="${className}">
-            ${items.map(([route, iconName, label]) => `
-                <button
-                    data-route="${route}"
-                    class="${runtime.route === route ? "active" : ""}"
-                    type="button"
-                >
-                    <span>${icon(iconName)}</span>
-                    <small>${label}</small>
-                </button>
-            `).join("")}
+            ${items.map(
+                (
+                    [
+                        route,
+                        iconName,
+                        label
+                    ]
+                ) => `
+                    <button
+                        data-route="${route}"
+                        class="${runtime.route === route ? "active" : ""}"
+                        type="button"
+                    >
+                        <span>
+                            ${icon(iconName)}
+                        </span>
+
+                        <small>
+                            ${label}
+                        </small>
+                    </button>
+                `
+            ).join("")}
         </nav>
     `;
 }
 
 function renderShell(state) {
-    let page = renderGeneric(runtime.route);
+    let page =
+        renderGeneric(
+            runtime.route
+        );
 
-    if (runtime.route === ROUTES.OVERVIEW) {
+    if (
+        runtime.route ===
+        ROUTES.OVERVIEW
+    ) {
         runtime.objectSection = "";
-        page = renderDashboardPage(state);
+
+        page =
+            renderDashboardPage(
+                state
+            );
     }
 
-    if (runtime.route === ROUTES.OBJECT_DETAIL) {
-        page = runtime.objectSection
-            ? renderObjectSectionPage(
-                state,
-                runtime.objectSection
-            )
-            : renderObjectDetailPage(state);
+    if (
+        runtime.route ===
+        ROUTES.OBJECT_DETAIL
+    ) {
+        page =
+            runtime.objectSection
+                ? renderObjectSectionPage(
+                    state,
+                    runtime.objectSection
+                )
+                : renderObjectDetailPage(
+                    state
+                );
     }
 
-    if (runtime.route === ROUTES.MATERIALS) {
-        page = renderMaterials(state);
+    if (
+        runtime.route ===
+        ROUTES.MATERIALS
+    ) {
+        page =
+            renderMaterials(
+                state
+            );
     }
 
-    if (runtime.route === ROUTES.MORE) {
-        page = renderMorePage(state);
+    if (
+        runtime.route ===
+        ROUTES.MORE
+    ) {
+        page =
+            renderMorePage(
+                state
+            );
     }
 
-    const user = state?.currentUser;
+    const user =
+        state?.currentUser;
 
     return `
         <div class="app-shell">
             <aside class="sidebar">
                 <div class="brand">
-                    <span class="brand-logo">${icon("logo")}</span>
-                    <strong>FACILITY OS</strong>
+                    <span class="brand-logo">
+                        ${icon("logo")}
+                    </span>
+
+                    <strong>
+                        FACILITY OS
+                    </strong>
                 </div>
 
-                ${renderNavigation("sidebar-nav")}
+                ${renderNavigation(
+                    "sidebar-nav"
+                )}
 
                 <button
                     class="logout"
                     data-action="logout"
                     type="button"
                 >
-                    <span>${icon("logout")}</span>
+                    <span>
+                        ${icon("logout")}
+                    </span>
+
                     Abmelden
                 </button>
             </aside>
 
             <div class="app-area">
                 <header class="topbar">
-                    <div class="brand mobile-brand">
-                        <span class="brand-logo">${icon("logo")}</span>
-                        <strong>FACILITY OS</strong>
+                    <div
+                        class="brand mobile-brand"
+                    >
+                        <span
+                            class="brand-logo"
+                        >
+                            ${icon("logo")}
+                        </span>
+
+                        <strong>
+                            FACILITY OS
+                        </strong>
                     </div>
 
                     <div class="profile">
-                        <span class="profile-avatar">
+                        <span
+                            class="profile-avatar"
+                        >
                             ${esc(
                                 userName(user)
                                     .slice(0, 2)
@@ -676,41 +936,55 @@ function renderShell(state) {
                                         .split(/\s+/)[0]
                                 )}
                             </strong>
+
                             <small>
-                                ${esc(roleLabel(user?.role))}
+                                ${esc(
+                                    roleLabel(
+                                        user?.role
+                                    )
+                                )}
                             </small>
                         </div>
                     </div>
                 </header>
 
-                <main>${page}</main>
+                <main>
+                    ${page}
+                </main>
 
-                ${renderNavigation("bottom-nav")}
+                ${renderNavigation(
+                    "bottom-nav"
+                )}
             </div>
         </div>
     `;
 }
 
 function updateMaterialFormState() {
-    const objectInput = document.getElementById(
-        "material-object"
-    );
+    const objectInput =
+        document.getElementById(
+            "material-object"
+        );
 
-    const materialInput = document.getElementById(
-        "material-select"
-    );
+    const materialInput =
+        document.getElementById(
+            "material-select"
+        );
 
-    const unitInput = document.getElementById(
-        "material-unit"
-    );
+    const unitInput =
+        document.getElementById(
+            "material-unit"
+        );
 
-    const quantityInput = document.getElementById(
-        "material-quantity"
-    );
+    const quantityInput =
+        document.getElementById(
+            "material-quantity"
+        );
 
-    const submitButton = document.getElementById(
-        "material-submit"
-    );
+    const submitButton =
+        document.getElementById(
+            "material-submit"
+        );
 
     if (
         !objectInput ||
@@ -722,26 +996,18 @@ function updateMaterialFormState() {
         return;
     }
 
-    const normalizedQuantity =
-        txt(quantityInput.value)
-            .replace(/[^0-9]/g, "");
-
-    if (
-        quantityInput.value !==
-        normalizedQuantity
-    ) {
-        quantityInput.value =
-            normalizedQuantity;
-    }
+    const quantity =
+        Number.parseInt(
+            quantityInput.value,
+            10
+        );
 
     submitButton.disabled = !(
         objectInput.value &&
         materialInput.value &&
         unitInput.value &&
-        Number.parseInt(
-            normalizedQuantity,
-            10
-        ) > 0
+        Number.isInteger(quantity) &&
+        quantity > 0
     );
 }
 
@@ -765,27 +1031,43 @@ function selectMaterialButton(
 
             button.setAttribute(
                 "aria-pressed",
-                selected ? "true" : "false"
+                selected
+                    ? "true"
+                    : "false"
             );
         });
 }
 
 async function handleSubmit(event) {
-    if (event.target?.id === "login-form") {
+    if (
+        event.target?.id ===
+        "login-form"
+    ) {
         event.preventDefault();
 
-        const data = new FormData(event.target);
+        const data =
+            new FormData(
+                event.target
+            );
 
         try {
             await runtime.onLogin?.({
-                identifier: data.get("identifier"),
-                password: data.get("password")
+                identifier:
+                    data.get(
+                        "identifier"
+                    ),
+
+                password:
+                    data.get(
+                        "password"
+                    )
             });
         }
         catch (error) {
-            const message = document.getElementById(
-                "login-message"
-            );
+            const message =
+                document.getElementById(
+                    "login-message"
+                );
 
             if (message) {
                 message.textContent =
@@ -798,37 +1080,64 @@ async function handleSubmit(event) {
         return;
     }
 
-    if (event.target?.id === "material-order-form") {
+    if (
+        event.target?.id ===
+        "material-order-form"
+    ) {
         event.preventDefault();
 
-        const data = new FormData(event.target);
+        const data =
+            new FormData(
+                event.target
+            );
 
-        const selectedMaterial = activeMaterials(
-            runtime.state
-        ).find((material) =>
-            materialId(material) ===
-            txt(data.get("materialId"))
-        );
+        const selectedMaterial =
+            activeMaterials(
+                runtime.state
+            ).find(
+                (material) =>
+                    materialId(material) ===
+                    txt(
+                        data.get(
+                            "materialId"
+                        )
+                    )
+            );
 
-        const selectedObject = assignedObjects(
-            runtime.state
-        ).find((object) =>
-            objectId(object) ===
-            txt(data.get("objectId"))
-        );
+        const selectedObject =
+            assignedObjects(
+                runtime.state
+            ).find(
+                (object) =>
+                    objectId(object) ===
+                    txt(
+                        data.get(
+                            "objectId"
+                        )
+                    )
+            );
 
-        const quantity = Number(
-            data.get("quantity")
-        );
+        const quantity =
+            Number.parseInt(
+                txt(
+                    data.get(
+                        "quantity"
+                    )
+                ),
+                10
+            );
 
-        const message = document.getElementById(
-            "material-order-message"
-        );
+        const message =
+            document.getElementById(
+                "material-order-message"
+            );
 
         if (
             !selectedMaterial ||
             !selectedObject ||
-            !Number.isFinite(quantity) ||
+            !Number.isInteger(
+                quantity
+            ) ||
             quantity <= 0
         ) {
             if (message) {
@@ -840,48 +1149,100 @@ async function handleSubmit(event) {
         }
 
         const timestamp =
-            new Date().toISOString();
+            new Date()
+                .toISOString();
 
         addCollectionEntry(
             "workOrders",
             {
-                id: createId("MATERIAL"),
-                type: "MATERIAL_ORDER",
-                status: "OFFEN",
+                id:
+                    createId(
+                        "MATERIAL"
+                    ),
+
+                type:
+                    "MATERIAL_ORDER",
+
+                status:
+                    "OFFEN",
+
                 employeeId:
-                    runtime.state?.currentUser?.id ??
-                    runtime.state?.currentUser?.userId,
+                    runtime.state
+                        ?.currentUser
+                        ?.id ??
+                    runtime.state
+                        ?.currentUser
+                        ?.userId,
+
                 employeeName:
-                    userName(runtime.state?.currentUser),
+                    userName(
+                        runtime.state
+                            ?.currentUser
+                    ),
+
                 objectId:
-                    objectId(selectedObject),
+                    objectId(
+                        selectedObject
+                    ),
+
                 objectName:
-                    objectName(selectedObject),
+                    objectName(
+                        selectedObject
+                    ),
+
                 materialId:
-                    materialId(selectedMaterial),
+                    materialId(
+                        selectedMaterial
+                    ),
+
                 materialName:
-                    materialName(selectedMaterial),
+                    materialName(
+                        selectedMaterial
+                    ),
+
                 unit:
                     txt(
-                        data.get("unit") ??
-                        selectedMaterial?.unit
+                        data.get(
+                            "unit"
+                        ) ??
+                        selectedMaterial
+                            ?.unit
                     ),
+
                 quantity,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-                source: "LOCAL_TEST"
+
+                createdAt:
+                    timestamp,
+
+                updatedAt:
+                    timestamp,
+
+                source:
+                    "LOCAL_TEST"
             },
             {
-                notify: false,
-                persist: true
+                notify:
+                    false,
+
+                persist:
+                    true
             }
         );
 
         runtime.materialDraft = {
             objectId:
-                objectId(selectedObject),
-            materialId: "",
-            unit: ""
+                objectId(
+                    selectedObject
+                ),
+
+            materialId:
+                "",
+
+            unit:
+                "",
+
+            quantity:
+                ""
         };
 
         event.target.reset();
@@ -893,7 +1254,9 @@ async function handleSubmit(event) {
 
         if (objectInput) {
             objectInput.value =
-                runtime.materialDraft.objectId;
+                runtime
+                    .materialDraft
+                    .objectId;
         }
 
         document
@@ -904,6 +1267,7 @@ async function handleSubmit(event) {
                 button.classList.remove(
                     "selected"
                 );
+
                 button.setAttribute(
                     "aria-pressed",
                     "false"
@@ -937,31 +1301,44 @@ async function handleClick(event) {
     if (materialObjectButton) {
         event.preventDefault();
 
-        const selectedId = txt(
-            materialObjectButton.getAttribute(
-                "data-material-object-id"
-            )
-        );
+        const selectedId =
+            txt(
+                materialObjectButton
+                    .getAttribute(
+                        "data-material-object-id"
+                    )
+            );
 
         try {
             const selectedObject =
-                await runtime.onSelectObject?.(
-                    selectedId
-                );
+                await runtime
+                    .onSelectObject?.(
+                        selectedId
+                    );
 
             runtime.state.currentObject =
                 selectedObject ??
-                assignedObjects(runtime.state)
-                    .find((object) =>
+                assignedObjects(
+                    runtime.state
+                ).find(
+                    (object) =>
                         objectId(object) ===
                         selectedId
-                    ) ??
+                ) ??
                 null;
 
             runtime.materialDraft = {
-                objectId: selectedId,
-                materialId: "",
-                unit: ""
+                objectId:
+                    selectedId,
+
+                materialId:
+                    "",
+
+                unit:
+                    "",
+
+                quantity:
+                    ""
             };
 
             renderApp(runtime);
@@ -985,23 +1362,36 @@ async function handleClick(event) {
     if (materialButton) {
         event.preventDefault();
 
-        const selectedId = txt(
-            materialButton.getAttribute(
-                "data-material-id"
-            )
-        );
+        const selectedId =
+            txt(
+                materialButton
+                    .getAttribute(
+                        "data-material-id"
+                    )
+            );
 
-        const unit = txt(
-            materialButton.getAttribute(
-                "data-material-unit"
-            )
-        );
+        const unit =
+            txt(
+                materialButton
+                    .getAttribute(
+                        "data-material-unit"
+                    )
+            );
 
-        runtime.materialDraft.materialId =
+        runtime
+            .materialDraft
+            .materialId =
             selectedId;
 
-        runtime.materialDraft.unit =
+        runtime
+            .materialDraft
+            .unit =
             unit;
+
+        runtime
+            .materialDraft
+            .quantity =
+            "";
 
         const materialInput =
             document.getElementById(
@@ -1039,7 +1429,7 @@ async function handleClick(event) {
         }
 
         if (quantityInput) {
-            quantityInput.disabled = false;
+            quantityInput.value = "";
         }
 
         selectMaterialButton(
@@ -1049,132 +1439,42 @@ async function handleClick(event) {
         );
 
         updateMaterialFormState();
-
-        window.setTimeout(
-            () => quantityInput?.focus(),
-            0
-        );
-
         return;
     }
 
-    const quantityValueButton =
+    const sectionButton =
         event.target.closest(
-            "[data-quantity-value]"
+            "[data-object-section]"
         );
-
-    if (quantityValueButton) {
-        event.preventDefault();
-
-        const quantityInput =
-            document.getElementById(
-                "material-quantity"
-            );
-
-        const materialInput =
-            document.getElementById(
-                "material-select"
-            );
-
-        if (
-            !quantityInput ||
-            !materialInput?.value
-        ) {
-            return;
-        }
-
-        quantityInput.value =
-            quantityValueButton.getAttribute(
-                "data-quantity-value"
-            ) ?? "";
-
-        updateMaterialFormState();
-        return;
-    }
-
-    const quantityActionButton =
-        event.target.closest(
-            "[data-quantity-action]"
-        );
-
-    if (quantityActionButton) {
-        event.preventDefault();
-
-        const quantityInput =
-            document.getElementById(
-                "material-quantity"
-            );
-
-        const materialInput =
-            document.getElementById(
-                "material-select"
-            );
-
-        if (
-            !quantityInput ||
-            !materialInput?.value
-        ) {
-            return;
-        }
-
-        const currentValue =
-            Number.parseInt(
-                quantityInput.value,
-                10
-            ) || 0;
-
-        const action =
-            quantityActionButton.getAttribute(
-                "data-quantity-action"
-            );
-
-        const nextValue =
-            action === "increase"
-                ? currentValue + 1
-                : Math.max(
-                    0,
-                    currentValue - 1
-                );
-
-        quantityInput.value =
-            nextValue > 0
-                ? String(nextValue)
-                : "";
-
-        updateMaterialFormState();
-
-        quantityInput.focus();
-        return;
-    }
-
-    const sectionButton = event.target.closest(
-        "[data-object-section]"
-    );
 
     if (sectionButton) {
-        runtime.objectSection = txt(
-            sectionButton.getAttribute(
-                "data-object-section"
-            )
-        );
+        runtime.objectSection =
+            txt(
+                sectionButton.getAttribute(
+                    "data-object-section"
+                )
+            );
 
         renderApp(runtime);
         return;
     }
 
-    const sectionBackButton = event.target.closest(
-        "[data-object-section-back]"
-    );
+    const sectionBackButton =
+        event.target.closest(
+            "[data-object-section-back]"
+        );
 
     if (sectionBackButton) {
         runtime.objectSection = "";
+
         renderApp(runtime);
         return;
     }
 
-    const routeButton = event.target.closest(
-        "[data-route]"
-    );
+    const routeButton =
+        event.target.closest(
+            "[data-route]"
+        );
 
     if (routeButton) {
         runtime.objectSection = "";
@@ -1188,17 +1488,20 @@ async function handleClick(event) {
         return;
     }
 
-    const objectButton = event.target.closest(
-        "[data-object-id]"
-    );
+    const objectButton =
+        event.target.closest(
+            "[data-object-id]"
+        );
 
     if (objectButton) {
         try {
-            await runtime.onSelectObject?.(
-                objectButton.getAttribute(
-                    "data-object-id"
-                )
-            );
+            await runtime
+                .onSelectObject?.(
+                    objectButton
+                        .getAttribute(
+                            "data-object-id"
+                        )
+                );
 
             runtime.objectSection = "";
 
@@ -1217,22 +1520,40 @@ async function handleClick(event) {
         return;
     }
 
-    const action = event.target
-        .closest("[data-action]")
-        ?.getAttribute("data-action");
+    const action =
+        event.target
+            .closest(
+                "[data-action]"
+            )
+            ?.getAttribute(
+                "data-action"
+            );
 
     try {
-        if (action === "logout") {
+        if (
+            action ===
+            "logout"
+        ) {
             runtime.objectSection = "";
-            await runtime.onLogout?.();
+
+            await runtime
+                .onLogout?.();
         }
 
-        if (action === "checkin") {
-            await runtime.onCheckin?.();
+        if (
+            action ===
+            "checkin"
+        ) {
+            await runtime
+                .onCheckin?.();
         }
 
-        if (action === "checkout") {
-            await runtime.onCheckout?.();
+        if (
+            action ===
+            "checkout"
+        ) {
+            await runtime
+                .onCheckout?.();
         }
     }
     catch (error) {
@@ -1244,11 +1565,18 @@ async function handleClick(event) {
     }
 }
 
-function handleInput(event) {
+function handleChange(event) {
     if (
         event.target?.id ===
         "material-quantity"
     ) {
+        runtime
+            .materialDraft
+            .quantity =
+            txt(
+                event.target.value
+            );
+
         updateMaterialFormState();
     }
 }
@@ -1256,7 +1584,10 @@ function handleInput(event) {
 function bindEvents() {
     const app = root();
 
-    if (!app || eventsBound) {
+    if (
+        !app ||
+        eventsBound
+    ) {
         return;
     }
 
@@ -1271,14 +1602,16 @@ function bindEvents() {
     );
 
     app.addEventListener(
-        "input",
-        handleInput
+        "change",
+        handleChange
     );
 
     eventsBound = true;
 }
 
-export function renderApp(options = {}) {
+export function renderApp(
+    options = {}
+) {
     const app = root();
 
     if (!app) {
@@ -1294,7 +1627,8 @@ export function renderApp(options = {}) {
 
     runtime.state =
         options.state &&
-        typeof options.state === "object"
+        typeof options.state ===
+        "object"
             ? options.state
             : runtime.state;
 
@@ -1306,14 +1640,16 @@ export function renderApp(options = {}) {
             options.objectSection;
     }
 
-    for (const key of [
-        "onNavigate",
-        "onLogin",
-        "onLogout",
-        "onCheckin",
-        "onCheckout",
-        "onSelectObject"
-    ]) {
+    for (
+        const key of [
+            "onNavigate",
+            "onLogin",
+            "onLogout",
+            "onCheckin",
+            "onCheckout",
+            "onSelectObject"
+        ]
+    ) {
         if (
             typeof options[key] ===
             "function"
@@ -1324,10 +1660,16 @@ export function renderApp(options = {}) {
     }
 
     app.innerHTML =
-        runtime.route === ROUTES.LOGIN ||
-        !runtime.state?.currentUser
-            ? renderLogin(runtime.state)
-            : renderShell(runtime.state);
+        runtime.route ===
+        ROUTES.LOGIN ||
+        !runtime.state
+            ?.currentUser
+            ? renderLogin(
+                runtime.state
+            )
+            : renderShell(
+                runtime.state
+            );
 
     bindEvents();
     syncLiveTimer();
