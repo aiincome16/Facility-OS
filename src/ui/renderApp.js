@@ -368,14 +368,46 @@ function renderMaterials(state) {
                     >
                 </label>
 
-                <label>
-                    Anzahl
+                <section
+                    class="material-quantity-section"
+                    style="
+                        display: grid;
+                        gap: 10px;
+                    "
+                >
+                    <strong>Anzahl</strong>
+
+                    <div
+                        class="material-quantity-presets"
+                        style="
+                            display: grid;
+                            grid-template-columns:
+                                repeat(5, minmax(0, 1fr));
+                            gap: 8px;
+                        "
+                    >
+                        ${[1, 2, 3, 4, 5].map((value) => `
+                            <button
+                                type="button"
+                                class="secondary"
+                                data-quantity-value="${value}"
+                                style="
+                                    min-height: 48px;
+                                    padding: 0;
+                                    font-weight: 800;
+                                "
+                            >
+                                ${value}
+                            </button>
+                        `).join("")}
+                    </div>
 
                     <div
                         class="material-quantity-control"
                         style="
                             display: grid;
-                            grid-template-columns: 52px minmax(0, 1fr) 52px;
+                            grid-template-columns:
+                                52px minmax(0, 1fr) 52px;
                             gap: 8px;
                             align-items: center;
                         "
@@ -398,17 +430,26 @@ function renderMaterials(state) {
                         <input
                             id="material-quantity"
                             name="quantity"
-                            type="text"
+                            type="tel"
                             inputmode="numeric"
                             pattern="[0-9]*"
                             autocomplete="off"
-                            placeholder="Anzahl eingeben"
+                            placeholder="Anzahl"
                             required
                             style="
                                 min-height: 52px;
+                                width: 100%;
+                                padding: 0 12px;
+                                border: 1px solid var(--border);
+                                border-radius: 12px;
+                                background: #08172b;
+                                color: var(--text);
                                 text-align: center;
                                 font-size: 18px;
                                 font-weight: 800;
+                                opacity: 1;
+                                pointer-events: auto;
+                                touch-action: manipulation;
                             "
                         >
 
@@ -432,12 +473,11 @@ function renderMaterials(state) {
                         id="material-quantity-hint"
                         style="
                             color: var(--soft);
-                            font-weight: 400;
                         "
                     >
-                        Material auswählen und Anzahl eingeben oder + / − verwenden.
+                        Zahl antippen, eingeben oder eine Schnellauswahl verwenden.
                     </small>
-                </label>
+                </section>
 
                 <button
                     id="material-submit"
@@ -1015,6 +1055,40 @@ async function handleClick(event) {
             0
         );
 
+        return;
+    }
+
+    const quantityValueButton =
+        event.target.closest(
+            "[data-quantity-value]"
+        );
+
+    if (quantityValueButton) {
+        event.preventDefault();
+
+        const quantityInput =
+            document.getElementById(
+                "material-quantity"
+            );
+
+        const materialInput =
+            document.getElementById(
+                "material-select"
+            );
+
+        if (
+            !quantityInput ||
+            !materialInput?.value
+        ) {
+            return;
+        }
+
+        quantityInput.value =
+            quantityValueButton.getAttribute(
+                "data-quantity-value"
+            ) ?? "";
+
+        updateMaterialFormState();
         return;
     }
 
