@@ -370,16 +370,73 @@ function renderMaterials(state) {
 
                 <label>
                     Anzahl
-                    <input
-                        id="material-quantity"
-                        name="quantity"
-                        type="number"
-                        min="1"
-                        step="1"
-                        inputmode="numeric"
-                        required
-                        ${selectedMaterialId ? "" : "disabled"}
+
+                    <div
+                        class="material-quantity-control"
+                        style="
+                            display: grid;
+                            grid-template-columns: 52px minmax(0, 1fr) 52px;
+                            gap: 8px;
+                            align-items: center;
+                        "
                     >
+                        <button
+                            type="button"
+                            class="secondary"
+                            data-quantity-action="decrease"
+                            aria-label="Anzahl verringern"
+                            style="
+                                min-width: 52px;
+                                min-height: 52px;
+                                padding: 0;
+                                font-size: 26px;
+                            "
+                        >
+                            &minus;
+                        </button>
+
+                        <input
+                            id="material-quantity"
+                            name="quantity"
+                            type="text"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
+                            placeholder="Anzahl eingeben"
+                            required
+                            style="
+                                min-height: 52px;
+                                text-align: center;
+                                font-size: 18px;
+                                font-weight: 800;
+                            "
+                        >
+
+                        <button
+                            type="button"
+                            class="secondary"
+                            data-quantity-action="increase"
+                            aria-label="Anzahl erhöhen"
+                            style="
+                                min-width: 52px;
+                                min-height: 52px;
+                                padding: 0;
+                                font-size: 26px;
+                            "
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <small
+                        id="material-quantity-hint"
+                        style="
+                            color: var(--soft);
+                            font-weight: 400;
+                        "
+                    >
+                        Material auswählen und Anzahl eingeben oder + / − verwenden.
+                    </small>
                 </label>
 
                 <button
@@ -625,11 +682,26 @@ function updateMaterialFormState() {
         return;
     }
 
+    const normalizedQuantity =
+        txt(quantityInput.value)
+            .replace(/[^0-9]/g, "");
+
+    if (
+        quantityInput.value !==
+        normalizedQuantity
+    ) {
+        quantityInput.value =
+            normalizedQuantity;
+    }
+
     submitButton.disabled = !(
         objectInput.value &&
         materialInput.value &&
         unitInput.value &&
-        Number(quantityInput.value) > 0
+        Number.parseInt(
+            normalizedQuantity,
+            10
+        ) > 0
     );
 }
 
@@ -943,6 +1015,61 @@ async function handleClick(event) {
             0
         );
 
+        return;
+    }
+
+    const quantityActionButton =
+        event.target.closest(
+            "[data-quantity-action]"
+        );
+
+    if (quantityActionButton) {
+        event.preventDefault();
+
+        const quantityInput =
+            document.getElementById(
+                "material-quantity"
+            );
+
+        const materialInput =
+            document.getElementById(
+                "material-select"
+            );
+
+        if (
+            !quantityInput ||
+            !materialInput?.value
+        ) {
+            return;
+        }
+
+        const currentValue =
+            Number.parseInt(
+                quantityInput.value,
+                10
+            ) || 0;
+
+        const action =
+            quantityActionButton.getAttribute(
+                "data-quantity-action"
+            );
+
+        const nextValue =
+            action === "increase"
+                ? currentValue + 1
+                : Math.max(
+                    0,
+                    currentValue - 1
+                );
+
+        quantityInput.value =
+            nextValue > 0
+                ? String(nextValue)
+                : "";
+
+        updateMaterialFormState();
+
+        quantityInput.focus();
         return;
     }
 
