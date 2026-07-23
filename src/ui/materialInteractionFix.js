@@ -1,17 +1,11 @@
 /************************************************
  * Facility OS
  * materialInteractionFix.js
- *
- * Mobile-sichere Materialauswahl ohne Abhängigkeit
- * von nativen Select-Menüs.
  ************************************************/
 
-const ENHANCED_ATTRIBUTE =
-    "data-material-mobile-enhanced";
+const MARKER = "data-material-mobile-enhanced";
 
-let observer = null;
-
-function escapeHtml(value) {
+function esc(value) {
     return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
@@ -20,81 +14,47 @@ function escapeHtml(value) {
         .replaceAll("'", "&#039;");
 }
 
-function getOptions(selectElement) {
-    return Array.from(
-        selectElement?.options ?? []
-    ).filter((option) =>
-        String(option.value ?? "").trim() !== ""
-    );
+function optionsOf(select) {
+    return Array.from(select?.options ?? [])
+        .filter((option) =>
+            String(option.value ?? "").trim()
+        );
 }
 
-function createChoiceButton({
+function buttonHtml({
+    type,
     value,
     label,
     selected,
-    type,
     unit = ""
 }) {
     return `
         <button
             type="button"
             class="material-choice-button ${selected ? "selected" : ""}"
-            data-material-choice-type="${escapeHtml(type)}"
-            data-material-choice-value="${escapeHtml(value)}"
-            data-material-choice-unit="${escapeHtml(unit)}"
+            data-material-choice-type="${esc(type)}"
+            data-material-choice-value="${esc(value)}"
+            data-material-choice-unit="${esc(unit)}"
             aria-pressed="${selected ? "true" : "false"}"
         >
-            ${escapeHtml(label)}
+            ${esc(label)}
         </button>
     `;
 }
 
-function renderObjectChoices(form) {
-    const objectSelect =
-        form.querySelector("#material-object");
-
-    const container =
-        form.querySelector(
-            "[data-material-object-choices]"
-        );
-
-    if (!objectSelect || !container) {
-        return;
-    }
-
-    const options =
-        getOptions(objectSelect);
-
-    container.innerHTML =
-        options.length
-            ? options.map((option) =>
-                createChoiceButton({
-                    value:
-                        option.value,
-                    label:
-                        option.textContent.trim(),
-                    selected:
-                        option.value ===
-                        objectSelect.value,
-                    type:
-                        "object"
-                })
-            ).join("")
-            : `
-                <div class="material-choice-empty">
-                    Keine Objekte verfügbar.
-                </div>
-            `;
-}
-
-function renderMaterialChoices(form) {
+function renderChoices(form) {
     const objectSelect =
         form.querySelector("#material-object");
 
     const materialSelect =
         form.querySelector("#material-select");
 
-    const container =
+    const objectBox =
+        form.querySelector(
+            "[data-material-object-choices]"
+        );
+
+    const materialBox =
         form.querySelector(
             "[data-material-item-choices]"
         );
@@ -102,50 +62,66 @@ function renderMaterialChoices(form) {
     if (
         !objectSelect ||
         !materialSelect ||
-        !container
+        !objectBox ||
+        !materialBox
     ) {
         return;
     }
 
-    if (!objectSelect.value) {
-        container.innerHTML = `
-            <div class="material-choice-empty">
-                Zuerst ein Objekt auswählen.
-            </div>
-        `;
-        return;
-    }
-
-    const options =
-        getOptions(materialSelect);
-
-    container.innerHTML =
-        options.length
-            ? options.map((option) =>
-                createChoiceButton({
-                    value:
-                        option.value,
+    objectBox.innerHTML =
+        optionsOf(objectSelect)
+            .map((option) =>
+                buttonHtml({
+                    type: "object",
+                    value: option.value,
                     label:
                         option.textContent.trim(),
                     selected:
                         option.value ===
-                        materialSelect.value,
-                    type:
-                        "material",
-                    unit:
-                        option.getAttribute(
-                            "data-unit"
-                        ) ?? ""
+                        objectSelect.value
                 })
-            ).join("")
+            )
+            .join("") ||
+        `
+            <div class="material-choice-empty">
+                Keine Objekte verfügbar.
+            </div>
+        `;
+
+    materialBox.innerHTML =
+        objectSelect.value
+            ? (
+                optionsOf(materialSelect)
+                    .map((option) =>
+                        buttonHtml({
+                            type: "material",
+                            value: option.value,
+                            label:
+                                option.textContent.trim(),
+                            selected:
+                                option.value ===
+                                materialSelect.value,
+                            unit:
+                                option.getAttribute(
+                                    "data-unit"
+                                ) ?? ""
+                        })
+                    )
+                    .join("") ||
+                `
+                    <div class="material-choice-empty">
+                        Keine Materialien verfügbar.
+                    </div>
+                `
+            )
             : `
                 <div class="material-choice-empty">
-                    Keine Materialien verfügbar.
+                    Zuerst ein Objekt auswählen.
                 </div>
             `;
 }
 
-function updateFormState(form) {
+function syncForm(form) {
     const objectSelect =
         form.querySelector("#material-object");
 
@@ -181,6 +157,10 @@ function updateFormState(form) {
             "data-unit"
         ) ?? "";
 
+    materialSelect.disabled =
+        !objectSelect.value;
+
+    unitInput.disabled = false;
     unitInput.value = unit;
 
     quantityInput.disabled =
@@ -194,19 +174,15 @@ function updateFormState(form) {
         Number(quantityInput.value) > 0
     );
 
-    renderObjectChoices(form);
-    renderMaterialChoices(form);
+    renderChoices(form);
 }
 
-function selectObject(form, value) {
+function chooseObject(form, value) {
     const objectSelect =
         form.querySelector("#material-object");
 
     const materialSelect =
         form.querySelector("#material-select");
-
-    const unitInput =
-        form.querySelector("#material-unit");
 
     const quantityInput =
         form.querySelector("#material-quantity");
@@ -222,26 +198,14 @@ function selectObject(form, value) {
         materialSelect.value = "";
     }
 
-    if (unitInput) {
-        unitInput.disabled = false;
-        unitInput.value = "";
-    }
-
     if (quantityInput) {
-        quantityInput.disabled = true;
         quantityInput.value = "";
     }
 
-    objectSelect.dispatchEvent(
-        new Event("change", {
-            bubbles: true
-        })
-    );
-
-    updateFormState(form);
+    syncForm(form);
 }
 
-function selectMaterial(
+function chooseMaterial(
     form,
     value,
     unit
@@ -269,21 +233,19 @@ function selectMaterial(
 
     if (quantityInput) {
         quantityInput.disabled = false;
-        quantityInput.focus();
+
+        setTimeout(
+            () => quantityInput.focus(),
+            0
+        );
     }
 
-    materialSelect.dispatchEvent(
-        new Event("change", {
-            bubbles: true
-        })
-    );
-
-    updateFormState(form);
+    syncForm(form);
 }
 
-function handleChoiceClick(event) {
+function onDocumentClick(event) {
     const button =
-        event.target.closest(
+        event.target.closest?.(
             "[data-material-choice-type]"
         );
 
@@ -300,6 +262,10 @@ function handleChoiceClick(event) {
         return;
     }
 
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
     const type =
         button.getAttribute(
             "data-material-choice-type"
@@ -311,15 +277,12 @@ function handleChoiceClick(event) {
         ) ?? "";
 
     if (type === "object") {
-        selectObject(
-            form,
-            value
-        );
+        chooseObject(form, value);
         return;
     }
 
     if (type === "material") {
-        selectMaterial(
+        chooseMaterial(
             form,
             value,
             button.getAttribute(
@@ -329,12 +292,10 @@ function handleChoiceClick(event) {
     }
 }
 
-function enhanceMaterialForm(form) {
+function enhance(form) {
     if (
         !form ||
-        form.hasAttribute(
-            ENHANCED_ATTRIBUTE
-        )
+        form.hasAttribute(MARKER)
     ) {
         return;
     }
@@ -353,7 +314,7 @@ function enhanceMaterialForm(form) {
     }
 
     form.setAttribute(
-        ENHANCED_ATTRIBUTE,
+        MARKER,
         "true"
     );
 
@@ -365,102 +326,65 @@ function enhanceMaterialForm(form) {
         "material-native-select"
     );
 
-    const objectLabel =
-        objectSelect.closest("label");
+    objectSelect.closest("label")
+        ?.insertAdjacentHTML(
+            "afterend",
+            `
+                <section class="material-choice-section">
+                    <strong>1. Objekt auswählen</strong>
+                    <div
+                        class="material-choice-grid"
+                        data-material-object-choices
+                    ></div>
+                </section>
+            `
+        );
 
-    const materialLabel =
-        materialSelect.closest("label");
-
-    objectLabel?.insertAdjacentHTML(
-        "afterend",
-        `
-            <section class="material-choice-section">
-                <strong>1. Objekt auswählen</strong>
-                <div
-                    class="material-choice-grid"
-                    data-material-object-choices
-                ></div>
-            </section>
-        `
-    );
-
-    materialLabel?.insertAdjacentHTML(
-        "afterend",
-        `
-            <section class="material-choice-section">
-                <strong>2. Material auswählen</strong>
-                <div
-                    class="material-choice-grid"
-                    data-material-item-choices
-                ></div>
-            </section>
-        `
-    );
-
-    form.addEventListener(
-        "click",
-        handleChoiceClick
-    );
+    materialSelect.closest("label")
+        ?.insertAdjacentHTML(
+            "afterend",
+            `
+                <section class="material-choice-section">
+                    <strong>2. Material auswählen</strong>
+                    <div
+                        class="material-choice-grid"
+                        data-material-item-choices
+                    ></div>
+                </section>
+            `
+        );
 
     form.addEventListener(
         "input",
-        () => updateFormState(form)
+        () => syncForm(form)
     );
 
-    form.addEventListener(
-        "change",
-        () => {
-            window.setTimeout(
-                () => {
-                    const currentForm =
-                        document.getElementById(
-                            "material-order-form"
-                        );
-
-                    if (currentForm) {
-                        enhanceMaterialForm(
-                            currentForm
-                        );
-                        updateFormState(
-                            currentForm
-                        );
-                    }
-                },
-                0
-            );
-        }
-    );
-
-    updateFormState(form);
+    syncForm(form);
 }
 
 function scan() {
-    const form =
+    enhance(
         document.getElementById(
             "material-order-form"
-        );
-
-    if (form) {
-        enhanceMaterialForm(form);
-    }
+        )
+    );
 }
 
-function startObserver() {
-    if (observer) {
-        return;
-    }
-
-    observer = new MutationObserver(
-        scan
+function start() {
+    document.addEventListener(
+        "click",
+        onDocumentClick,
+        true
     );
 
-    observer.observe(
-        document.documentElement,
-        {
-            childList: true,
-            subtree: true
-        }
-    );
+    new MutationObserver(scan)
+        .observe(
+            document.documentElement,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
 
     scan();
 }
@@ -471,12 +395,12 @@ if (
 ) {
     document.addEventListener(
         "DOMContentLoaded",
-        startObserver,
+        start,
         {
             once: true
         }
     );
 }
 else {
-    startObserver();
+    start();
 }
