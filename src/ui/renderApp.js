@@ -8,6 +8,11 @@ const runtime = {
     route: ROUTES.LOGIN,
     state: {},
     objectSection: "",
+    materialDraft: {
+        objectId: "",
+        materialId: "",
+        unit: ""
+    },
     onNavigate: null,
     onLogin: null,
     onLogout: null,
@@ -232,10 +237,29 @@ function activeMaterials(state) {
 
 function renderMaterials(state) {
     const objects = assignedObjects(state);
-    const selectedObjectId = objectId(
-        state?.currentObject
-    );
     const materials = activeMaterials(state);
+
+    const selectedObjectId =
+        runtime.materialDraft.objectId ||
+        objectId(state?.currentObject);
+
+    const selectedMaterialId =
+        runtime.materialDraft.materialId;
+
+    const selectedMaterial =
+        materials.find((material) =>
+            materialId(material) === selectedMaterialId
+        );
+
+    const unit =
+        runtime.materialDraft.unit ||
+        txt(selectedMaterial?.unit);
+
+    runtime.materialDraft.objectId =
+        selectedObjectId;
+
+    runtime.materialDraft.unit =
+        unit;
 
     return `
         <section class="content-page">
@@ -244,7 +268,7 @@ function renderMaterials(state) {
                     <span class="eyebrow">MATERIALMELDUNG</span>
                     <h1>Material bestellen</h1>
                     <p>
-                        Objekt und Material ausw&auml;hlen.
+                        Objekt und Material direkt antippen.
                         Die Einheit wird automatisch &uuml;bernommen.
                     </p>
                 </div>
@@ -254,59 +278,93 @@ function renderMaterials(state) {
                 id="material-order-form"
                 class="material-order-form"
             >
-                <label>
-                    Objekt
-                    <select
-                        id="material-object"
-                        name="objectId"
-                        required
-                    >
-                        <option value="">Objekt ausw&auml;hlen</option>
+                <input
+                    id="material-object"
+                    name="objectId"
+                    type="hidden"
+                    value="${esc(selectedObjectId)}"
+                >
 
-                        ${objects.map((object) => `
-                            <option
-                                value="${esc(objectId(object))}"
-                                ${objectId(object) === selectedObjectId
-                                    ? "selected"
-                                    : ""
-                                }
-                            >
-                                ${esc(objectName(object))}
-                            </option>
-                        `).join("")}
-                    </select>
-                </label>
+                <input
+                    id="material-select"
+                    name="materialId"
+                    type="hidden"
+                    value="${esc(selectedMaterialId)}"
+                >
 
-                <label>
-                    Material
-                    <select
-                        id="material-select"
-                        name="materialId"
-                        required
-                        
-                    >
-                        <option value="">Material ausw&auml;hlen</option>
+                <input
+                    id="material-unit"
+                    name="unit"
+                    type="hidden"
+                    value="${esc(unit)}"
+                >
 
-                        ${materials.map((material) => `
-                            <option
-                                value="${esc(materialId(material))}"
-                                data-unit="${esc(material?.unit ?? "")}"
-                            >
-                                ${esc(materialName(material))}
-                            </option>
-                        `).join("")}
-                    </select>
-                </label>
+                <section class="material-choice-section">
+                    <strong>1. Objekt ausw&auml;hlen</strong>
+
+                    <div class="material-choice-grid">
+                        ${objects.map((object) => {
+                            const id = objectId(object);
+                            const selected =
+                                id === selectedObjectId;
+
+                            return `
+                                <button
+                                    type="button"
+                                    class="material-choice-button ${selected ? "selected" : ""}"
+                                    data-material-object-id="${esc(id)}"
+                                    aria-pressed="${selected ? "true" : "false"}"
+                                >
+                                    ${esc(objectName(object))}
+                                </button>
+                            `;
+                        }).join("") || `
+                            <div class="material-choice-empty">
+                                Keine Objekte verf&uuml;gbar.
+                            </div>
+                        `}
+                    </div>
+                </section>
+
+                <section class="material-choice-section">
+                    <strong>2. Material ausw&auml;hlen</strong>
+
+                    <div class="material-choice-grid">
+                        ${selectedObjectId
+                            ? materials.map((material) => {
+                                const id = materialId(material);
+                                const selected =
+                                    id === selectedMaterialId;
+
+                                return `
+                                    <button
+                                        type="button"
+                                        class="material-choice-button ${selected ? "selected" : ""}"
+                                        data-material-id="${esc(id)}"
+                                        data-material-unit="${esc(material?.unit ?? "")}"
+                                        aria-pressed="${selected ? "true" : "false"}"
+                                    >
+                                        ${esc(materialName(material))}
+                                    </button>
+                                `;
+                            }).join("")
+                            : `
+                                <div class="material-choice-empty">
+                                    Zuerst ein Objekt ausw&auml;hlen.
+                                </div>
+                            `
+                        }
+                    </div>
+                </section>
 
                 <label>
                     Einheit
                     <input
-                        id="material-unit"
-                        name="unit"
+                        id="material-unit-display"
                         type="text"
                         readonly
+                        value="${esc(unit)}"
                         placeholder="Wird automatisch gesetzt"
-                        
                     >
                 </label>
 
@@ -318,8 +376,9 @@ function renderMaterials(state) {
                         type="number"
                         min="1"
                         step="1"
+                        inputmode="numeric"
                         required
-                        
+                        ${selectedMaterialId ? "" : "disabled"}
                     >
                 </label>
 
@@ -536,21 +595,29 @@ function renderShell(state) {
 }
 
 function updateMaterialFormState() {
-    const materialSelect = document.getElementById(
+    const objectInput = document.getElementById(
+        "material-object"
+    );
+
+    const materialInput = document.getElementById(
         "material-select"
     );
+
     const unitInput = document.getElementById(
         "material-unit"
     );
+
     const quantityInput = document.getElementById(
         "material-quantity"
     );
+
     const submitButton = document.getElementById(
         "material-submit"
     );
 
     if (
-        !materialSelect ||
+        !objectInput ||
+        !materialInput ||
         !unitInput ||
         !quantityInput ||
         !submitButton
@@ -558,28 +625,37 @@ function updateMaterialFormState() {
         return;
     }
 
-    const option =
-        materialSelect.options[
-            materialSelect.selectedIndex
-        ];
-
-    const unit = option?.getAttribute(
-        "data-unit"
-    ) ?? "";
-
-    unitInput.value = unit;
-
-    const objectSelect = document.getElementById(
-        "material-object"
+    submitButton.disabled = !(
+        objectInput.value &&
+        materialInput.value &&
+        unitInput.value &&
+        Number(quantityInput.value) > 0
     );
+}
 
-    const valid =
-        Boolean(objectSelect?.value) &&
-        Boolean(materialSelect.value) &&
-        Boolean(unit) &&
-        Number(quantityInput.value) > 0;
+function selectMaterialButton(
+    selector,
+    selectedValue,
+    attributeName
+) {
+    document
+        .querySelectorAll(selector)
+        .forEach((button) => {
+            const selected =
+                button.getAttribute(
+                    attributeName
+                ) === selectedValue;
 
-    submitButton.disabled = !valid;
+            button.classList.toggle(
+                "selected",
+                selected
+            );
+
+            button.setAttribute(
+                "aria-pressed",
+                selected ? "true" : "false"
+            );
+        });
 }
 
 async function handleSubmit(event) {
@@ -614,6 +690,7 @@ async function handleSubmit(event) {
         event.preventDefault();
 
         const data = new FormData(event.target);
+
         const selectedMaterial = activeMaterials(
             runtime.state
         ).find((material) =>
@@ -644,13 +721,14 @@ async function handleSubmit(event) {
         ) {
             if (message) {
                 message.textContent =
-                    "Bitte fÃ¼lle alle Felder vollstÃ¤ndig aus.";
+                    "Bitte fülle alle Felder vollständig aus.";
             }
 
             return;
         }
 
-        const timestamp = new Date().toISOString();
+        const timestamp =
+            new Date().toISOString();
 
         addCollectionEntry(
             "workOrders",
@@ -677,46 +755,197 @@ async function handleSubmit(event) {
                         selectedMaterial?.unit
                     ),
                 quantity,
-                createdAt:
-                    timestamp,
-                updatedAt:
-                    timestamp,
-                source:
-                    "LOCAL_TEST"
+                createdAt: timestamp,
+                updatedAt: timestamp,
+                source: "LOCAL_TEST"
             },
             {
-                notify:
-                    false,
-                persist:
-                    true
+                notify: false,
+                persist: true
             }
         );
 
+        runtime.materialDraft = {
+            objectId:
+                objectId(selectedObject),
+            materialId: "",
+            unit: ""
+        };
+
         event.target.reset();
 
-        const unitInput = document.getElementById(
-            "material-unit"
-        );
-        const submitButton = document.getElementById(
-            "material-submit"
-        );
+        const objectInput =
+            document.getElementById(
+                "material-object"
+            );
 
-        if (unitInput) {
-            unitInput.value = "";
+        if (objectInput) {
+            objectInput.value =
+                runtime.materialDraft.objectId;
         }
 
-        if (submitButton) {
-            submitButton.disabled = true;
+        document
+            .querySelectorAll(
+                "[data-material-id]"
+            )
+            .forEach((button) => {
+                button.classList.remove(
+                    "selected"
+                );
+                button.setAttribute(
+                    "aria-pressed",
+                    "false"
+                );
+            });
+
+        const unitDisplay =
+            document.getElementById(
+                "material-unit-display"
+            );
+
+        if (unitDisplay) {
+            unitDisplay.value = "";
         }
 
         if (message) {
             message.textContent =
                 "Materialbestellung wurde gespeichert.";
         }
+
+        updateMaterialFormState();
     }
 }
 
 async function handleClick(event) {
+    const materialObjectButton =
+        event.target.closest(
+            "[data-material-object-id]"
+        );
+
+    if (materialObjectButton) {
+        event.preventDefault();
+
+        const selectedId = txt(
+            materialObjectButton.getAttribute(
+                "data-material-object-id"
+            )
+        );
+
+        try {
+            const selectedObject =
+                await runtime.onSelectObject?.(
+                    selectedId
+                );
+
+            runtime.state.currentObject =
+                selectedObject ??
+                assignedObjects(runtime.state)
+                    .find((object) =>
+                        objectId(object) ===
+                        selectedId
+                    ) ??
+                null;
+
+            runtime.materialDraft = {
+                objectId: selectedId,
+                materialId: "",
+                unit: ""
+            };
+
+            renderApp(runtime);
+        }
+        catch (error) {
+            window.alert(
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            );
+        }
+
+        return;
+    }
+
+    const materialButton =
+        event.target.closest(
+            "[data-material-id]"
+        );
+
+    if (materialButton) {
+        event.preventDefault();
+
+        const selectedId = txt(
+            materialButton.getAttribute(
+                "data-material-id"
+            )
+        );
+
+        const unit = txt(
+            materialButton.getAttribute(
+                "data-material-unit"
+            )
+        );
+
+        runtime.materialDraft.materialId =
+            selectedId;
+
+        runtime.materialDraft.unit =
+            unit;
+
+        const materialInput =
+            document.getElementById(
+                "material-select"
+            );
+
+        const unitInput =
+            document.getElementById(
+                "material-unit"
+            );
+
+        const unitDisplay =
+            document.getElementById(
+                "material-unit-display"
+            );
+
+        const quantityInput =
+            document.getElementById(
+                "material-quantity"
+            );
+
+        if (materialInput) {
+            materialInput.value =
+                selectedId;
+        }
+
+        if (unitInput) {
+            unitInput.value =
+                unit;
+        }
+
+        if (unitDisplay) {
+            unitDisplay.value =
+                unit;
+        }
+
+        if (quantityInput) {
+            quantityInput.disabled = false;
+        }
+
+        selectMaterialButton(
+            "[data-material-id]",
+            selectedId,
+            "data-material-id"
+        );
+
+        updateMaterialFormState();
+
+        window.setTimeout(
+            () => quantityInput?.focus(),
+            0
+        );
+
+        return;
+    }
+
     const sectionButton = event.target.closest(
         "[data-object-section]"
     );
@@ -748,11 +977,13 @@ async function handleClick(event) {
 
     if (routeButton) {
         runtime.objectSection = "";
+
         runtime.onNavigate?.(
             routeButton.getAttribute(
                 "data-route"
             )
         );
+
         return;
     }
 
@@ -769,6 +1000,7 @@ async function handleClick(event) {
             );
 
             runtime.objectSection = "";
+
             runtime.onNavigate?.(
                 ROUTES.OBJECT_DETAIL
             );
@@ -811,50 +1043,6 @@ async function handleClick(event) {
     }
 }
 
-async function handleChange(event) {
-    if (event.target?.id === "material-object") {
-        const selectedId =
-            txt(event.target.value);
-
-        if (!selectedId) {
-            runtime.state.currentObject = null;
-            updateMaterialFormState();
-            return;
-        }
-
-        try {
-            const selectedObject =
-                await runtime.onSelectObject?.(
-                    selectedId
-                );
-
-            runtime.state.currentObject =
-                selectedObject ??
-                assignedObjects(runtime.state)
-                    .find((object) =>
-                        objectId(object) ===
-                        selectedId
-                    ) ??
-                null;
-
-            updateMaterialFormState();
-        }
-        catch (error) {
-            window.alert(
-                error instanceof Error
-                    ? error.message
-                    : String(error)
-            );
-        }
-
-        return;
-    }
-
-    if (event.target?.id === "material-select") {
-        updateMaterialFormState();
-    }
-}
-
 function handleInput(event) {
     if (
         event.target?.id ===
@@ -879,11 +1067,6 @@ function bindEvents() {
     app.addEventListener(
         "click",
         handleClick
-    );
-
-    app.addEventListener(
-        "change",
-        handleChange
     );
 
     app.addEventListener(
