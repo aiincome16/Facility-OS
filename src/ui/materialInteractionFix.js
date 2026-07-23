@@ -1,9 +1,12 @@
 /************************************************
  * Facility OS
  * materialInteractionFix.js
+ *
+ * Direkte, mobile-sichere Materialauswahl.
  ************************************************/
 
-const MARKER = "data-material-mobile-enhanced";
+const MARKER =
+    "data-material-mobile-enhanced";
 
 function esc(value) {
     return String(value ?? "")
@@ -14,114 +17,47 @@ function esc(value) {
         .replaceAll("'", "&#039;");
 }
 
-function optionsOf(select) {
-    return Array.from(select?.options ?? [])
-        .filter((option) =>
-            String(option.value ?? "").trim()
-        );
+function getForm() {
+    return document.getElementById(
+        "material-order-form"
+    );
 }
 
-function buttonHtml({
-    type,
-    value,
-    label,
-    selected,
-    unit = ""
-}) {
-    return `
-        <button
-            type="button"
-            class="material-choice-button ${selected ? "selected" : ""}"
-            data-material-choice-type="${esc(type)}"
-            data-material-choice-value="${esc(value)}"
-            data-material-choice-unit="${esc(unit)}"
-            aria-pressed="${selected ? "true" : "false"}"
-        >
-            ${esc(label)}
-        </button>
-    `;
+function getOptions(selectElement) {
+    return Array.from(
+        selectElement?.options ?? []
+    ).filter((option) =>
+        String(option.value ?? "").trim() !== ""
+    );
 }
 
-function renderChoices(form) {
-    const objectSelect =
-        form.querySelector("#material-object");
+function setSelectedButton(
+    container,
+    selectedValue
+) {
+    container
+        ?.querySelectorAll(
+            ".material-choice-button"
+        )
+        .forEach((button) => {
+            const selected =
+                button.getAttribute(
+                    "data-value"
+                ) === selectedValue;
 
-    const materialSelect =
-        form.querySelector("#material-select");
+            button.classList.toggle(
+                "selected",
+                selected
+            );
 
-    const objectBox =
-        form.querySelector(
-            "[data-material-object-choices]"
-        );
-
-    const materialBox =
-        form.querySelector(
-            "[data-material-item-choices]"
-        );
-
-    if (
-        !objectSelect ||
-        !materialSelect ||
-        !objectBox ||
-        !materialBox
-    ) {
-        return;
-    }
-
-    objectBox.innerHTML =
-        optionsOf(objectSelect)
-            .map((option) =>
-                buttonHtml({
-                    type: "object",
-                    value: option.value,
-                    label:
-                        option.textContent.trim(),
-                    selected:
-                        option.value ===
-                        objectSelect.value
-                })
-            )
-            .join("") ||
-        `
-            <div class="material-choice-empty">
-                Keine Objekte verfügbar.
-            </div>
-        `;
-
-    materialBox.innerHTML =
-        objectSelect.value
-            ? (
-                optionsOf(materialSelect)
-                    .map((option) =>
-                        buttonHtml({
-                            type: "material",
-                            value: option.value,
-                            label:
-                                option.textContent.trim(),
-                            selected:
-                                option.value ===
-                                materialSelect.value,
-                            unit:
-                                option.getAttribute(
-                                    "data-unit"
-                                ) ?? ""
-                        })
-                    )
-                    .join("") ||
-                `
-                    <div class="material-choice-empty">
-                        Keine Materialien verfügbar.
-                    </div>
-                `
-            )
-            : `
-                <div class="material-choice-empty">
-                    Zuerst ein Objekt auswählen.
-                </div>
-            `;
+            button.setAttribute(
+                "aria-pressed",
+                selected ? "true" : "false"
+            );
+        });
 }
 
-function syncForm(form) {
+function updateSubmitState(form) {
     const objectSelect =
         form.querySelector("#material-object");
 
@@ -147,150 +83,219 @@ function syncForm(form) {
         return;
     }
 
-    const selectedOption =
-        materialSelect.options[
-            materialSelect.selectedIndex
-        ];
-
-    const unit =
-        selectedOption?.getAttribute(
-            "data-unit"
-        ) ?? "";
-
-    materialSelect.disabled =
-        !objectSelect.value;
-
-    unitInput.disabled = false;
-    unitInput.value = unit;
-
-    quantityInput.disabled =
-        !objectSelect.value ||
-        !materialSelect.value;
-
     submitButton.disabled = !(
         objectSelect.value &&
         materialSelect.value &&
-        unit &&
+        unitInput.value &&
         Number(quantityInput.value) > 0
     );
-
-    renderChoices(form);
 }
 
-function chooseObject(form, value) {
+function renderMaterialButtons(form) {
     const objectSelect =
         form.querySelector("#material-object");
 
     const materialSelect =
         form.querySelector("#material-select");
 
-    const quantityInput =
-        form.querySelector("#material-quantity");
+    const container =
+        form.querySelector(
+            "[data-material-item-choices]"
+        );
 
-    if (!objectSelect) {
+    if (
+        !objectSelect ||
+        !materialSelect ||
+        !container
+    ) {
         return;
     }
 
-    objectSelect.value = value;
-
-    if (materialSelect) {
-        materialSelect.disabled = false;
-        materialSelect.value = "";
+    if (!objectSelect.value) {
+        container.innerHTML = `
+            <div class="material-choice-empty">
+                Zuerst ein Objekt auswählen.
+            </div>
+        `;
+        return;
     }
 
-    if (quantityInput) {
-        quantityInput.value = "";
-    }
-
-    syncForm(form);
+    container.innerHTML =
+        getOptions(materialSelect)
+            .map((option) => `
+                <button
+                    type="button"
+                    class="material-choice-button"
+                    data-value="${esc(option.value)}"
+                    onclick="window.facilityChooseMaterial(
+                        '${esc(option.value)}',
+                        '${esc(
+                            option.getAttribute(
+                                "data-unit"
+                            ) ?? ""
+                        )}'
+                    )"
+                >
+                    ${esc(option.textContent.trim())}
+                </button>
+            `)
+            .join("");
 }
 
-function chooseMaterial(
-    form,
-    value,
-    unit
-) {
-    const materialSelect =
-        form.querySelector("#material-select");
+function renderObjectButtons(form) {
+    const objectSelect =
+        form.querySelector("#material-object");
 
-    const unitInput =
-        form.querySelector("#material-unit");
+    const container =
+        form.querySelector(
+            "[data-material-object-choices]"
+        );
 
-    const quantityInput =
-        form.querySelector("#material-quantity");
-
-    if (!materialSelect) {
+    if (!objectSelect || !container) {
         return;
     }
 
-    materialSelect.disabled = false;
-    materialSelect.value = value;
+    container.innerHTML =
+        getOptions(objectSelect)
+            .map((option) => `
+                <button
+                    type="button"
+                    class="material-choice-button"
+                    data-value="${esc(option.value)}"
+                    onclick="window.facilityChooseObject(
+                        '${esc(option.value)}'
+                    )"
+                >
+                    ${esc(option.textContent.trim())}
+                </button>
+            `)
+            .join("");
 
-    if (unitInput) {
-        unitInput.disabled = false;
-        unitInput.value = unit;
-    }
+    setSelectedButton(
+        container,
+        objectSelect.value
+    );
+}
 
-    if (quantityInput) {
-        quantityInput.disabled = false;
+window.facilityChooseObject =
+    function facilityChooseObject(
+        objectId
+    ) {
+        const form = getForm();
 
-        setTimeout(
-            () => quantityInput.focus(),
+        if (!form) {
+            return;
+        }
+
+        const objectSelect =
+            form.querySelector(
+                "#material-object"
+            );
+
+        const materialSelect =
+            form.querySelector(
+                "#material-select"
+            );
+
+        const unitInput =
+            form.querySelector(
+                "#material-unit"
+            );
+
+        const quantityInput =
+            form.querySelector(
+                "#material-quantity"
+            );
+
+        if (!objectSelect) {
+            return;
+        }
+
+        objectSelect.value = objectId;
+
+        if (materialSelect) {
+            materialSelect.disabled = false;
+            materialSelect.value = "";
+        }
+
+        if (unitInput) {
+            unitInput.disabled = false;
+            unitInput.value = "";
+        }
+
+        if (quantityInput) {
+            quantityInput.disabled = true;
+            quantityInput.value = "";
+        }
+
+        setSelectedButton(
+            form.querySelector(
+                "[data-material-object-choices]"
+            ),
+            objectId
+        );
+
+        renderMaterialButtons(form);
+        updateSubmitState(form);
+    };
+
+window.facilityChooseMaterial =
+    function facilityChooseMaterial(
+        selectedMaterialId,
+        unit
+    ) {
+        const form = getForm();
+
+        if (!form) {
+            return;
+        }
+
+        const materialSelect =
+            form.querySelector(
+                "#material-select"
+            );
+
+        const unitInput =
+            form.querySelector(
+                "#material-unit"
+            );
+
+        const quantityInput =
+            form.querySelector(
+                "#material-quantity"
+            );
+
+        if (!materialSelect) {
+            return;
+        }
+
+        materialSelect.disabled = false;
+        materialSelect.value =
+            selectedMaterialId;
+
+        if (unitInput) {
+            unitInput.disabled = false;
+            unitInput.value = unit;
+        }
+
+        if (quantityInput) {
+            quantityInput.disabled = false;
+        }
+
+        setSelectedButton(
+            form.querySelector(
+                "[data-material-item-choices]"
+            ),
+            selectedMaterialId
+        );
+
+        updateSubmitState(form);
+
+        window.setTimeout(
+            () => quantityInput?.focus(),
             0
         );
-    }
-
-    syncForm(form);
-}
-
-function onDocumentClick(event) {
-    const button =
-        event.target.closest?.(
-            "[data-material-choice-type]"
-        );
-
-    if (!button) {
-        return;
-    }
-
-    const form =
-        button.closest(
-            "#material-order-form"
-        );
-
-    if (!form) {
-        return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    const type =
-        button.getAttribute(
-            "data-material-choice-type"
-        );
-
-    const value =
-        button.getAttribute(
-            "data-material-choice-value"
-        ) ?? "";
-
-    if (type === "object") {
-        chooseObject(form, value);
-        return;
-    }
-
-    if (type === "material") {
-        chooseMaterial(
-            form,
-            value,
-            button.getAttribute(
-                "data-material-choice-unit"
-            ) ?? ""
-        );
-    }
-}
+    };
 
 function enhance(form) {
     if (
@@ -326,12 +331,14 @@ function enhance(form) {
         "material-native-select"
     );
 
-    objectSelect.closest("label")
+    objectSelect
+        .closest("label")
         ?.insertAdjacentHTML(
             "afterend",
             `
                 <section class="material-choice-section">
                     <strong>1. Objekt auswählen</strong>
+
                     <div
                         class="material-choice-grid"
                         data-material-object-choices
@@ -340,12 +347,14 @@ function enhance(form) {
             `
         );
 
-    materialSelect.closest("label")
+    materialSelect
+        .closest("label")
         ?.insertAdjacentHTML(
             "afterend",
             `
                 <section class="material-choice-section">
                     <strong>2. Material auswählen</strong>
+
                     <div
                         class="material-choice-grid"
                         data-material-item-choices
@@ -356,27 +365,19 @@ function enhance(form) {
 
     form.addEventListener(
         "input",
-        () => syncForm(form)
+        () => updateSubmitState(form)
     );
 
-    syncForm(form);
+    renderObjectButtons(form);
+    renderMaterialButtons(form);
+    updateSubmitState(form);
 }
 
 function scan() {
-    enhance(
-        document.getElementById(
-            "material-order-form"
-        )
-    );
+    enhance(getForm());
 }
 
 function start() {
-    document.addEventListener(
-        "click",
-        onDocumentClick,
-        true
-    );
-
     new MutationObserver(scan)
         .observe(
             document.documentElement,
