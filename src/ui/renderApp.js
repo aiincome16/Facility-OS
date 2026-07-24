@@ -105,32 +105,24 @@ function createId(prefix) {
 }
 
 function formatClock(startTime) {
-    const start =
-        new Date(startTime);
+    const start = new Date(startTime);
 
-    if (
-        Number.isNaN(
-            start.getTime()
-        )
-    ) {
+    if (Number.isNaN(start.getTime())) {
         return "00:00:00";
     }
 
-    const totalSeconds =
-        Math.max(
-            0,
-            Math.floor(
-                (
-                    Date.now() -
-                    start.getTime()
-                ) / 1000
-            )
-        );
+    const totalSeconds = Math.max(
+        0,
+        Math.floor(
+            (
+                Date.now() -
+                start.getTime()
+            ) / 1000
+        )
+    );
 
     const hours =
-        Math.floor(
-            totalSeconds / 3600
-        );
+        Math.floor(totalSeconds / 3600);
 
     const minutes =
         Math.floor(
@@ -352,6 +344,47 @@ function activeMaterials(state) {
         );
 }
 
+function renderQuantityOptions(
+    selectedQuantity
+) {
+    return Array.from(
+        {
+            length: 50
+        },
+        (_, index) =>
+            index + 1
+    )
+        .map((value) => {
+            const valueText =
+                String(value);
+
+            const selected =
+                valueText ===
+                selectedQuantity;
+
+            return `
+                <label
+                    class="material-quantity-option"
+                >
+                    <input
+                        type="radio"
+                        name="quantity"
+                        value="${valueText}"
+                        ${selected
+                            ? "checked"
+                            : ""
+                        }
+                    >
+
+                    <span>
+                        ${valueText}
+                    </span>
+                </label>
+            `;
+        })
+        .join("");
+}
+
 function renderMaterials(state) {
     const objects =
         assignedObjects(state);
@@ -394,6 +427,87 @@ function renderMaterials(state) {
 
     return `
         <section class="content-page">
+            <style>
+                .material-quantity-section {
+                    display: grid;
+                    gap: 10px;
+                }
+
+                .material-quantity-section > strong {
+                    color: var(--soft);
+                    font-weight: 700;
+                }
+
+                .material-quantity-grid {
+                    display: grid;
+                    grid-template-columns:
+                        repeat(5, minmax(0, 1fr));
+                    gap: 8px;
+                }
+
+                .material-quantity-option {
+                    position: relative;
+                    display: block;
+                    min-width: 0;
+                    color: inherit;
+                    font-weight: 800;
+                }
+
+                .material-quantity-option input {
+                    position: absolute;
+                    width: 1px;
+                    height: 1px;
+                    margin: 0;
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                .material-quantity-option span {
+                    display: grid;
+                    min-height: 46px;
+                    place-items: center;
+                    border: 1px solid var(--border);
+                    border-radius: 11px;
+                    background: #08172b;
+                    color: var(--text);
+                    user-select: none;
+                    -webkit-user-select: none;
+                    touch-action: manipulation;
+                    -webkit-tap-highlight-color:
+                        transparent;
+                }
+
+                .material-quantity-option
+                input:checked + span {
+                    border-color: var(--blue);
+                    background:
+                        rgba(95, 127, 255, .28);
+                    box-shadow:
+                        0 0 0 2px var(--blue);
+                }
+
+                .material-quantity-option
+                input:focus-visible + span {
+                    outline:
+                        2px solid var(--blue);
+                    outline-offset: 2px;
+                }
+
+                @media (max-width: 380px) {
+                    .material-quantity-grid {
+                        grid-template-columns:
+                            repeat(4, minmax(0, 1fr));
+                    }
+                }
+
+                @media (min-width: 700px) {
+                    .material-quantity-grid {
+                        grid-template-columns:
+                            repeat(10, minmax(0, 1fr));
+                    }
+                }
+            </style>
+
             <header class="dashboard-heading">
                 <div>
                     <span class="eyebrow">
@@ -550,39 +664,34 @@ function renderMaterials(state) {
                     >
                 </label>
 
-                <label>
-                    Anzahl
+                <section
+                    class="material-quantity-section"
+                >
+                    <strong>
+                        Anzahl
+                    </strong>
 
-                    <select
-                        id="material-quantity"
-                        name="quantity"
-                        required
-                    >
-                        <option value="">
-                            Anzahl ausw&auml;hlen
-                        </option>
-
-                        ${Array.from(
-                            {
-                                length: 50
-                            },
-                            (_, index) =>
-                                index + 1
-                        ).map(
-                            (value) => `
-                                <option
-                                    value="${value}"
-                                    ${String(value) === quantity
-                                        ? "selected"
-                                        : ""
-                                    }
-                                >
-                                    ${value}
-                                </option>
-                            `
-                        ).join("")}
-                    </select>
-                </label>
+                    ${selectedMaterialId
+                        ? `
+                            <div
+                                class="material-quantity-grid"
+                                role="radiogroup"
+                                aria-label="Anzahl auswählen"
+                            >
+                                ${renderQuantityOptions(
+                                    quantity
+                                )}
+                            </div>
+                        `
+                        : `
+                            <div
+                                class="material-choice-empty"
+                            >
+                                Zuerst ein Material ausw&auml;hlen.
+                            </div>
+                        `
+                    }
+                </section>
 
                 <button
                     id="material-submit"
@@ -596,6 +705,7 @@ function renderMaterials(state) {
                 <div
                     id="material-order-message"
                     class="message"
+                    aria-live="polite"
                 ></div>
             </form>
         </section>
@@ -960,7 +1070,16 @@ function renderShell(state) {
     `;
 }
 
-function updateMaterialFormState() {
+function getMaterialFormElements() {
+    const form =
+        document.getElementById(
+            "material-order-form"
+        );
+
+    if (!form) {
+        return null;
+    }
+
     const objectInput =
         document.getElementById(
             "material-object"
@@ -976,36 +1095,64 @@ function updateMaterialFormState() {
             "material-unit"
         );
 
-    const quantityInput =
-        document.getElementById(
-            "material-quantity"
-        );
-
     const submitButton =
         document.getElementById(
             "material-submit"
+        );
+
+    const message =
+        document.getElementById(
+            "material-order-message"
         );
 
     if (
         !objectInput ||
         !materialInput ||
         !unitInput ||
-        !quantityInput ||
-        !submitButton
+        !submitButton ||
+        !message
     ) {
+        throw new Error(
+            "Das Materialformular ist unvollständig."
+        );
+    }
+
+    return {
+        form,
+        objectInput,
+        materialInput,
+        unitInput,
+        submitButton,
+        message
+    };
+}
+
+function selectedQuantityValue() {
+    return txt(
+        document.querySelector(
+            '#material-order-form input[name="quantity"]:checked'
+        )?.value
+    );
+}
+
+function updateMaterialFormState() {
+    const elements =
+        getMaterialFormElements();
+
+    if (!elements) {
         return;
     }
 
     const quantity =
         Number.parseInt(
-            quantityInput.value,
+            selectedQuantityValue(),
             10
         );
 
-    submitButton.disabled = !(
-        objectInput.value &&
-        materialInput.value &&
-        unitInput.value &&
+    elements.submitButton.disabled = !(
+        elements.objectInput.value &&
+        elements.materialInput.value &&
+        elements.unitInput.value &&
         Number.isInteger(quantity) &&
         quantity > 0
     );
@@ -1036,6 +1183,18 @@ function selectMaterialButton(
                     : "false"
             );
         });
+}
+
+function clearQuantitySelection() {
+    document
+        .querySelectorAll(
+            '#material-order-form input[name="quantity"]'
+        )
+        .forEach((input) => {
+            input.checked = false;
+        });
+
+    runtime.materialDraft.quantity = "";
 }
 
 async function handleSubmit(event) {
@@ -1127,10 +1286,14 @@ async function handleSubmit(event) {
                 10
             );
 
-        const message =
-            document.getElementById(
-                "material-order-message"
+        const elements =
+            getMaterialFormElements();
+
+        if (!elements) {
+            throw new Error(
+                "Das Materialformular wurde nicht gefunden."
             );
+        }
 
         if (
             !selectedMaterial ||
@@ -1140,10 +1303,8 @@ async function handleSubmit(event) {
             ) ||
             quantity <= 0
         ) {
-            if (message) {
-                message.textContent =
-                    "Bitte fülle alle Felder vollständig aus.";
-            }
+            elements.message.textContent =
+                "Bitte wähle Objekt, Material und Anzahl vollständig aus.";
 
             return;
         }
@@ -1283,18 +1444,25 @@ async function handleSubmit(event) {
             unitDisplay.value = "";
         }
 
-        if (message) {
-            message.textContent =
-                "Materialbestellung wurde gespeichert.";
-        }
+        elements.message.textContent =
+            "Materialbestellung wurde gespeichert.";
 
         updateMaterialFormState();
     }
 }
 
 async function handleClick(event) {
+    const eventElement =
+        event.target instanceof Element
+            ? event.target
+            : null;
+
+    if (!eventElement) {
+        return;
+    }
+
     const materialObjectButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-material-object-id]"
         );
 
@@ -1355,7 +1523,7 @@ async function handleClick(event) {
     }
 
     const materialButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-material-id]"
         );
 
@@ -1388,11 +1556,6 @@ async function handleClick(event) {
             .unit =
             unit;
 
-        runtime
-            .materialDraft
-            .quantity =
-            "";
-
         const materialInput =
             document.getElementById(
                 "material-select"
@@ -1408,29 +1571,26 @@ async function handleClick(event) {
                 "material-unit-display"
             );
 
-        const quantityInput =
-            document.getElementById(
-                "material-quantity"
+        if (
+            !materialInput ||
+            !unitInput ||
+            !unitDisplay
+        ) {
+            throw new Error(
+                "Die Materialauswahl konnte nicht vollständig aktualisiert werden."
             );
-
-        if (materialInput) {
-            materialInput.value =
-                selectedId;
         }
 
-        if (unitInput) {
-            unitInput.value =
-                unit;
-        }
+        materialInput.value =
+            selectedId;
 
-        if (unitDisplay) {
-            unitDisplay.value =
-                unit;
-        }
+        unitInput.value =
+            unit;
 
-        if (quantityInput) {
-            quantityInput.value = "";
-        }
+        unitDisplay.value =
+            unit;
+
+        clearQuantitySelection();
 
         selectMaterialButton(
             "[data-material-id]",
@@ -1443,7 +1603,7 @@ async function handleClick(event) {
     }
 
     const sectionButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-object-section]"
         );
 
@@ -1460,7 +1620,7 @@ async function handleClick(event) {
     }
 
     const sectionBackButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-object-section-back]"
         );
 
@@ -1472,7 +1632,7 @@ async function handleClick(event) {
     }
 
     const routeButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-route]"
         );
 
@@ -1489,7 +1649,7 @@ async function handleClick(event) {
     }
 
     const objectButton =
-        event.target.closest(
+        eventElement.closest(
             "[data-object-id]"
         );
 
@@ -1521,7 +1681,7 @@ async function handleClick(event) {
     }
 
     const action =
-        event.target
+        eventElement
             .closest(
                 "[data-action]"
             )
@@ -1566,15 +1726,20 @@ async function handleClick(event) {
 }
 
 function handleChange(event) {
+    const target =
+        event.target;
+
     if (
-        event.target?.id ===
-        "material-quantity"
+        target instanceof
+        HTMLInputElement &&
+        target.name ===
+        "quantity"
     ) {
         runtime
             .materialDraft
             .quantity =
             txt(
-                event.target.value
+                target.value
             );
 
         updateMaterialFormState();
@@ -1584,10 +1749,13 @@ function handleChange(event) {
 function bindEvents() {
     const app = root();
 
-    if (
-        !app ||
-        eventsBound
-    ) {
+    if (!app) {
+        throw new Error(
+            'Das Element "#app" wurde nicht gefunden.'
+        );
+    }
+
+    if (eventsBound) {
         return;
     }
 
