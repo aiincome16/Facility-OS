@@ -344,47 +344,6 @@ function activeMaterials(state) {
         );
 }
 
-function renderQuantityOptions(
-    selectedQuantity
-) {
-    return Array.from(
-        {
-            length: 50
-        },
-        (_, index) =>
-            index + 1
-    )
-        .map((value) => {
-            const valueText =
-                String(value);
-
-            const selected =
-                valueText ===
-                selectedQuantity;
-
-            return `
-                <label
-                    class="material-quantity-option"
-                >
-                    <input
-                        type="radio"
-                        name="quantity"
-                        value="${valueText}"
-                        ${selected
-                            ? "checked"
-                            : ""
-                        }
-                    >
-
-                    <span>
-                        ${valueText}
-                    </span>
-                </label>
-            `;
-        })
-        .join("");
-}
-
 function renderMaterials(state) {
     const objects =
         assignedObjects(state);
@@ -438,73 +397,37 @@ function renderMaterials(state) {
                     font-weight: 700;
                 }
 
-                .material-quantity-grid {
-                    display: grid;
-                    grid-template-columns:
-                        repeat(5, minmax(0, 1fr));
-                    gap: 8px;
-                }
-
-                .material-quantity-option {
-                    position: relative;
+                .material-quantity-input {
                     display: block;
-                    min-width: 0;
-                    color: inherit;
-                    font-weight: 800;
-                }
-
-                .material-quantity-option input {
-                    position: absolute;
-                    width: 1px;
-                    height: 1px;
-                    margin: 0;
-                    opacity: 0;
-                    pointer-events: none;
-                }
-
-                .material-quantity-option span {
-                    display: grid;
-                    min-height: 46px;
-                    place-items: center;
+                    width: 100%;
+                    min-height: 54px;
+                    padding: 0 14px;
                     border: 1px solid var(--border);
-                    border-radius: 11px;
+                    border-radius: 12px;
                     background: #08172b;
                     color: var(--text);
-                    user-select: none;
-                    -webkit-user-select: none;
+                    font-size: 18px;
+                    font-weight: 800;
+                    line-height: 1;
+                    text-align: center;
+                    opacity: 1;
+                    pointer-events: auto;
                     touch-action: manipulation;
-                    -webkit-tap-highlight-color:
-                        transparent;
+                    -webkit-appearance: none;
+                    appearance: none;
                 }
 
-                .material-quantity-option
-                input:checked + span {
+                .material-quantity-input:focus {
                     border-color: var(--blue);
-                    background:
-                        rgba(95, 127, 255, .28);
-                    box-shadow:
-                        0 0 0 2px var(--blue);
-                }
-
-                .material-quantity-option
-                input:focus-visible + span {
-                    outline:
-                        2px solid var(--blue);
+                    outline: 2px solid var(--blue);
                     outline-offset: 2px;
                 }
 
-                @media (max-width: 380px) {
-                    .material-quantity-grid {
-                        grid-template-columns:
-                            repeat(4, minmax(0, 1fr));
-                    }
-                }
-
-                @media (min-width: 700px) {
-                    .material-quantity-grid {
-                        grid-template-columns:
-                            repeat(10, minmax(0, 1fr));
-                    }
+                .material-quantity-help {
+                    margin: 0;
+                    color: var(--soft);
+                    font-size: 14px;
+                    line-height: 1.4;
                 }
             </style>
 
@@ -671,26 +594,28 @@ function renderMaterials(state) {
                         Anzahl
                     </strong>
 
-                    ${selectedMaterialId
-                        ? `
-                            <div
-                                class="material-quantity-grid"
-                                role="radiogroup"
-                                aria-label="Anzahl auswählen"
-                            >
-                                ${renderQuantityOptions(
-                                    quantity
-                                )}
-                            </div>
-                        `
-                        : `
-                            <div
-                                class="material-choice-empty"
-                            >
-                                Zuerst ein Material ausw&auml;hlen.
-                            </div>
-                        `
-                    }
+                    <input
+                        id="material-quantity"
+                        class="material-quantity-input"
+                        name="quantity"
+                        type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        maxlength="3"
+                        autocomplete="off"
+                        enterkeyhint="done"
+                        value="${esc(quantity)}"
+                        placeholder="Anzahl eingeben"
+                        aria-describedby="material-quantity-help"
+                        required
+                    >
+
+                    <p
+                        id="material-quantity-help"
+                        class="material-quantity-help"
+                    >
+                        Ganze Zahl zwischen 1 und 999 eingeben.
+                    </p>
                 </section>
 
                 <button
@@ -1095,6 +1020,11 @@ function getMaterialFormElements() {
             "material-unit"
         );
 
+    const quantityInput =
+        document.getElementById(
+            "material-quantity"
+        );
+
     const submitButton =
         document.getElementById(
             "material-submit"
@@ -1109,6 +1039,7 @@ function getMaterialFormElements() {
         !objectInput ||
         !materialInput ||
         !unitInput ||
+        !quantityInput ||
         !submitButton ||
         !message
     ) {
@@ -1122,18 +1053,12 @@ function getMaterialFormElements() {
         objectInput,
         materialInput,
         unitInput,
+        quantityInput,
         submitButton,
         message
     };
 }
 
-function selectedQuantityValue() {
-    return txt(
-        document.querySelector(
-            '#material-order-form input[name="quantity"]:checked'
-        )?.value
-    );
-}
 
 function updateMaterialFormState() {
     const elements =
@@ -1145,7 +1070,7 @@ function updateMaterialFormState() {
 
     const quantity =
         Number.parseInt(
-            selectedQuantityValue(),
+            elements.quantityInput.value,
             10
         );
 
@@ -1186,14 +1111,18 @@ function selectMaterialButton(
 }
 
 function clearQuantitySelection() {
-    document
-        .querySelectorAll(
-            '#material-order-form input[name="quantity"]'
-        )
-        .forEach((input) => {
-            input.checked = false;
-        });
+    const quantityInput =
+        document.getElementById(
+            "material-quantity"
+        );
 
+    if (!quantityInput) {
+        throw new Error(
+            "Das Eingabefeld für die Anzahl wurde nicht gefunden."
+        );
+    }
+
+    quantityInput.value = "";
     runtime.materialDraft.quantity = "";
 }
 
@@ -1725,25 +1654,52 @@ async function handleClick(event) {
     }
 }
 
-function handleChange(event) {
-    const target =
-        event.target;
+function normalizeQuantityValue(value) {
+    return String(value ?? "")
+        .replace(/[^0-9]/g, "")
+        .slice(0, 3);
+}
+
+function synchronizeQuantityInput(target) {
+    if (
+        !(target instanceof HTMLInputElement) ||
+        target.id !==
+        "material-quantity"
+    ) {
+        return;
+    }
+
+    const normalizedValue =
+        normalizeQuantityValue(
+            target.value
+        );
 
     if (
-        target instanceof
-        HTMLInputElement &&
-        target.name ===
-        "quantity"
+        target.value !==
+        normalizedValue
     ) {
-        runtime
-            .materialDraft
-            .quantity =
-            txt(
-                target.value
-            );
-
-        updateMaterialFormState();
+        target.value =
+            normalizedValue;
     }
+
+    runtime
+        .materialDraft
+        .quantity =
+        normalizedValue;
+
+    updateMaterialFormState();
+}
+
+function handleInput(event) {
+    synchronizeQuantityInput(
+        event.target
+    );
+}
+
+function handleChange(event) {
+    synchronizeQuantityInput(
+        event.target
+    );
 }
 
 function bindEvents() {
@@ -1767,6 +1723,11 @@ function bindEvents() {
     app.addEventListener(
         "click",
         handleClick
+    );
+
+    app.addEventListener(
+        "input",
+        handleInput
     );
 
     app.addEventListener(
