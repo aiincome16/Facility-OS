@@ -29,6 +29,10 @@ const runtime = {
     absenceConfirmation: null,
     absenceNotice: null,
     replacementSearchRequestId: "",
+    taskObjectId: "",
+    taskRoomId: "",
+    taskExpandedId: "",
+    taskNotice: null,
     onNavigate: null,
     onLogin: null,
     onLogout: null,
@@ -4464,6 +4468,1808 @@ function renderMorePage(state) {
     `;
 }
 
+
+function taskDateKey(value = new Date()) {
+    const date =
+        value instanceof Date
+            ? value
+            : new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return "";
+    }
+
+    const year =
+        date.getFullYear();
+
+    const month =
+        String(
+            date.getMonth() + 1
+        ).padStart(2, "0");
+
+    const day =
+        String(
+            date.getDate()
+        ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
+function taskRole(state) {
+    return txt(
+        state?.currentUser?.role
+    ).toUpperCase();
+}
+
+function taskCurrentUserId(state) {
+    return txt(
+        state?.currentUser?.id ??
+        state?.currentUser?.userId
+    );
+}
+
+function taskObjectsForRole(state) {
+    const role =
+        taskRole(state);
+
+    const allObjects =
+        arr(state?.objects)
+            .filter(
+                (object) =>
+                    object?.active !== false
+            );
+
+    if (
+        [
+            "SUPER_ADMIN",
+            "ADMIN"
+        ].includes(role)
+    ) {
+        return allObjects;
+    }
+
+    if (
+        role ===
+        "OBJEKTLEITER"
+    ) {
+        const allowedIds =
+            managedAbsenceObjectIds(
+                state
+            );
+
+        return allObjects.filter(
+            (object) =>
+                allowedIds.includes(
+                    objectId(object)
+                )
+        );
+    }
+
+    if (
+        role ===
+        "MITARBEITER"
+    ) {
+        return assignedObjects(
+            state
+        );
+    }
+
+    return [];
+}
+
+function taskRoomsForObject(
+    state,
+    selectedObjectId
+) {
+    return arr(state?.rooms)
+        .filter(
+            (room) =>
+                room?.active !== false &&
+                txt(
+                    room?.objectId
+                ) ===
+                txt(
+                    selectedObjectId
+                )
+        )
+        .sort(
+            (first, second) =>
+                Number(
+                    first?.sequence ??
+                    0
+                ) -
+                Number(
+                    second?.sequence ??
+                    0
+                )
+        );
+}
+
+function tasksForRoom(
+    state,
+    selectedObjectId,
+    selectedRoomId
+) {
+    return arr(state?.tasks)
+        .filter(
+            (task) =>
+                task?.active !== false &&
+                txt(
+                    task?.objectId
+                ) ===
+                    txt(
+                        selectedObjectId
+                    ) &&
+                txt(
+                    task?.roomId
+                ) ===
+                    txt(
+                        selectedRoomId
+                    )
+        )
+        .sort(
+            (first, second) =>
+                Number(
+                    first?.sequence ??
+                    0
+                ) -
+                Number(
+                    second?.sequence ??
+                    0
+                )
+        );
+}
+
+function allTasksForObject(
+    state,
+    selectedObjectId
+) {
+    return arr(state?.tasks)
+        .filter(
+            (task) =>
+                task?.active !== false &&
+                txt(
+                    task?.objectId
+                ) ===
+                txt(
+                    selectedObjectId
+                )
+        );
+}
+
+function taskLogDateKey(log) {
+    return txt(
+        log?.workDate
+    ) || taskDateKey(
+        log?.completedAt ??
+        log?.startedAt ??
+        log?.createdAt
+    );
+}
+
+function activeTaskLogsForToday(
+    state,
+    selectedObjectId
+) {
+    const today =
+        taskDateKey();
+
+    return arr(state?.taskLogs)
+        .filter(
+            (log) =>
+                txt(
+                    log?.objectId
+                ) ===
+                    txt(
+                        selectedObjectId
+                    ) &&
+                taskLogDateKey(
+                    log
+                ) ===
+                    today &&
+                ![
+                    "CANCELLED",
+                    "DELETED"
+                ].includes(
+                    txt(
+                        log?.status
+                    ).toUpperCase()
+                )
+        );
+}
+
+function completedTaskLog(
+    state,
+    taskId,
+    {
+        employeeOnly = false
+    } = {}
+) {
+    const employeeId =
+        taskCurrentUserId(
+            state
+        );
+
+    return activeTaskLogsForToday(
+        state,
+        runtime.taskObjectId
+    )
+        .filter(
+            (log) =>
+                txt(
+                    log?.taskId
+                ) ===
+                    txt(taskId) &&
+                txt(
+                    log?.status
+                ).toUpperCase() ===
+                    "COMPLETED" &&
+                (
+                    !employeeOnly ||
+                    [
+                        log?.userId,
+                        log?.employeeId
+                    ]
+                        .map(String)
+                        .includes(
+                            employeeId
+                        )
+                )
+        )
+        .sort(
+            (first, second) =>
+                String(
+                    second?.completedAt ??
+                    ""
+                ).localeCompare(
+                    String(
+                        first?.completedAt ??
+                        ""
+                    )
+                )
+        )[0] ?? null;
+}
+
+function currentRunningShiftForTasks(
+    state
+) {
+    const employeeId =
+        taskCurrentUserId(
+            state
+        );
+
+    const candidates = [
+        state?.currentShift,
+        ...arr(
+            state?.shifts
+        )
+    ].filter(Boolean);
+
+    return candidates.find(
+        (shift) => {
+            const belongs =
+                [
+                    shift?.userId,
+                    shift?.employeeId
+                ]
+                    .map(String)
+                    .includes(
+                        employeeId
+                    );
+
+            const status =
+                txt(
+                    shift?.status
+                ).toUpperCase();
+
+            const running =
+                [
+                    "RUNNING",
+                    "ACTIVE"
+                ].includes(
+                    status
+                ) ||
+                (
+                    Boolean(
+                        shift?.startTime ??
+                        shift?.checkinTime
+                    ) &&
+                    !Boolean(
+                        shift?.endTime ??
+                        shift?.checkoutTime
+                    ) &&
+                    ![
+                        "FINISHED",
+                        "COMPLETED",
+                        "CANCELLED",
+                        "CLOSED"
+                    ].includes(
+                        status
+                    )
+                );
+
+            return (
+                belongs &&
+                running
+            );
+        }
+    ) ?? null;
+}
+
+function taskEmployeeName(
+    state,
+    log
+) {
+    const storedName =
+        txt(
+            log?.employeeName
+        );
+
+    if (storedName) {
+        return storedName;
+    }
+
+    const employeeId =
+        txt(
+            log?.employeeId ??
+            log?.userId
+        );
+
+    const employee =
+        arr(state?.users)
+            .find(
+                (user) =>
+                    txt(
+                        user?.id ??
+                        user?.userId
+                    ) ===
+                    employeeId
+            );
+
+    return employee
+        ? userName(employee)
+        : "Mitarbeiter";
+}
+
+function formatTaskCompletionTime(
+    value
+) {
+    const date =
+        new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return "";
+    }
+
+    return new Intl.DateTimeFormat(
+        "de-DE",
+        {
+            hour:
+                "2-digit",
+
+            minute:
+                "2-digit"
+        }
+    ).format(date);
+}
+
+function ensureTaskSelection(state) {
+    const objects =
+        taskObjectsForRole(
+            state
+        );
+
+    const availableObjectIds =
+        objects
+            .map(objectId);
+
+    const role =
+        taskRole(state);
+
+    const shift =
+        role ===
+        "MITARBEITER"
+            ? currentRunningShiftForTasks(
+                state
+            )
+            : null;
+
+    const preferredObjectId =
+        txt(
+            shift?.objectId
+        ) ||
+        objectId(
+            state?.currentObject
+        );
+
+    if (
+        !availableObjectIds.includes(
+            txt(
+                runtime
+                    .taskObjectId
+            )
+        )
+    ) {
+        runtime.taskObjectId =
+            availableObjectIds.includes(
+                preferredObjectId
+            )
+                ? preferredObjectId
+                : (
+                    availableObjectIds[0] ??
+                    ""
+                );
+    }
+
+    const rooms =
+        taskRoomsForObject(
+            state,
+            runtime.taskObjectId
+        );
+
+    const availableRoomIds =
+        rooms
+            .map(
+                (room) =>
+                    txt(room?.id)
+            );
+
+    if (
+        !availableRoomIds.includes(
+            txt(
+                runtime
+                    .taskRoomId
+            )
+        )
+    ) {
+        runtime.taskRoomId =
+            availableRoomIds[0] ??
+            "";
+    }
+
+    return {
+        objects,
+        rooms,
+        shift
+    };
+}
+
+function taskProgressForRoom(
+    state,
+    room,
+    role
+) {
+    const tasks =
+        tasksForRoom(
+            state,
+            runtime.taskObjectId,
+            room?.id
+        );
+
+    const completed =
+        tasks.filter(
+            (task) =>
+                Boolean(
+                    completedTaskLog(
+                        state,
+                        task?.id,
+                        {
+                            employeeOnly:
+                                role ===
+                                "MITARBEITER"
+                        }
+                    )
+                )
+        ).length;
+
+    return {
+        total:
+            tasks.length,
+
+        completed
+    };
+}
+
+function renderTaskNotice() {
+    const notice =
+        runtime.taskNotice;
+
+    if (!notice?.text) {
+        return "";
+    }
+
+    return `
+        <div
+            class="task-notice ${esc(
+                notice.tone ??
+                "success"
+            )}"
+            role="status"
+        >
+            ${esc(
+                notice.text
+            )}
+        </div>
+    `;
+}
+
+function renderTaskCard(
+    state,
+    task,
+    role,
+    shift
+) {
+    const employeeView =
+        role ===
+        "MITARBEITER";
+
+    const completedLog =
+        completedTaskLog(
+            state,
+            task?.id,
+            {
+                employeeOnly:
+                    employeeView
+            }
+        );
+
+    const expanded =
+        runtime.taskExpandedId ===
+        txt(task?.id);
+
+    const shiftMatchesObject =
+        Boolean(
+            shift &&
+            txt(
+                shift?.objectId
+            ) ===
+            txt(
+                runtime.taskObjectId
+            )
+        );
+
+    const canComplete =
+        employeeView &&
+        shiftMatchesObject;
+
+    return `
+        <article
+            class="task-card ${completedLog ? "completed" : ""}"
+        >
+            <div
+                class="task-card-topline"
+            >
+                <span
+                    class="task-category"
+                >
+                    ${esc(
+                        txt(
+                            task?.category
+                        )
+                            .replaceAll(
+                                "_",
+                                " "
+                            ) ||
+                        "AUFGABE"
+                    )}
+                </span>
+
+                <span
+                    class="task-status ${completedLog ? "success" : "open"}"
+                >
+                    ${completedLog
+                        ? "Erledigt"
+                        : "Offen"
+                    }
+                </span>
+            </div>
+
+            <div
+                class="task-card-heading"
+            >
+                <div>
+                    <h3>
+                        ${esc(
+                            task?.title
+                        )}
+                    </h3>
+
+                    <p>
+                        ${esc(
+                            task
+                                ?.description
+                        )}
+                    </p>
+                </div>
+
+                <span
+                    class="task-minutes"
+                >
+                    ${Number(
+                        task
+                            ?.estimatedMinutes
+                    ) || 0}
+                    Min.
+                </span>
+            </div>
+
+            ${completedLog
+                ? `
+                    <div
+                        class="task-completion-info"
+                    >
+                        <strong>
+                            ${employeeView
+                                ? "Heute erledigt"
+                                : esc(
+                                    taskEmployeeName(
+                                        state,
+                                        completedLog
+                                    )
+                                )
+                            }
+                        </strong>
+
+                        <span>
+                            ${esc(
+                                formatTaskCompletionTime(
+                                    completedLog
+                                        ?.completedAt
+                                )
+                            )} Uhr
+                        </span>
+                    </div>
+                `
+                : ""
+            }
+
+            <button
+                type="button"
+                class="task-detail-toggle"
+                data-task-toggle-id="${esc(
+                    task?.id
+                )}"
+                aria-expanded="${expanded ? "true" : "false"}"
+            >
+                ${expanded
+                    ? "Anleitung schließen"
+                    : "Anleitung anzeigen"
+                }
+            </button>
+
+            ${expanded
+                ? `
+                    <div
+                        class="task-instructions"
+                    >
+                        ${arr(
+                            task
+                                ?.instructions
+                        ).length
+                            ? `
+                                <ol>
+                                    ${arr(
+                                        task
+                                            ?.instructions
+                                    ).map(
+                                        (
+                                            instruction
+                                        ) => `
+                                            <li>
+                                                ${esc(
+                                                    instruction
+                                                )}
+                                            </li>
+                                        `
+                                    ).join("")}
+                                </ol>
+                            `
+                            : `
+                                <p>
+                                    Keine zusätzlichen
+                                    Arbeitsschritte hinterlegt.
+                                </p>
+                            `
+                        }
+
+                        ${task?.documentationRequired === true
+                            ? `
+                                <small>
+                                    Hinweis: Bei Abweichungen
+                                    oder Problemen ist eine
+                                    Dokumentation erforderlich.
+                                </small>
+                            `
+                            : ""
+                        }
+                    </div>
+                `
+                : ""
+            }
+
+            ${employeeView
+                ? `
+                    <div
+                        class="task-card-actions"
+                    >
+                        ${completedLog
+                            ? `
+                                <button
+                                    type="button"
+                                    class="task-undo-button"
+                                    data-task-undo-log-id="${esc(
+                                        completedLog?.id
+                                    )}"
+                                >
+                                    Rückgängig
+                                </button>
+                            `
+                            : `
+                                <button
+                                    type="button"
+                                    class="primary"
+                                    data-task-complete-id="${esc(
+                                        task?.id
+                                    )}"
+                                    ${canComplete
+                                        ? ""
+                                        : "disabled"
+                                    }
+                                >
+                                    Als erledigt markieren
+                                </button>
+                            `
+                        }
+                    </div>
+                `
+                : ""
+            }
+        </article>
+    `;
+}
+
+function renderTaskPage(state) {
+    const role =
+        taskRole(state);
+
+    const allowed =
+        [
+            "SUPER_ADMIN",
+            "ADMIN",
+            "OBJEKTLEITER",
+            "MITARBEITER"
+        ].includes(role);
+
+    const {
+        objects,
+        rooms,
+        shift
+    } =
+        ensureTaskSelection(
+            state
+        );
+
+    const selectedObject =
+        objects.find(
+            (object) =>
+                objectId(object) ===
+                runtime.taskObjectId
+        );
+
+    const selectedRoom =
+        rooms.find(
+            (room) =>
+                txt(room?.id) ===
+                runtime.taskRoomId
+        );
+
+    const roomTasks =
+        tasksForRoom(
+            state,
+            runtime.taskObjectId,
+            runtime.taskRoomId
+        );
+
+    const objectTasks =
+        allTasksForObject(
+            state,
+            runtime.taskObjectId
+        );
+
+    const employeeOnly =
+        role ===
+        "MITARBEITER";
+
+    const completedCount =
+        objectTasks.filter(
+            (task) =>
+                Boolean(
+                    completedTaskLog(
+                        state,
+                        task?.id,
+                        {
+                            employeeOnly
+                        }
+                    )
+                )
+        ).length;
+
+    const remainingCount =
+        Math.max(
+            0,
+            objectTasks.length -
+                completedCount
+        );
+
+    const completionPercent =
+        objectTasks.length
+            ? Math.round(
+                (
+                    completedCount /
+                    objectTasks.length
+                ) * 100
+            )
+            : 0;
+
+    const shiftMatchesObject =
+        role !==
+        "MITARBEITER" ||
+        (
+            shift &&
+            txt(
+                shift?.objectId
+            ) ===
+            txt(
+                runtime.taskObjectId
+            )
+        );
+
+    return `
+        <section
+            class="content-page task-page"
+        >
+            <style>
+                .task-page {
+                    display: grid;
+                    gap: 18px;
+                }
+
+                .task-page h1,
+                .task-page h2,
+                .task-page h3,
+                .task-page p {
+                    margin: 0;
+                }
+
+                .task-summary-grid {
+                    display: grid;
+                    grid-template-columns:
+                        repeat(3, minmax(0, 1fr));
+                    gap: 10px;
+                }
+
+                .task-summary-card {
+                    display: grid;
+                    gap: 7px;
+                    padding: 15px;
+                    border: 1px solid var(--border);
+                    border-radius: 14px;
+                    background: var(--panel);
+                }
+
+                .task-summary-card span {
+                    color: var(--soft);
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+
+                .task-summary-card strong {
+                    font-size: 24px;
+                }
+
+                .task-progress-card {
+                    display: grid;
+                    gap: 10px;
+                    padding: 17px;
+                    border: 1px solid var(--border);
+                    border-radius: 16px;
+                    background: var(--panel);
+                }
+
+                .task-progress-heading {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                }
+
+                .task-progress-track {
+                    overflow: hidden;
+                    height: 11px;
+                    border-radius: 999px;
+                    background: #08172b;
+                }
+
+                .task-progress-track span {
+                    display: block;
+                    width: var(--task-progress);
+                    height: 100%;
+                    border-radius: inherit;
+                    background:
+                        linear-gradient(
+                            90deg,
+                            #5f7fff,
+                            #5ce29d
+                        );
+                }
+
+                .task-panel {
+                    display: grid;
+                    gap: 15px;
+                    padding: 18px;
+                    border: 1px solid var(--border);
+                    border-radius: 17px;
+                    background: var(--panel);
+                }
+
+                .task-section-heading {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 14px;
+                }
+
+                .task-section-heading p {
+                    margin-top: 5px;
+                    color: var(--soft);
+                    line-height: 1.45;
+                }
+
+                .task-object-grid,
+                .task-room-grid {
+                    display: grid;
+                    grid-template-columns:
+                        repeat(2, minmax(0, 1fr));
+                    gap: 9px;
+                }
+
+                .task-object-grid button,
+                .task-room-grid button {
+                    min-width: 0;
+                    min-height: 52px;
+                    padding: 10px 12px;
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    background: #08172b;
+                    color: var(--text);
+                    text-align: left;
+                    font-weight: 800;
+                    touch-action: manipulation;
+                    -webkit-tap-highlight-color:
+                        transparent;
+                }
+
+                .task-object-grid button.selected,
+                .task-room-grid button.selected {
+                    border-color: var(--blue);
+                    background:
+                        rgba(95, 127, 255, .22);
+                    box-shadow:
+                        0 0 0 2px var(--blue);
+                }
+
+                .task-room-grid button {
+                    display: grid;
+                    gap: 4px;
+                }
+
+                .task-room-grid small {
+                    color: var(--soft);
+                }
+
+                .task-shift-warning {
+                    padding: 14px 16px;
+                    border: 1px solid
+                        rgba(255, 171, 64, .48);
+                    border-radius: 13px;
+                    background:
+                        rgba(255, 171, 64, .12);
+                    color: #ffd18d;
+                    font-weight: 800;
+                    line-height: 1.45;
+                }
+
+                .task-notice {
+                    padding: 14px 16px;
+                    border-radius: 13px;
+                    font-weight: 800;
+                }
+
+                .task-notice.success {
+                    border: 1px solid
+                        rgba(39, 174, 96, .48);
+                    background:
+                        rgba(39, 174, 96, .14);
+                    color: #7df0b1;
+                }
+
+                .task-notice.warning {
+                    border: 1px solid
+                        rgba(255, 171, 64, .48);
+                    background:
+                        rgba(255, 171, 64, .12);
+                    color: #ffd18d;
+                }
+
+                .task-list {
+                    display: grid;
+                    gap: 12px;
+                }
+
+                .task-card {
+                    display: grid;
+                    gap: 13px;
+                    padding: 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 15px;
+                    background: #08172b;
+                }
+
+                .task-card.completed {
+                    border-color:
+                        rgba(39, 174, 96, .42);
+                    background:
+                        linear-gradient(
+                            180deg,
+                            rgba(39, 174, 96, .09),
+                            #08172b
+                        );
+                }
+
+                .task-card-topline,
+                .task-card-heading,
+                .task-completion-info {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 12px;
+                }
+
+                .task-category,
+                .task-status {
+                    display: inline-flex;
+                    min-height: 29px;
+                    align-items: center;
+                    padding: 5px 9px;
+                    border-radius: 999px;
+                    font-size: 11px;
+                    font-weight: 900;
+                }
+
+                .task-category {
+                    background:
+                        rgba(95, 127, 255, .18);
+                    color: #b9c5ff;
+                }
+
+                .task-status.open {
+                    background:
+                        rgba(255, 171, 64, .14);
+                    color: #ffd18d;
+                }
+
+                .task-status.success {
+                    background:
+                        rgba(39, 174, 96, .16);
+                    color: #7df0b1;
+                }
+
+                .task-card-heading h3 {
+                    font-size: 18px;
+                }
+
+                .task-card-heading p {
+                    margin-top: 5px;
+                    color: var(--soft);
+                    line-height: 1.45;
+                }
+
+                .task-minutes {
+                    flex: 0 0 auto;
+                    padding: 6px 9px;
+                    border-radius: 10px;
+                    background: #10233f;
+                    color: var(--soft);
+                    font-size: 12px;
+                    font-weight: 800;
+                }
+
+                .task-completion-info {
+                    padding: 11px 12px;
+                    border: 1px solid
+                        rgba(39, 174, 96, .34);
+                    border-radius: 12px;
+                    background:
+                        rgba(39, 174, 96, .08);
+                }
+
+                .task-completion-info span {
+                    color: var(--soft);
+                }
+
+                .task-detail-toggle {
+                    min-height: 43px;
+                    padding: 8px 11px;
+                    border: 1px solid var(--border);
+                    border-radius: 11px;
+                    background: #10233f;
+                    color: var(--text);
+                    font-weight: 800;
+                }
+
+                .task-instructions {
+                    display: grid;
+                    gap: 10px;
+                    padding: 13px;
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    background: #061326;
+                }
+
+                .task-instructions ol {
+                    display: grid;
+                    gap: 8px;
+                    margin: 0;
+                    padding-left: 22px;
+                }
+
+                .task-instructions small {
+                    color: #ffd18d;
+                    line-height: 1.45;
+                }
+
+                .task-card-actions {
+                    display: grid;
+                }
+
+                .task-card-actions button {
+                    min-height: 50px;
+                    border-radius: 12px;
+                    font-weight: 900;
+                }
+
+                .task-card-actions button:disabled {
+                    opacity: .45;
+                }
+
+                .task-undo-button {
+                    border: 1px solid var(--border);
+                    background: #10233f;
+                    color: var(--text);
+                }
+
+                .task-empty {
+                    padding: 16px;
+                    border: 1px dashed var(--border);
+                    border-radius: 12px;
+                    color: var(--soft);
+                    line-height: 1.5;
+                }
+
+                @media (max-width: 640px) {
+                    .task-summary-grid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .task-object-grid,
+                    .task-room-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                @media (max-width: 390px) {
+                    .task-panel,
+                    .task-card {
+                        padding: 14px 12px;
+                    }
+
+                    .task-card-heading {
+                        display: grid;
+                    }
+
+                    .task-minutes {
+                        justify-self: start;
+                    }
+                }
+            </style>
+
+            <header
+                class="dashboard-heading"
+            >
+                <div>
+                    <span class="eyebrow">
+                        TAGESAUFGABEN
+                    </span>
+
+                    <h1>
+                        Aufgaben und Räume
+                    </h1>
+
+                    <p>
+                        ${role === "MITARBEITER"
+                            ? "Tagesaufgaben nach Objekt und Raum abarbeiten."
+                            : "Aufgabenfortschritt der Objekte für heute prüfen."
+                        }
+                    </p>
+                </div>
+            </header>
+
+            ${allowed
+                ? ""
+                : `
+                    <div
+                        class="task-empty"
+                    >
+                        Für diese Rolle ist der
+                        Aufgabenbereich nicht freigegeben.
+                    </div>
+                `
+            }
+
+            ${allowed
+                ? `
+                    ${renderTaskNotice()}
+
+                    ${role === "MITARBEITER" &&
+                        !shiftMatchesObject
+                        ? `
+                            <div
+                                class="task-shift-warning"
+                            >
+                                Zum Abschließen von Aufgaben
+                                muss eine laufende Schicht im
+                                ausgewählten Objekt vorhanden
+                                sein. Aufgaben und Anleitungen
+                                können trotzdem angesehen werden.
+                            </div>
+                        `
+                        : ""
+                    }
+
+                    <section
+                        class="task-summary-grid"
+                    >
+                        <article
+                            class="task-summary-card"
+                        >
+                            <span>
+                                Aufgaben gesamt
+                            </span>
+
+                            <strong>
+                                ${objectTasks.length}
+                            </strong>
+                        </article>
+
+                        <article
+                            class="task-summary-card"
+                        >
+                            <span>
+                                Heute erledigt
+                            </span>
+
+                            <strong>
+                                ${completedCount}
+                            </strong>
+                        </article>
+
+                        <article
+                            class="task-summary-card"
+                        >
+                            <span>
+                                Noch offen
+                            </span>
+
+                            <strong>
+                                ${remainingCount}
+                            </strong>
+                        </article>
+                    </section>
+
+                    <section
+                        class="task-progress-card"
+                    >
+                        <div
+                            class="task-progress-heading"
+                        >
+                            <strong>
+                                Tagesfortschritt
+                            </strong>
+
+                            <span>
+                                ${completionPercent} %
+                            </span>
+                        </div>
+
+                        <div
+                            class="task-progress-track"
+                            style="--task-progress: ${completionPercent}%"
+                            aria-label="${completionPercent} Prozent erledigt"
+                        >
+                            <span></span>
+                        </div>
+                    </section>
+
+                    <section
+                        class="task-panel"
+                    >
+                        <div
+                            class="task-section-heading"
+                        >
+                            <div>
+                                <h2>
+                                    1. Objekt
+                                </h2>
+
+                                <p>
+                                    Objekt für die Aufgabenliste auswählen.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="task-object-grid"
+                        >
+                            ${objects.map(
+                                (object) => {
+                                    const id =
+                                        objectId(object);
+
+                                    return `
+                                        <button
+                                            type="button"
+                                            class="${runtime.taskObjectId === id ? "selected" : ""}"
+                                            data-task-object-id="${esc(
+                                                id
+                                            )}"
+                                        >
+                                            ${esc(
+                                                objectName(
+                                                    object
+                                                )
+                                            )}
+                                        </button>
+                                    `;
+                                }
+                            ).join("") || `
+                                <div
+                                    class="task-empty"
+                                >
+                                    Keine Objekte verfügbar.
+                                </div>
+                            `}
+                        </div>
+                    </section>
+
+                    <section
+                        class="task-panel"
+                    >
+                        <div
+                            class="task-section-heading"
+                        >
+                            <div>
+                                <h2>
+                                    2. Raum
+                                </h2>
+
+                                <p>
+                                    Raum auswählen und Fortschritt prüfen.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="task-room-grid"
+                        >
+                            ${rooms.map(
+                                (room) => {
+                                    const progress =
+                                        taskProgressForRoom(
+                                            state,
+                                            room,
+                                            role
+                                        );
+
+                                    return `
+                                        <button
+                                            type="button"
+                                            class="${runtime.taskRoomId === txt(room?.id) ? "selected" : ""}"
+                                            data-task-room-id="${esc(
+                                                room?.id
+                                            )}"
+                                        >
+                                            <strong>
+                                                ${esc(
+                                                    room?.name
+                                                )}
+                                            </strong>
+
+                                            <small>
+                                                ${progress.completed}
+                                                von
+                                                ${progress.total}
+                                                erledigt
+                                            </small>
+                                        </button>
+                                    `;
+                                }
+                            ).join("") || `
+                                <div
+                                    class="task-empty"
+                                >
+                                    Für dieses Objekt wurden
+                                    keine Räume gefunden.
+                                </div>
+                            `}
+                        </div>
+                    </section>
+
+                    <section
+                        class="task-panel"
+                    >
+                        <div
+                            class="task-section-heading"
+                        >
+                            <div>
+                                <h2>
+                                    ${esc(
+                                        selectedRoom
+                                            ?.name ??
+                                        "Aufgaben"
+                                    )}
+                                </h2>
+
+                                <p>
+                                    ${esc(
+                                        selectedRoom
+                                            ?.notes ??
+                                        selectedObject
+                                            ?.notes ??
+                                        "Aufgaben für den ausgewählten Raum."
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="task-list"
+                        >
+                            ${roomTasks.length
+                                ? roomTasks.map(
+                                    (task) =>
+                                        renderTaskCard(
+                                            state,
+                                            task,
+                                            role,
+                                            shift
+                                        )
+                                ).join("")
+                                : `
+                                    <div
+                                        class="task-empty"
+                                    >
+                                        Für diesen Raum sind
+                                        keine aktiven Aufgaben
+                                        hinterlegt.
+                                    </div>
+                                `
+                            }
+                        </div>
+                    </section>
+                `
+                : ""
+            }
+        </section>
+    `;
+}
+
+function completeTask(
+    state,
+    taskId
+) {
+    if (
+        taskRole(state) !==
+        "MITARBEITER"
+    ) {
+        throw new Error(
+            "Nur Mitarbeiter können Aufgaben abschließen."
+        );
+    }
+
+    const task =
+        arr(state?.tasks)
+            .find(
+                (entry) =>
+                    txt(
+                        entry?.id
+                    ) ===
+                    txt(taskId)
+            );
+
+    if (
+        !task ||
+        task?.active === false
+    ) {
+        throw new Error(
+            "Die Aufgabe wurde nicht gefunden."
+        );
+    }
+
+    const shift =
+        currentRunningShiftForTasks(
+            state
+        );
+
+    if (!shift) {
+        throw new Error(
+            "Bitte zuerst eine Schicht starten."
+        );
+    }
+
+    if (
+        txt(
+            shift?.objectId
+        ) !==
+        txt(
+            task?.objectId
+        )
+    ) {
+        throw new Error(
+            "Die laufende Schicht gehört zu einem anderen Objekt."
+        );
+    }
+
+    if (
+        completedTaskLog(
+            state,
+            taskId,
+            {
+                employeeOnly:
+                    true
+            }
+        )
+    ) {
+        runtime.taskNotice = {
+            tone:
+                "warning",
+
+            text:
+                "Diese Aufgabe wurde heute bereits erledigt."
+        };
+
+        renderApp(runtime);
+        return;
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    addCollectionEntry(
+        "taskLogs",
+        {
+            id:
+                createId(
+                    "TASKLOG"
+                ),
+
+            shiftId:
+                txt(
+                    shift?.id
+                ),
+
+            taskId:
+                txt(
+                    task?.id
+                ),
+
+            userId:
+                taskCurrentUserId(
+                    state
+                ),
+
+            employeeId:
+                taskCurrentUserId(
+                    state
+                ),
+
+            employeeName:
+                userName(
+                    state
+                        ?.currentUser
+                ),
+
+            objectId:
+                txt(
+                    task?.objectId
+                ),
+
+            roomId:
+                txt(
+                    task?.roomId
+                ),
+
+            status:
+                "COMPLETED",
+
+            workDate:
+                taskDateKey(),
+
+            startedAt:
+                null,
+
+            completedAt:
+                timestamp,
+
+            actualMinutes:
+                null,
+
+            estimatedMinutes:
+                Number(
+                    task
+                        ?.estimatedMinutes
+                ) || 0,
+
+            deviationMinutes:
+                null,
+
+            documentationRequired:
+                false,
+
+            documentationProvided:
+                false,
+
+            documentationType:
+                null,
+
+            notes:
+                "",
+
+            attachments:
+                [],
+
+            issueReported:
+                false,
+
+            ticketId:
+                null,
+
+            offlineCreated:
+                true,
+
+            synced:
+                false,
+
+            createdAt:
+                timestamp,
+
+            updatedAt:
+                timestamp,
+
+            source:
+                "LOCAL_TEST"
+        },
+        {
+            notify:
+                false,
+
+            persist:
+                true
+        }
+    );
+
+    runtime.taskNotice = {
+        tone:
+            "success",
+
+        text:
+            `${txt(
+                task?.title
+            )} wurde als erledigt gespeichert.`
+    };
+
+    renderApp(runtime);
+}
+
+function undoTaskCompletion(
+    state,
+    logId
+) {
+    if (
+        taskRole(state) !==
+        "MITARBEITER"
+    ) {
+        throw new Error(
+            "Nur Mitarbeiter können eigene Aufgaben zurücksetzen."
+        );
+    }
+
+    const employeeId =
+        taskCurrentUserId(
+            state
+        );
+
+    const log =
+        arr(state?.taskLogs)
+            .find(
+                (entry) =>
+                    txt(
+                        entry?.id
+                    ) ===
+                        txt(logId) &&
+                    [
+                        entry?.userId,
+                        entry?.employeeId
+                    ]
+                        .map(String)
+                        .includes(
+                            employeeId
+                        ) &&
+                    txt(
+                        entry?.status
+                    ).toUpperCase() ===
+                        "COMPLETED"
+            );
+
+    if (!log) {
+        throw new Error(
+            "Der Aufgabenabschluss wurde nicht gefunden."
+        );
+    }
+
+    updateCollectionEntry(
+        "taskLogs",
+        logId,
+        {
+            status:
+                "CANCELLED",
+
+            cancelledAt:
+                new Date()
+                    .toISOString(),
+
+            updatedAt:
+                new Date()
+                    .toISOString()
+        },
+        {
+            notify:
+                false,
+
+            persist:
+                true
+        }
+    );
+
+    runtime.taskNotice = {
+        tone:
+            "warning",
+
+        text:
+            "Der Aufgabenabschluss wurde zurückgesetzt."
+    };
+
+    renderApp(runtime);
+}
+
 function renderGeneric(route) {
     const title = ({
         [ROUTES.TASKS]:
@@ -4952,6 +6758,16 @@ function renderShell(state) {
 
     if (
         runtime.route ===
+        ROUTES.TASKS
+    ) {
+        page =
+            renderTaskPage(
+                state
+            );
+    }
+
+    if (
+        runtime.route ===
         ROUTES.MORE
     ) {
         page =
@@ -5422,6 +7238,142 @@ async function handleClick(event) {
             : null;
 
     if (!eventElement) {
+        return;
+    }
+
+    const taskObjectButton =
+        eventElement.closest(
+            "[data-task-object-id]"
+        );
+
+    if (taskObjectButton) {
+        event.preventDefault();
+
+        runtime.taskObjectId =
+            txt(
+                taskObjectButton.getAttribute(
+                    "data-task-object-id"
+                )
+            );
+
+        runtime.taskRoomId = "";
+        runtime.taskExpandedId = "";
+        runtime.taskNotice = null;
+
+        renderApp(runtime);
+        return;
+    }
+
+    const taskRoomButton =
+        eventElement.closest(
+            "[data-task-room-id]"
+        );
+
+    if (taskRoomButton) {
+        event.preventDefault();
+
+        runtime.taskRoomId =
+            txt(
+                taskRoomButton.getAttribute(
+                    "data-task-room-id"
+                )
+            );
+
+        runtime.taskExpandedId = "";
+        runtime.taskNotice = null;
+
+        renderApp(runtime);
+        return;
+    }
+
+    const taskToggleButton =
+        eventElement.closest(
+            "[data-task-toggle-id]"
+        );
+
+    if (taskToggleButton) {
+        event.preventDefault();
+
+        const taskId =
+            txt(
+                taskToggleButton.getAttribute(
+                    "data-task-toggle-id"
+                )
+            );
+
+        runtime.taskExpandedId =
+            runtime.taskExpandedId ===
+                taskId
+                ? ""
+                : taskId;
+
+        renderApp(runtime);
+        return;
+    }
+
+    const taskCompleteButton =
+        eventElement.closest(
+            "[data-task-complete-id]"
+        );
+
+    if (taskCompleteButton) {
+        event.preventDefault();
+
+        try {
+            completeTask(
+                runtime.state,
+                taskCompleteButton.getAttribute(
+                    "data-task-complete-id"
+                )
+            );
+        }
+        catch (error) {
+            runtime.taskNotice = {
+                tone:
+                    "warning",
+
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+            };
+
+            renderApp(runtime);
+        }
+
+        return;
+    }
+
+    const taskUndoButton =
+        eventElement.closest(
+            "[data-task-undo-log-id]"
+        );
+
+    if (taskUndoButton) {
+        event.preventDefault();
+
+        try {
+            undoTaskCompletion(
+                runtime.state,
+                taskUndoButton.getAttribute(
+                    "data-task-undo-log-id"
+                )
+            );
+        }
+        catch (error) {
+            runtime.taskNotice = {
+                tone:
+                    "warning",
+
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+            };
+
+            renderApp(runtime);
+        }
+
         return;
     }
 
@@ -6281,6 +8233,14 @@ async function handleClick(event) {
 
         if (
             nextRoute !==
+            ROUTES.TASKS
+        ) {
+            runtime.taskExpandedId = "";
+            runtime.taskNotice = null;
+        }
+
+        if (
+            nextRoute !==
             ROUTES.MORE
         ) {
             runtime.moreSection = "";
@@ -6353,6 +8313,10 @@ async function handleClick(event) {
             runtime.absenceConfirmation = null;
             runtime.absenceNotice = null;
             runtime.replacementSearchRequestId = "";
+            runtime.taskObjectId = "";
+            runtime.taskRoomId = "";
+            runtime.taskExpandedId = "";
+            runtime.taskNotice = null;
 
             await runtime
                 .onLogout?.();
