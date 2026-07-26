@@ -14,6 +14,7 @@ const runtime = {
         unit: "",
         quantity: ""
     },
+    materialConfirmation: null,
     onNavigate: null,
     onLogin: null,
     onLogout: null,
@@ -344,7 +345,310 @@ function activeMaterials(state) {
         );
 }
 
+function formatDateTime(value) {
+    const date =
+        new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return "";
+    }
+
+    return new Intl.DateTimeFormat(
+        "de-DE",
+        {
+            dateStyle:
+                "medium",
+
+            timeStyle:
+                "short"
+        }
+    ).format(date);
+}
+
+function renderMaterialConfirmation(order) {
+    const quantity =
+        Number.parseInt(
+            order?.quantity,
+            10
+        );
+
+    const amount =
+        [
+            Number.isInteger(quantity)
+                ? String(quantity)
+                : "",
+
+            txt(order?.unit)
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+    return `
+        <section class="content-page">
+            <style>
+                .material-confirmation-card {
+                    display: grid;
+                    gap: 20px;
+                    padding: 24px;
+                    border: 1px solid
+                        rgba(92, 226, 157, .45);
+                    border-radius: 18px;
+                    background:
+                        linear-gradient(
+                            180deg,
+                            rgba(39, 174, 96, .16),
+                            rgba(8, 23, 43, .98)
+                        );
+                    box-shadow:
+                        0 18px 50px
+                        rgba(0, 0, 0, .2);
+                }
+
+                .material-confirmation-symbol {
+                    display: grid;
+                    width: 68px;
+                    height: 68px;
+                    place-items: center;
+                    border: 2px solid
+                        rgba(92, 226, 157, .8);
+                    border-radius: 50%;
+                    background:
+                        rgba(39, 174, 96, .2);
+                    color: #7df0b1;
+                    font-size: 34px;
+                    font-weight: 900;
+                }
+
+                .material-confirmation-card h1,
+                .material-confirmation-card p {
+                    margin: 0;
+                }
+
+                .material-confirmation-card p {
+                    color: var(--soft);
+                    line-height: 1.55;
+                }
+
+                .material-confirmation-details {
+                    display: grid;
+                    gap: 0;
+                    overflow: hidden;
+                    border: 1px solid var(--border);
+                    border-radius: 14px;
+                    background: #08172b;
+                }
+
+                .material-confirmation-row {
+                    display: grid;
+                    grid-template-columns:
+                        minmax(105px, .8fr)
+                        minmax(0, 1.4fr);
+                    gap: 14px;
+                    padding: 14px;
+                    border-bottom:
+                        1px solid var(--border);
+                }
+
+                .material-confirmation-row:last-child {
+                    border-bottom: 0;
+                }
+
+                .material-confirmation-row span {
+                    color: var(--soft);
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+
+                .material-confirmation-row strong {
+                    min-width: 0;
+                    overflow-wrap: anywhere;
+                    color: var(--text);
+                    text-align: right;
+                }
+
+                .material-confirmation-status {
+                    color: #7df0b1 !important;
+                }
+
+                .material-confirmation-actions {
+                    display: grid;
+                    gap: 10px;
+                }
+
+                .material-confirmation-actions
+                button {
+                    width: 100%;
+                }
+
+                .material-confirmation-actions
+                .secondary {
+                    border: 1px solid var(--border);
+                    background: #08172b;
+                    color: var(--text);
+                }
+
+                @media (max-width: 420px) {
+                    .material-confirmation-card {
+                        padding: 20px 16px;
+                    }
+
+                    .material-confirmation-row {
+                        grid-template-columns: 1fr;
+                        gap: 5px;
+                    }
+
+                    .material-confirmation-row strong {
+                        text-align: left;
+                    }
+                }
+            </style>
+
+            <article
+                class="material-confirmation-card"
+                aria-live="polite"
+            >
+                <div
+                    class="material-confirmation-symbol"
+                    aria-hidden="true"
+                >
+                    &#10003;
+                </div>
+
+                <div>
+                    <span class="eyebrow">
+                        BESTELLBESTÄTIGUNG
+                    </span>
+
+                    <h1>
+                        Bestellung gespeichert
+                    </h1>
+
+                    <p>
+                        Die Materialbestellung wurde
+                        erfolgreich erfasst und hat den
+                        Status „Offen“.
+                    </p>
+                </div>
+
+                <div
+                    class="material-confirmation-details"
+                >
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Bestellnummer
+                        </span>
+
+                        <strong>
+                            ${esc(order?.id)}
+                        </strong>
+                    </div>
+
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Objekt
+                        </span>
+
+                        <strong>
+                            ${esc(order?.objectName)}
+                        </strong>
+                    </div>
+
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Material
+                        </span>
+
+                        <strong>
+                            ${esc(order?.materialName)}
+                        </strong>
+                    </div>
+
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Bestellmenge
+                        </span>
+
+                        <strong>
+                            ${esc(amount)}
+                        </strong>
+                    </div>
+
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Status
+                        </span>
+
+                        <strong
+                            class="material-confirmation-status"
+                        >
+                            Offen
+                        </strong>
+                    </div>
+
+                    <div
+                        class="material-confirmation-row"
+                    >
+                        <span>
+                            Gespeichert
+                        </span>
+
+                        <strong>
+                            ${esc(
+                                formatDateTime(
+                                    order?.createdAt
+                                )
+                            )}
+                        </strong>
+                    </div>
+                </div>
+
+                <div
+                    class="material-confirmation-actions"
+                >
+                    <button
+                        type="button"
+                        class="primary"
+                        data-material-confirmation-action="new-order"
+                    >
+                        Weitere Bestellung
+                    </button>
+
+                    <button
+                        type="button"
+                        class="secondary"
+                        data-material-confirmation-action="overview"
+                    >
+                        Zur Startseite
+                    </button>
+                </div>
+            </article>
+        </section>
+    `;
+}
+
 function renderMaterials(state) {
+    if (
+        runtime.materialConfirmation
+    ) {
+        return renderMaterialConfirmation(
+            runtime.materialConfirmation
+        );
+    }
+
     const objects =
         assignedObjects(state);
 
@@ -1332,74 +1636,76 @@ async function handleSubmit(event) {
             new Date()
                 .toISOString();
 
+        const order = {
+            id:
+                createId(
+                    "MATERIAL"
+                ),
+
+            type:
+                "MATERIAL_ORDER",
+
+            status:
+                "OFFEN",
+
+            employeeId:
+                runtime.state
+                    ?.currentUser
+                    ?.id ??
+                runtime.state
+                    ?.currentUser
+                    ?.userId,
+
+            employeeName:
+                userName(
+                    runtime.state
+                        ?.currentUser
+                ),
+
+            objectId:
+                objectId(
+                    selectedObject
+                ),
+
+            objectName:
+                objectName(
+                    selectedObject
+                ),
+
+            materialId:
+                materialId(
+                    selectedMaterial
+                ),
+
+            materialName:
+                materialName(
+                    selectedMaterial
+                ),
+
+            unit:
+                txt(
+                    data.get(
+                        "unit"
+                    ) ??
+                    selectedMaterial
+                        ?.unit
+                ),
+
+            quantity,
+
+            createdAt:
+                timestamp,
+
+            updatedAt:
+                timestamp,
+
+            source:
+                "LOCAL_TEST"
+        };
+
         addCollectionEntry(
             "workOrders",
-            {
-                id:
-                    createId(
-                        "MATERIAL"
-                    ),
-
-                type:
-                    "MATERIAL_ORDER",
-
-                status:
-                    "OFFEN",
-
-                employeeId:
-                    runtime.state
-                        ?.currentUser
-                        ?.id ??
-                    runtime.state
-                        ?.currentUser
-                        ?.userId,
-
-                employeeName:
-                    userName(
-                        runtime.state
-                            ?.currentUser
-                    ),
-
-                objectId:
-                    objectId(
-                        selectedObject
-                    ),
-
-                objectName:
-                    objectName(
-                        selectedObject
-                    ),
-
-                materialId:
-                    materialId(
-                        selectedMaterial
-                    ),
-
-                materialName:
-                    materialName(
-                        selectedMaterial
-                    ),
-
-                unit:
-                    txt(
-                        data.get(
-                            "unit"
-                        ) ??
-                        selectedMaterial
-                            ?.unit
-                    ),
-
-                quantity,
-
-                createdAt:
-                    timestamp,
-
-                updatedAt:
-                    timestamp,
-
-                source:
-                    "LOCAL_TEST"
-            },
+            order,
             {
                 notify:
                     false,
@@ -1411,9 +1717,7 @@ async function handleSubmit(event) {
 
         runtime.materialDraft = {
             objectId:
-                objectId(
-                    selectedObject
-                ),
+                order.objectId,
 
             materialId:
                 "",
@@ -1425,50 +1729,11 @@ async function handleSubmit(event) {
                 ""
         };
 
-        event.target.reset();
+        runtime.materialConfirmation =
+            order;
 
-        const objectInput =
-            document.getElementById(
-                "material-object"
-            );
-
-        if (objectInput) {
-            objectInput.value =
-                runtime
-                    .materialDraft
-                    .objectId;
-        }
-
-        document
-            .querySelectorAll(
-                "[data-material-id]"
-            )
-            .forEach((button) => {
-                button.classList.remove(
-                    "selected"
-                );
-
-                button.setAttribute(
-                    "aria-pressed",
-                    "false"
-                );
-            });
-
-        const unitDisplay =
-            document.getElementById(
-                "material-unit-display"
-            );
-
-        if (unitDisplay) {
-            unitDisplay.value = "";
-        }
-
-        clearQuantitySelection();
-
-        elements.message.textContent =
-            "Materialbestellung wurde gespeichert.";
-
-        updateMaterialFormState();
+        renderApp(runtime);
+        return;
     }
 }
 
@@ -1480,6 +1745,78 @@ async function handleClick(event) {
 
     if (!eventElement) {
         return;
+    }
+
+    const confirmationActionButton =
+        eventElement.closest(
+            "[data-material-confirmation-action]"
+        );
+
+    if (confirmationActionButton) {
+        event.preventDefault();
+
+        const action =
+            txt(
+                confirmationActionButton.getAttribute(
+                    "data-material-confirmation-action"
+                )
+            );
+
+        const confirmedOrder =
+            runtime.materialConfirmation;
+
+        if (action === "new-order") {
+            runtime.materialDraft = {
+                objectId:
+                    txt(
+                        confirmedOrder?.objectId
+                    ),
+
+                materialId:
+                    "",
+
+                unit:
+                    "",
+
+                quantity:
+                    ""
+            };
+
+            runtime.materialConfirmation =
+                null;
+
+            renderApp(runtime);
+            return;
+        }
+
+        if (action === "overview") {
+            runtime.materialConfirmation =
+                null;
+
+            runtime.materialDraft = {
+                objectId:
+                    "",
+
+                materialId:
+                    "",
+
+                unit:
+                    "",
+
+                quantity:
+                    ""
+            };
+
+            runtime.onNavigate?.(
+                ROUTES.OVERVIEW
+            );
+
+            return;
+        }
+
+        throw new Error(
+            "Unbekannte Bestätigungsaktion."
+        );
     }
 
     const quantityKeyButton =
@@ -1625,6 +1962,9 @@ async function handleClick(event) {
                 quantity:
                     ""
             };
+
+            runtime.materialConfirmation =
+                null;
 
             renderApp(runtime);
         }
