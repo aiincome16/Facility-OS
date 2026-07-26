@@ -4567,6 +4567,346 @@ function renderNavigation(className) {
     `;
 }
 
+function renderAbsenceDashboardEntry(state) {
+    const role =
+        normalizedRole(state);
+
+    if (
+        ![
+            "SUPER_ADMIN",
+            "ADMIN",
+            "OBJEKTLEITER",
+            "MITARBEITER",
+            "BUCHHALTUNG"
+        ].includes(role)
+    ) {
+        return "";
+    }
+
+    const requests =
+        visibleAbsenceRequests(
+            state
+        );
+
+    const activeRequests =
+        requests.filter(
+            (request) =>
+                ![
+                    "REJECTED",
+                    "CANCELLED"
+                ].includes(
+                    txt(
+                        request?.status
+                    ).toUpperCase()
+                )
+        );
+
+    const openReplacements =
+        activeRequests.filter(
+            (request) =>
+                txt(
+                    request
+                        ?.replacementStatus
+                ).toUpperCase() !==
+                "ASSIGNED"
+        ).length;
+
+    if (
+        role ===
+        "MITARBEITER"
+    ) {
+        return `
+            <section
+                class="absence-dashboard-entry"
+            >
+                <style>
+                    .absence-dashboard-entry {
+                        display: grid;
+                        gap: 14px;
+                        margin: 0 0 18px;
+                        padding: 18px;
+                        border: 1px solid
+                            rgba(95, 127, 255, .48);
+                        border-radius: 18px;
+                        background:
+                            linear-gradient(
+                                135deg,
+                                rgba(95, 127, 255, .18),
+                                rgba(8, 23, 43, .98)
+                            );
+                        box-shadow:
+                            0 16px 42px
+                            rgba(0, 0, 0, .16);
+                    }
+
+                    .absence-dashboard-entry-heading {
+                        display: flex;
+                        align-items: flex-start;
+                        justify-content: space-between;
+                        gap: 14px;
+                    }
+
+                    .absence-dashboard-entry h2,
+                    .absence-dashboard-entry p {
+                        margin: 0;
+                    }
+
+                    .absence-dashboard-entry p {
+                        margin-top: 5px;
+                        color: var(--soft);
+                        line-height: 1.45;
+                    }
+
+                    .absence-dashboard-entry-count {
+                        display: grid;
+                        min-width: 44px;
+                        min-height: 44px;
+                        place-items: center;
+                        border-radius: 13px;
+                        background: #10233f;
+                        color: var(--text);
+                        font-size: 18px;
+                        font-weight: 900;
+                    }
+
+                    .absence-dashboard-entry-actions {
+                        display: grid;
+                        grid-template-columns:
+                            repeat(2, minmax(0, 1fr));
+                        gap: 10px;
+                    }
+
+                    .absence-dashboard-entry-actions button {
+                        min-height: 54px;
+                        padding: 10px 13px;
+                        border-radius: 13px;
+                        font-weight: 900;
+                        touch-action: manipulation;
+                        -webkit-tap-highlight-color:
+                            transparent;
+                    }
+
+                    .absence-dashboard-entry-actions
+                    .vacation-action {
+                        border: 1px solid
+                            rgba(95, 127, 255, .65);
+                        background:
+                            rgba(95, 127, 255, .24);
+                        color: #d9e0ff;
+                    }
+
+                    .absence-dashboard-entry-actions
+                    .sick-action {
+                        border: 1px solid
+                            rgba(255, 171, 64, .62);
+                        background:
+                            rgba(255, 171, 64, .16);
+                        color: #ffd18d;
+                    }
+
+                    @media (max-width: 390px) {
+                        .absence-dashboard-entry {
+                            padding: 16px 13px;
+                        }
+
+                        .absence-dashboard-entry-actions {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                </style>
+
+                <div
+                    class="absence-dashboard-entry-heading"
+                >
+                    <div>
+                        <span class="eyebrow">
+                            ABWESENHEIT
+                        </span>
+
+                        <h2>
+                            Urlaub oder Krankheit melden
+                        </h2>
+
+                        <p>
+                            Antrag oder Krankmeldung direkt
+                            von der Startseite aus öffnen.
+                        </p>
+                    </div>
+
+                    <span
+                        class="absence-dashboard-entry-count"
+                        aria-label="${activeRequests.length} aktive Vorgänge"
+                    >
+                        ${activeRequests.length}
+                    </span>
+                </div>
+
+                <div
+                    class="absence-dashboard-entry-actions"
+                >
+                    <button
+                        type="button"
+                        class="vacation-action"
+                        data-absence-open-mode="VACATION_REQUEST"
+                    >
+                        Urlaub beantragen
+                    </button>
+
+                    <button
+                        type="button"
+                        class="sick-action"
+                        data-absence-open-mode="SICK_REPORT"
+                    >
+                        Krankmelden
+                    </button>
+                </div>
+            </section>
+        `;
+    }
+
+    const title =
+        role ===
+        "BUCHHALTUNG"
+            ? "Abwesenheitsübersicht"
+            : "Abwesenheiten und Vertretung";
+
+    const description =
+        role ===
+        "BUCHHALTUNG"
+            ? "Urlaub und Krankheit für Zeitprüfung und Abrechnung ansehen."
+            : "Anträge prüfen, Krankmeldungen bestätigen und Vertretungen organisieren.";
+
+    return `
+        <section
+            class="absence-dashboard-entry"
+        >
+            <style>
+                .absence-dashboard-entry {
+                    display: grid;
+                    gap: 14px;
+                    margin: 0 0 18px;
+                    padding: 18px;
+                    border: 1px solid
+                        rgba(95, 127, 255, .48);
+                    border-radius: 18px;
+                    background:
+                        linear-gradient(
+                            135deg,
+                            rgba(95, 127, 255, .18),
+                            rgba(8, 23, 43, .98)
+                        );
+                    box-shadow:
+                        0 16px 42px
+                        rgba(0, 0, 0, .16);
+                }
+
+                .absence-dashboard-entry-heading {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 14px;
+                }
+
+                .absence-dashboard-entry h2,
+                .absence-dashboard-entry p {
+                    margin: 0;
+                }
+
+                .absence-dashboard-entry p {
+                    margin-top: 5px;
+                    color: var(--soft);
+                    line-height: 1.45;
+                }
+
+                .absence-dashboard-entry-count {
+                    display: grid;
+                    min-width: 44px;
+                    min-height: 44px;
+                    place-items: center;
+                    border-radius: 13px;
+                    background: #10233f;
+                    color: var(--text);
+                    font-size: 18px;
+                    font-weight: 900;
+                }
+
+                .absence-dashboard-manager-button {
+                    width: 100%;
+                    min-height: 54px;
+                    padding: 11px 14px;
+                    border: 1px solid
+                        rgba(95, 127, 255, .65);
+                    border-radius: 13px;
+                    background:
+                        rgba(95, 127, 255, .24);
+                    color: #d9e0ff;
+                    font-weight: 900;
+                    touch-action: manipulation;
+                    -webkit-tap-highlight-color:
+                        transparent;
+                }
+
+                .absence-dashboard-entry-meta {
+                    color: var(--soft);
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+
+                @media (max-width: 390px) {
+                    .absence-dashboard-entry {
+                        padding: 16px 13px;
+                    }
+                }
+            </style>
+
+            <div
+                class="absence-dashboard-entry-heading"
+            >
+                <div>
+                    <span class="eyebrow">
+                        ABWESENHEIT
+                    </span>
+
+                    <h2>
+                        ${esc(title)}
+                    </h2>
+
+                    <p>
+                        ${esc(description)}
+                    </p>
+                </div>
+
+                <span
+                    class="absence-dashboard-entry-count"
+                    aria-label="${activeRequests.length} aktive Vorgänge"
+                >
+                    ${activeRequests.length}
+                </span>
+            </div>
+
+            <button
+                type="button"
+                class="absence-dashboard-manager-button"
+                data-more-section="ABSENCE"
+            >
+                Bereich öffnen
+            </button>
+
+            ${role === "BUCHHALTUNG"
+                ? ""
+                : `
+                    <div
+                        class="absence-dashboard-entry-meta"
+                    >
+                        ${openReplacements}
+                        offene Vertretung${openReplacements === 1 ? "" : "en"}
+                    </div>
+                `
+            }
+        </section>
+    `;
+}
+
 function renderShell(state) {
     let page =
         renderGeneric(
@@ -4700,6 +5040,13 @@ function renderShell(state) {
                 </header>
 
                 <main>
+                    ${runtime.route === ROUTES.OVERVIEW
+                        ? renderAbsenceDashboardEntry(
+                            state
+                        )
+                        : ""
+                    }
+
                     ${page}
                 </main>
 
@@ -5078,6 +5425,74 @@ async function handleClick(event) {
         return;
     }
 
+    const absenceOpenModeButton =
+        eventElement.closest(
+            "[data-absence-open-mode]"
+        );
+
+    if (absenceOpenModeButton) {
+        event.preventDefault();
+
+        const mode =
+            txt(
+                absenceOpenModeButton.getAttribute(
+                    "data-absence-open-mode"
+                )
+            ).toUpperCase();
+
+        if (
+            ![
+                "VACATION_REQUEST",
+                "SICK_REPORT"
+            ].includes(mode)
+        ) {
+            throw new Error(
+                "Ungültige Abwesenheitsart."
+            );
+        }
+
+        runtime.absenceDraft.type =
+            mode;
+
+        runtime.absenceDraft.startOffset =
+            mode ===
+            "SICK_REPORT"
+                ? 0
+                : 1;
+
+        runtime.absenceDraft.durationDays =
+            1;
+
+        runtime.absenceDraft.certificateStatus =
+            "UNKNOWN";
+
+        runtime.moreSection =
+            "ABSENCE";
+
+        runtime.absenceConfirmation =
+            null;
+
+        runtime.absenceNotice =
+            null;
+
+        runtime.replacementSearchRequestId =
+            "";
+
+        if (
+            runtime.route ===
+            ROUTES.MORE
+        ) {
+            renderApp(runtime);
+        }
+        else {
+            runtime.onNavigate?.(
+                ROUTES.MORE
+            );
+        }
+
+        return;
+    }
+
     const moreSectionButton =
         eventElement.closest(
             "[data-more-section]"
@@ -5102,7 +5517,18 @@ async function handleClick(event) {
         runtime.replacementSearchRequestId =
             "";
 
-        renderApp(runtime);
+        if (
+            runtime.route ===
+            ROUTES.MORE
+        ) {
+            renderApp(runtime);
+        }
+        else {
+            runtime.onNavigate?.(
+                ROUTES.MORE
+            );
+        }
+
         return;
     }
 
