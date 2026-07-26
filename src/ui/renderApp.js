@@ -397,44 +397,61 @@ function renderMaterials(state) {
                     font-weight: 700;
                 }
 
-                .material-quantity-entry-button {
+                .material-quantity-display {
                     display: grid;
-                    width: 100%;
-                    min-height: 58px;
-                    grid-template-columns: minmax(0, 1fr) auto;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 10px 14px;
+                    min-height: 62px;
+                    place-items: center;
+                    padding: 8px 14px;
                     border: 1px solid var(--border);
                     border-radius: 12px;
                     background: #08172b;
                     color: var(--text);
-                    text-align: left;
-                    touch-action: manipulation;
-                    -webkit-tap-highlight-color: transparent;
+                    font-size: 28px;
+                    font-weight: 900;
+                    letter-spacing: 0.04em;
+                    text-align: center;
                 }
 
-                .material-quantity-entry-button span,
-                .material-quantity-entry-button strong {
-                    display: block;
-                }
-
-                .material-quantity-entry-button span {
+                .material-quantity-display.empty {
                     color: var(--soft);
-                    font-size: 14px;
+                    font-size: 17px;
                     font-weight: 700;
+                    letter-spacing: 0;
                 }
 
-                .material-quantity-entry-button strong {
+                .material-quantity-keypad {
+                    display: grid;
+                    grid-template-columns:
+                        repeat(3, minmax(0, 1fr));
+                    gap: 9px;
+                }
+
+                .material-quantity-key {
+                    min-width: 0;
+                    min-height: 54px;
+                    padding: 8px;
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    background: #10233f;
                     color: var(--text);
-                    font-size: 20px;
-                    font-weight: 800;
+                    font-size: 21px;
+                    font-weight: 900;
+                    line-height: 1;
+                    touch-action: manipulation;
+                    -webkit-tap-highlight-color:
+                        transparent;
+                    user-select: none;
+                    -webkit-user-select: none;
                 }
 
-                .material-quantity-entry-button:focus-visible {
-                    border-color: var(--blue);
-                    outline: 2px solid var(--blue);
-                    outline-offset: 2px;
+                .material-quantity-key:active {
+                    transform: scale(0.97);
+                }
+
+                .material-quantity-key.secondary-key {
+                    background: #08172b;
+                    color: var(--soft);
+                    font-size: 16px;
                 }
 
                 .material-quantity-help {
@@ -615,29 +632,70 @@ function renderMaterials(state) {
                         value="${esc(quantity)}"
                     >
 
-                    <button
-                        id="material-quantity-button"
-                        class="material-quantity-entry-button"
-                        type="button"
-                        data-material-quantity-entry
-                        aria-describedby="material-quantity-help"
+                    <div
+                        id="material-quantity-display"
+                        class="material-quantity-display ${quantity ? "" : "empty"}"
+                        aria-live="polite"
                     >
-                        <span>
-                            Anzahl eingeben
-                        </span>
+                        ${quantity || "Noch keine Anzahl"}
+                    </div>
 
-                        <strong
-                            id="material-quantity-display"
+                    <div
+                        class="material-quantity-keypad"
+                        aria-label="Anzahl eingeben"
+                    >
+                        ${[
+                            "1",
+                            "2",
+                            "3",
+                            "4",
+                            "5",
+                            "6",
+                            "7",
+                            "8",
+                            "9"
+                        ].map((digit) => `
+                            <button
+                                type="button"
+                                class="material-quantity-key"
+                                data-material-quantity-key="${digit}"
+                            >
+                                ${digit}
+                            </button>
+                        `).join("")}
+
+                        <button
+                            type="button"
+                            class="material-quantity-key secondary-key"
+                            data-material-quantity-key="clear"
                         >
-                            ${quantity || "Tippen"}
-                        </strong>
-                    </button>
+                            Löschen
+                        </button>
+
+                        <button
+                            type="button"
+                            class="material-quantity-key"
+                            data-material-quantity-key="0"
+                        >
+                            0
+                        </button>
+
+                        <button
+                            type="button"
+                            class="material-quantity-key secondary-key"
+                            data-material-quantity-key="backspace"
+                            aria-label="Letzte Ziffer löschen"
+                        >
+                            ⌫
+                        </button>
+                    </div>
 
                     <p
                         id="material-quantity-help"
                         class="material-quantity-help"
                     >
-                        Ganze Zahl zwischen 1 und 999 eingeben.
+                        Zahl direkt über die Tasten eingeben.
+                        Maximal 999.
                     </p>
                 </section>
 
@@ -1424,12 +1482,12 @@ async function handleClick(event) {
         return;
     }
 
-    const quantityEntryButton =
+    const quantityKeyButton =
         eventElement.closest(
-            "[data-material-quantity-entry]"
+            "[data-material-quantity-key]"
         );
 
-    if (quantityEntryButton) {
+    if (quantityKeyButton) {
         event.preventDefault();
 
         const elements =
@@ -1448,36 +1506,44 @@ async function handleClick(event) {
             return;
         }
 
-        const enteredValue =
-            window.prompt(
-                "Anzahl eingeben (1 bis 999):",
+        const key =
+            txt(
+                quantityKeyButton.getAttribute(
+                    "data-material-quantity-key"
+                )
+            );
+
+        let nextValue =
+            txt(
                 elements.quantityInput.value
             );
 
-        if (enteredValue === null) {
-            return;
+        if (key === "clear") {
+            nextValue = "";
         }
-
-        const normalizedValue =
-            String(enteredValue)
-                .replace(/[^0-9]/g, "")
-                .slice(0, 3);
-
-        const quantity =
-            Number.parseInt(
-                normalizedValue,
-                10
-            );
-
-        if (
-            !Number.isInteger(quantity) ||
-            quantity < 1 ||
-            quantity > 999
+        else if (key === "backspace") {
+            nextValue =
+                nextValue.slice(0, -1);
+        }
+        else if (
+            /^[0-9]$/.test(key)
         ) {
-            elements.message.textContent =
-                "Bitte gib eine ganze Zahl zwischen 1 und 999 ein.";
+            if (nextValue.length >= 3) {
+                elements.message.textContent =
+                    "Die Anzahl darf höchstens 999 betragen.";
 
-            return;
+                return;
+            }
+
+            nextValue =
+                `${nextValue}${key}`
+                    .replace(/^0+(?=\d)/, "")
+                    .slice(0, 3);
+        }
+        else {
+            throw new Error(
+                "Ungültige Mengentaste."
+            );
         }
 
         const quantityDisplay =
@@ -1492,15 +1558,22 @@ async function handleClick(event) {
         }
 
         elements.quantityInput.value =
-            String(quantity);
-
-        quantityDisplay.textContent =
-            String(quantity);
+            nextValue;
 
         runtime.materialDraft.quantity =
-            String(quantity);
+            nextValue;
+
+        quantityDisplay.textContent =
+            nextValue ||
+            "Noch keine Anzahl";
+
+        quantityDisplay.classList.toggle(
+            "empty",
+            !nextValue
+        );
 
         elements.message.textContent = "";
+
         updateMaterialFormState();
         return;
     }
