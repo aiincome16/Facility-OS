@@ -397,27 +397,41 @@ function renderMaterials(state) {
                     font-weight: 700;
                 }
 
-                .material-quantity-input {
-                    display: block;
+                .material-quantity-entry-button {
+                    display: grid;
                     width: 100%;
-                    min-height: 54px;
-                    padding: 0 14px;
+                    min-height: 58px;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 10px 14px;
                     border: 1px solid var(--border);
                     border-radius: 12px;
                     background: #08172b;
                     color: var(--text);
-                    font-size: 18px;
-                    font-weight: 800;
-                    line-height: 1;
-                    text-align: center;
-                    opacity: 1;
-                    pointer-events: auto;
+                    text-align: left;
                     touch-action: manipulation;
-                    -webkit-appearance: none;
-                    appearance: none;
+                    -webkit-tap-highlight-color: transparent;
                 }
 
-                .material-quantity-input:focus {
+                .material-quantity-entry-button span,
+                .material-quantity-entry-button strong {
+                    display: block;
+                }
+
+                .material-quantity-entry-button span {
+                    color: var(--soft);
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+
+                .material-quantity-entry-button strong {
+                    color: var(--text);
+                    font-size: 20px;
+                    font-weight: 800;
+                }
+
+                .material-quantity-entry-button:focus-visible {
                     border-color: var(--blue);
                     outline: 2px solid var(--blue);
                     outline-offset: 2px;
@@ -596,19 +610,28 @@ function renderMaterials(state) {
 
                     <input
                         id="material-quantity"
-                        class="material-quantity-input"
                         name="quantity"
-                        type="text"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        maxlength="3"
-                        autocomplete="off"
-                        enterkeyhint="done"
+                        type="hidden"
                         value="${esc(quantity)}"
-                        placeholder="Anzahl eingeben"
-                        aria-describedby="material-quantity-help"
-                        required
                     >
+
+                    <button
+                        id="material-quantity-button"
+                        class="material-quantity-entry-button"
+                        type="button"
+                        data-material-quantity-entry
+                        aria-describedby="material-quantity-help"
+                    >
+                        <span>
+                            Anzahl eingeben
+                        </span>
+
+                        <strong
+                            id="material-quantity-display"
+                        >
+                            ${quantity || "Tippen"}
+                        </strong>
+                    </button>
 
                     <p
                         id="material-quantity-help"
@@ -1116,13 +1139,22 @@ function clearQuantitySelection() {
             "material-quantity"
         );
 
-    if (!quantityInput) {
+    const quantityDisplay =
+        document.getElementById(
+            "material-quantity-display"
+        );
+
+    if (
+        !quantityInput ||
+        !quantityDisplay
+    ) {
         throw new Error(
-            "Das Eingabefeld für die Anzahl wurde nicht gefunden."
+            "Die Mengeneingabe wurde nicht vollständig gefunden."
         );
     }
 
     quantityInput.value = "";
+    quantityDisplay.textContent = "Tippen";
     runtime.materialDraft.quantity = "";
 }
 
@@ -1373,6 +1405,8 @@ async function handleSubmit(event) {
             unitDisplay.value = "";
         }
 
+        clearQuantitySelection();
+
         elements.message.textContent =
             "Materialbestellung wurde gespeichert.";
 
@@ -1387,6 +1421,87 @@ async function handleClick(event) {
             : null;
 
     if (!eventElement) {
+        return;
+    }
+
+    const quantityEntryButton =
+        eventElement.closest(
+            "[data-material-quantity-entry]"
+        );
+
+    if (quantityEntryButton) {
+        event.preventDefault();
+
+        const elements =
+            getMaterialFormElements();
+
+        if (!elements) {
+            throw new Error(
+                "Das Materialformular wurde nicht gefunden."
+            );
+        }
+
+        if (!elements.materialInput.value) {
+            elements.message.textContent =
+                "Bitte wähle zuerst ein Material aus.";
+
+            return;
+        }
+
+        const enteredValue =
+            window.prompt(
+                "Anzahl eingeben (1 bis 999):",
+                elements.quantityInput.value
+            );
+
+        if (enteredValue === null) {
+            return;
+        }
+
+        const normalizedValue =
+            String(enteredValue)
+                .replace(/[^0-9]/g, "")
+                .slice(0, 3);
+
+        const quantity =
+            Number.parseInt(
+                normalizedValue,
+                10
+            );
+
+        if (
+            !Number.isInteger(quantity) ||
+            quantity < 1 ||
+            quantity > 999
+        ) {
+            elements.message.textContent =
+                "Bitte gib eine ganze Zahl zwischen 1 und 999 ein.";
+
+            return;
+        }
+
+        const quantityDisplay =
+            document.getElementById(
+                "material-quantity-display"
+            );
+
+        if (!quantityDisplay) {
+            throw new Error(
+                "Die Mengenanzeige wurde nicht gefunden."
+            );
+        }
+
+        elements.quantityInput.value =
+            String(quantity);
+
+        quantityDisplay.textContent =
+            String(quantity);
+
+        runtime.materialDraft.quantity =
+            String(quantity);
+
+        elements.message.textContent = "";
+        updateMaterialFormState();
         return;
     }
 
@@ -1654,54 +1769,6 @@ async function handleClick(event) {
     }
 }
 
-function normalizeQuantityValue(value) {
-    return String(value ?? "")
-        .replace(/[^0-9]/g, "")
-        .slice(0, 3);
-}
-
-function synchronizeQuantityInput(target) {
-    if (
-        !(target instanceof HTMLInputElement) ||
-        target.id !==
-        "material-quantity"
-    ) {
-        return;
-    }
-
-    const normalizedValue =
-        normalizeQuantityValue(
-            target.value
-        );
-
-    if (
-        target.value !==
-        normalizedValue
-    ) {
-        target.value =
-            normalizedValue;
-    }
-
-    runtime
-        .materialDraft
-        .quantity =
-        normalizedValue;
-
-    updateMaterialFormState();
-}
-
-function handleInput(event) {
-    synchronizeQuantityInput(
-        event.target
-    );
-}
-
-function handleChange(event) {
-    synchronizeQuantityInput(
-        event.target
-    );
-}
-
 function bindEvents() {
     const app = root();
 
@@ -1725,15 +1792,6 @@ function bindEvents() {
         handleClick
     );
 
-    app.addEventListener(
-        "input",
-        handleInput
-    );
-
-    app.addEventListener(
-        "change",
-        handleChange
-    );
 
     eventsBound = true;
 }
