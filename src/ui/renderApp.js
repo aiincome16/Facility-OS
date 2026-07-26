@@ -33,6 +33,23 @@ const runtime = {
     taskRoomId: "",
     taskExpandedId: "",
     taskNotice: null,
+    communicationTab: "INBOX",
+    communicationExpandedTicketId: "",
+    communicationNotice: null,
+    communicationConfirmation: null,
+    communicationDraft: {
+        objectId: "",
+        roomId: "",
+        type: "",
+        priority: "MEDIUM",
+        quickText: "",
+        customText: ""
+    },
+    communicationReplyDraft: {
+        ticketId: "",
+        preset: "",
+        customText: ""
+    },
     onNavigate: null,
     onLogin: null,
     onLogout: null,
@@ -6270,6 +6287,4206 @@ function undoTaskCompletion(
     renderApp(runtime);
 }
 
+
+function communicationRole(state) {
+    return txt(
+        state?.currentUser?.role
+    ).toUpperCase();
+}
+
+function communicationUserId(state) {
+    return txt(
+        state?.currentUser?.id ??
+        state?.currentUser?.userId
+    );
+}
+
+function communicationObjectIds(state) {
+    const role =
+        communicationRole(state);
+
+    if (
+        [
+            "SUPER_ADMIN",
+            "ADMIN",
+            "BUCHHALTUNG"
+        ].includes(role)
+    ) {
+        return arr(state?.objects)
+            .filter(
+                (object) =>
+                    object?.active !== false
+            )
+            .map(objectId)
+            .filter(Boolean);
+    }
+
+    if (
+        role ===
+        "OBJEKTLEITER"
+    ) {
+        return managedAbsenceObjectIds(
+            state
+        );
+    }
+
+    if (
+        [
+            "MITARBEITER",
+            "KUNDE"
+        ].includes(role)
+    ) {
+        return assignedObjects(
+            state
+        )
+            .map(objectId)
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
+function communicationObjects(state) {
+    const allowedIds =
+        communicationObjectIds(
+            state
+        );
+
+    return arr(state?.objects)
+        .filter(
+            (object) =>
+                object?.active !== false &&
+                allowedIds.includes(
+                    objectId(object)
+                )
+        );
+}
+
+function communicationRooms(
+    state,
+    selectedObjectId
+) {
+    return arr(state?.rooms)
+        .filter(
+            (room) =>
+                room?.active !== false &&
+                txt(room?.objectId) ===
+                    txt(
+                        selectedObjectId
+                    )
+        )
+        .sort(
+            (first, second) =>
+                Number(
+                    first?.sequence ??
+                    0
+                ) -
+                Number(
+                    second?.sequence ??
+                    0
+                )
+        );
+}
+
+function communicationTicketTypeOptions(
+    role
+) {
+    if (
+        role ===
+        "KUNDE"
+    ) {
+        return [
+            [
+                "ADDITIONAL_SERVICE",
+                "Zusatzleistung"
+            ],
+            [
+                "COMPLAINT",
+                "Beschwerde"
+            ],
+            [
+                "CHANGE_REQUEST",
+                "Änderungswunsch"
+            ],
+            [
+                "INFORMATION",
+                "Information anfordern"
+            ]
+        ];
+    }
+
+    return [
+        [
+            "DAMAGE",
+            "Schaden"
+        ],
+        [
+            "ACCESS",
+            "Zugang nicht möglich"
+        ],
+        [
+            "QUALITY",
+            "Qualitätsproblem"
+        ],
+        [
+            "SAFETY",
+            "Sicherheitsproblem"
+        ],
+        [
+            "MATERIAL",
+            "Materialproblem"
+        ],
+        [
+            "OTHER",
+            "Sonstige Meldung"
+        ]
+    ];
+}
+
+function communicationTypeLabel(
+    type
+) {
+    const labels = {
+        DAMAGE:
+            "Schaden",
+        ACCESS:
+            "Zugang",
+        QUALITY:
+            "Qualitätsproblem",
+        SAFETY:
+            "Sicherheitsproblem",
+        MATERIAL:
+            "Materialproblem",
+        OTHER:
+            "Sonstige Meldung",
+        CUSTOMER_REQUEST:
+            "Kundenanfrage",
+        ADDITIONAL_SERVICE:
+            "Zusatzleistung",
+        COMPLAINT:
+            "Beschwerde",
+        CHANGE_REQUEST:
+            "Änderungswunsch",
+        INFORMATION:
+            "Information"
+    };
+
+    return labels[
+        txt(type).toUpperCase()
+    ] ?? (
+        txt(type)
+            .replaceAll(
+                "_",
+                " "
+            ) ||
+        "Meldung"
+    );
+}
+
+function communicationQuickOptions(
+    type
+) {
+    const options = {
+        DAMAGE: [
+            "Ausstattung oder Gegenstand ist beschädigt.",
+            "Ein Defekt beeinträchtigt die Arbeit.",
+            "Eine Reparatur oder Prüfung ist erforderlich."
+        ],
+        ACCESS: [
+            "Ein Raum ist verschlossen oder nicht zugänglich.",
+            "Schlüssel oder Zugangsmittel fehlen.",
+            "Der Zugang ist nur eingeschränkt möglich."
+        ],
+        QUALITY: [
+            "Die vereinbarte Reinigungsqualität konnte nicht eingehalten werden.",
+            "Eine Nachreinigung ist erforderlich.",
+            "Vorhandene Verschmutzung benötigt zusätzliche Zeit."
+        ],
+        SAFETY: [
+            "Es besteht eine mögliche Unfall- oder Sicherheitsgefahr.",
+            "Ein Bereich muss vorerst abgesichert werden.",
+            "Eine dringende Prüfung ist erforderlich."
+        ],
+        MATERIAL: [
+            "Benötigtes Material fehlt.",
+            "Der Materialbestand ist kritisch niedrig.",
+            "Falsches oder ungeeignetes Material wurde bereitgestellt."
+        ],
+        OTHER: [
+            "Es liegt eine sonstige betriebliche Meldung vor.",
+            "Eine Rückmeldung der Objektleitung wird benötigt.",
+            "Der Vorgang soll dokumentiert und geprüft werden."
+        ],
+        ADDITIONAL_SERVICE: [
+            "Eine zusätzliche Reinigungsleistung wird benötigt.",
+            "Eine einmalige Sonderleistung wird angefragt.",
+            "Der bestehende Leistungsumfang soll erweitert werden."
+        ],
+        COMPLAINT: [
+            "Eine vereinbarte Leistung wurde nicht zufriedenstellend ausgeführt.",
+            "Ein Bereich weist weiterhin Verschmutzungen auf.",
+            "Eine zeitnahe Rückmeldung und Prüfung wird erbeten."
+        ],
+        CHANGE_REQUEST: [
+            "Der bestehende Reinigungsplan soll angepasst werden.",
+            "Ein Raum oder Termin soll geändert werden.",
+            "Der Leistungsumfang soll dauerhaft verändert werden."
+        ],
+        INFORMATION: [
+            "Es werden Informationen zum aktuellen Leistungsstand benötigt.",
+            "Eine Rückmeldung zum Reinigungsplan wird benötigt.",
+            "Ein Nachweis oder Bericht wird angefragt."
+        ]
+    };
+
+    return options[
+        txt(type).toUpperCase()
+    ] ?? options.OTHER;
+}
+
+function communicationPriorityLabel(
+    priority
+) {
+    return ({
+        LOW:
+            "Niedrig",
+        MEDIUM:
+            "Normal",
+        HIGH:
+            "Dringend"
+    }[
+        txt(priority).toUpperCase()
+    ] ?? "Normal");
+}
+
+function communicationStatusLabel(
+    status
+) {
+    return ({
+        OPEN:
+            "Offen",
+        IN_PROGRESS:
+            "In Bearbeitung",
+        RESOLVED:
+            "Erledigt",
+        CLOSED:
+            "Geschlossen",
+        COMPLETED:
+            "Erledigt",
+        APPROVED:
+            "Genehmigt",
+        PENDING_CUSTOMER_APPROVAL:
+            "Wartet auf Kundenfreigabe"
+    }[
+        txt(status).toUpperCase()
+    ] ?? "Offen");
+}
+
+function communicationStatusTone(
+    status
+) {
+    const normalized =
+        txt(status).toUpperCase();
+
+    if (
+        [
+            "RESOLVED",
+            "CLOSED",
+            "COMPLETED",
+            "APPROVED"
+        ].includes(normalized)
+    ) {
+        return "success";
+    }
+
+    if (
+        normalized ===
+        "IN_PROGRESS"
+    ) {
+        return "progress";
+    }
+
+    return "open";
+}
+
+function communicationPriorityTone(
+    priority
+) {
+    return ({
+        HIGH:
+            "high",
+        MEDIUM:
+            "medium",
+        LOW:
+            "low"
+    }[
+        txt(priority).toUpperCase()
+    ] ?? "medium");
+}
+
+function communicationDateTime(value) {
+    const date =
+        new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return "";
+    }
+
+    return new Intl.DateTimeFormat(
+        "de-DE",
+        {
+            dateStyle:
+                "short",
+            timeStyle:
+                "short"
+        }
+    ).format(date);
+}
+
+function communicationUserById(
+    state,
+    userId
+) {
+    return arr(state?.users)
+        .find(
+            (user) =>
+                txt(
+                    user?.id ??
+                    user?.userId
+                ) ===
+                txt(userId)
+        ) ?? null;
+}
+
+function communicationObjectById(
+    state,
+    selectedObjectId
+) {
+    return arr(state?.objects)
+        .find(
+            (object) =>
+                objectId(object) ===
+                txt(
+                    selectedObjectId
+                )
+        ) ?? null;
+}
+
+function communicationRoomById(
+    state,
+    selectedRoomId
+) {
+    return arr(state?.rooms)
+        .find(
+            (room) =>
+                txt(room?.id) ===
+                txt(selectedRoomId)
+        ) ?? null;
+}
+
+function isCommunicationTicket(
+    ticket
+) {
+    const type =
+        txt(ticket?.type)
+            .toUpperCase();
+
+    return (
+        !isAbsenceEntry(ticket) &&
+        type !==
+            "ABSENCE"
+    );
+}
+
+function visibleCommunicationTickets(
+    state
+) {
+    const role =
+        communicationRole(state);
+
+    const userId =
+        communicationUserId(state);
+
+    const objectIds =
+        communicationObjectIds(
+            state
+        );
+
+    return arr(state?.tickets)
+        .filter(
+            isCommunicationTicket
+        )
+        .filter(
+            (ticket) => {
+                const createdBy =
+                    txt(
+                        ticket?.createdByUserId ??
+                        ticket?.employeeId
+                    );
+
+                const assignedTo =
+                    txt(
+                        ticket?.assignedToUserId
+                    );
+
+                if (
+                    [
+                        "SUPER_ADMIN",
+                        "ADMIN"
+                    ].includes(role)
+                ) {
+                    return true;
+                }
+
+                if (
+                    role ===
+                    "OBJEKTLEITER"
+                ) {
+                    return objectIds.includes(
+                        txt(
+                            ticket?.objectId
+                        )
+                    );
+                }
+
+                if (
+                    role ===
+                    "MITARBEITER"
+                ) {
+                    return (
+                        createdBy ===
+                            userId ||
+                        assignedTo ===
+                            userId
+                    );
+                }
+
+                if (
+                    role ===
+                    "KUNDE"
+                ) {
+                    return (
+                        ticket?.customerVisible ===
+                            true &&
+                        (
+                            createdBy ===
+                                userId ||
+                            objectIds.includes(
+                                txt(
+                                    ticket?.objectId
+                                )
+                            )
+                        )
+                    );
+                }
+
+                if (
+                    role ===
+                    "BUCHHALTUNG"
+                ) {
+                    return (
+                        createdBy ===
+                            userId ||
+                        assignedTo ===
+                            userId
+                    );
+                }
+
+                return false;
+            }
+        );
+}
+
+function visibleCommunicationCustomerRequests(
+    state,
+    tickets
+) {
+    const role =
+        communicationRole(state);
+
+    const userId =
+        communicationUserId(state);
+
+    const objectIds =
+        communicationObjectIds(
+            state
+        );
+
+    const linkedTicketIds =
+        new Set(
+            tickets
+                .map(
+                    (ticket) =>
+                        txt(ticket?.id)
+                )
+        );
+
+    return arr(
+        state?.customerRequests
+    )
+        .filter(
+            (request) =>
+                !linkedTicketIds.has(
+                    txt(
+                        request?.relatedTicketId
+                    )
+                )
+        )
+        .filter(
+            (request) => {
+                if (
+                    [
+                        "SUPER_ADMIN",
+                        "ADMIN"
+                    ].includes(role)
+                ) {
+                    return true;
+                }
+
+                if (
+                    role ===
+                    "OBJEKTLEITER"
+                ) {
+                    return objectIds.includes(
+                        txt(
+                            request?.objectId
+                        )
+                    );
+                }
+
+                if (
+                    role ===
+                    "KUNDE"
+                ) {
+                    return (
+                        txt(
+                            request?.customerUserId
+                        ) ===
+                            userId ||
+                        objectIds.includes(
+                            txt(
+                                request?.objectId
+                            )
+                        )
+                    );
+                }
+
+                if (
+                    role ===
+                    "BUCHHALTUNG"
+                ) {
+                    return true;
+                }
+
+                return false;
+            }
+        );
+}
+
+function visibleCommunicationMessages(
+    state
+) {
+    const userId =
+        communicationUserId(
+            state
+        );
+
+    return arr(state?.messages)
+        .filter(
+            (message) =>
+                txt(
+                    message?.senderUserId
+                ) ===
+                    userId ||
+                arr(
+                    message?.recipientUserIds
+                )
+                    .map(String)
+                    .includes(
+                        userId
+                    )
+        );
+}
+
+function communicationNotificationRecipientId(
+    notification
+) {
+    return txt(
+        notification?.recipientUserId ??
+        notification?.userId
+    );
+}
+
+function visibleCommunicationNotifications(
+    state
+) {
+    const userId =
+        communicationUserId(
+            state
+        );
+
+    return arr(state?.notifications)
+        .filter(
+            (notification) =>
+                communicationNotificationRecipientId(
+                    notification
+                ) ===
+                userId
+        );
+}
+
+function communicationMessageUnread(
+    state,
+    message
+) {
+    const userId =
+        communicationUserId(
+            state
+        );
+
+    const incoming =
+        arr(
+            message?.recipientUserIds
+        )
+            .map(String)
+            .includes(
+                userId
+            );
+
+    return (
+        incoming &&
+        !arr(
+            message?.readByUserIds
+        )
+            .map(String)
+            .includes(
+                userId
+            )
+    );
+}
+
+function communicationNotificationUnread(
+    notification
+) {
+    return (
+        notification?.read !==
+            true &&
+        txt(
+            notification?.status
+        ).toUpperCase() !==
+            "READ"
+    );
+}
+
+function communicationUnreadCount(
+    state
+) {
+    const messageCount =
+        visibleCommunicationMessages(
+            state
+        )
+            .filter(
+                (message) =>
+                    communicationMessageUnread(
+                        state,
+                        message
+                    )
+            ).length;
+
+    const notificationCount =
+        visibleCommunicationNotifications(
+            state
+        )
+            .filter(
+                communicationNotificationUnread
+            ).length;
+
+    return (
+        messageCount +
+        notificationCount
+    );
+}
+
+function communicationOpenTicketCount(
+    state
+) {
+    return visibleCommunicationTickets(
+        state
+    ).filter(
+        (ticket) =>
+            ![
+                "RESOLVED",
+                "CLOSED",
+                "COMPLETED"
+            ].includes(
+                txt(
+                    ticket?.status
+                ).toUpperCase()
+            )
+    ).length;
+}
+
+function ensureCommunicationDraft(
+    state
+) {
+    const role =
+        communicationRole(state);
+
+    const objects =
+        communicationObjects(
+            state
+        );
+
+    const objectIds =
+        objects
+            .map(objectId);
+
+    const currentObjectId =
+        objectId(
+            state?.currentObject
+        );
+
+    if (
+        !objectIds.includes(
+            txt(
+                runtime
+                    .communicationDraft
+                    .objectId
+            )
+        )
+    ) {
+        runtime.communicationDraft.objectId =
+            objectIds.includes(
+                currentObjectId
+            )
+                ? currentObjectId
+                : (
+                    objectIds[0] ??
+                    ""
+                );
+    }
+
+    const rooms =
+        communicationRooms(
+            state,
+            runtime
+                .communicationDraft
+                .objectId
+        );
+
+    const roomIds =
+        rooms.map(
+            (room) =>
+                txt(room?.id)
+        );
+
+    if (
+        runtime
+            .communicationDraft
+            .roomId &&
+        !roomIds.includes(
+            txt(
+                runtime
+                    .communicationDraft
+                    .roomId
+            )
+        )
+    ) {
+        runtime.communicationDraft.roomId =
+            "";
+    }
+
+    const typeOptions =
+        communicationTicketTypeOptions(
+            role
+        );
+
+    const validTypes =
+        typeOptions.map(
+            ([
+                value
+            ]) => value
+        );
+
+    if (
+        !validTypes.includes(
+            txt(
+                runtime
+                    .communicationDraft
+                    .type
+            ).toUpperCase()
+        )
+    ) {
+        runtime.communicationDraft.type =
+            validTypes[0] ??
+            "OTHER";
+    }
+
+    if (
+        ![
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+        ].includes(
+            txt(
+                runtime
+                    .communicationDraft
+                    .priority
+            ).toUpperCase()
+        )
+    ) {
+        runtime.communicationDraft.priority =
+            "MEDIUM";
+    }
+
+    const quickOptions =
+        communicationQuickOptions(
+            runtime
+                .communicationDraft
+                .type
+        );
+
+    if (
+        !quickOptions.includes(
+            txt(
+                runtime
+                    .communicationDraft
+                    .quickText
+            )
+        )
+    ) {
+        runtime.communicationDraft.quickText =
+            quickOptions[0] ??
+            "";
+    }
+
+    return {
+        role,
+        objects,
+        rooms,
+        typeOptions,
+        quickOptions,
+        draft:
+            runtime.communicationDraft
+    };
+}
+
+function communicationManagerId(
+    state,
+    selectedObject
+) {
+    const directManagerId =
+        txt(
+            selectedObject?.objectLeaderId ??
+            selectedObject?.managerId ??
+            selectedObject?.leaderId
+        );
+
+    if (directManagerId) {
+        return directManagerId;
+    }
+
+    return txt(
+        arr(state?.users)
+            .find(
+                (user) =>
+                    [
+                        "OBJEKTLEITER",
+                        "ADMIN",
+                        "SUPER_ADMIN"
+                    ].includes(
+                        txt(
+                            user?.role
+                        ).toUpperCase()
+                    )
+            )?.id
+    );
+}
+
+function createCommunicationNotification({
+    recipientUserId,
+    objectId: relatedObjectId,
+    type,
+    priority,
+    title,
+    message,
+    relatedEntityType,
+    relatedEntityId
+}) {
+    const recipientId =
+        txt(recipientUserId);
+
+    if (!recipientId) {
+        return null;
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    return addCollectionEntry(
+        "notifications",
+        {
+            id:
+                createId(
+                    "NOTIFICATION"
+                ),
+            userId:
+                recipientId,
+            recipientUserId:
+                recipientId,
+            objectId:
+                txt(
+                    relatedObjectId
+                ),
+            type:
+                txt(type),
+            priority:
+                txt(priority) ||
+                "MEDIUM",
+            title:
+                txt(title),
+            message:
+                txt(message),
+            relatedEntityType:
+                txt(
+                    relatedEntityType
+                ),
+            relatedEntityId:
+                txt(
+                    relatedEntityId
+                ),
+            read:
+                false,
+            status:
+                "UNREAD",
+            actionRequired:
+                true,
+            actionRoute:
+                ROUTES.COMMUNICATION,
+            createdAt:
+                timestamp,
+            updatedAt:
+                timestamp,
+            readAt:
+                null,
+            source:
+                "LOCAL_TEST"
+        },
+        {
+            notify:
+                false,
+            persist:
+                true
+        }
+    );
+}
+
+function renderCommunicationNotice() {
+    const notice =
+        runtime.communicationNotice;
+
+    if (!notice?.text) {
+        return "";
+    }
+
+    return `
+        <div
+            class="communication-notice ${esc(
+                notice.tone ??
+                "success"
+            )}"
+            role="status"
+        >
+            ${esc(
+                notice.text
+            )}
+        </div>
+    `;
+}
+
+function renderCommunicationConfirmation(
+    confirmation
+) {
+    return `
+        <article
+            class="communication-confirmation"
+            aria-live="polite"
+        >
+            <div
+                class="communication-confirmation-symbol"
+                aria-hidden="true"
+            >
+                &#10003;
+            </div>
+
+            <div>
+                <span class="eyebrow">
+                    MELDUNG GESPEICHERT
+                </span>
+
+                <h2>
+                    ${esc(
+                        confirmation?.heading ??
+                        "Vorgang wurde erfasst"
+                    )}
+                </h2>
+
+                <p>
+                    ${esc(
+                        confirmation?.message ??
+                        "Die zuständige Stelle wurde informiert."
+                    )}
+                </p>
+            </div>
+
+            <div
+                class="communication-detail-list"
+            >
+                <div>
+                    <span>Vorgangsnummer</span>
+                    <strong>
+                        ${esc(
+                            confirmation?.id
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Objekt</span>
+                    <strong>
+                        ${esc(
+                            confirmation?.objectName
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Art</span>
+                    <strong>
+                        ${esc(
+                            confirmation?.typeLabel
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Status</span>
+                    <strong>
+                        ${esc(
+                            confirmation?.statusLabel ??
+                            "Offen"
+                        )}
+                    </strong>
+                </div>
+            </div>
+
+            <div
+                class="communication-confirmation-actions"
+            >
+                <button
+                    type="button"
+                    class="primary"
+                    data-communication-confirmation-action="overview"
+                >
+                    Zur Übersicht
+                </button>
+
+                <button
+                    type="button"
+                    class="secondary"
+                    data-communication-confirmation-action="new"
+                >
+                    Weitere Meldung
+                </button>
+            </div>
+        </article>
+    `;
+}
+
+function renderCommunicationInbox(
+    state
+) {
+    const userId =
+        communicationUserId(
+            state
+        );
+
+    const messages =
+        visibleCommunicationMessages(
+            state
+        ).map(
+            (message) => ({
+                kind:
+                    "MESSAGE",
+                id:
+                    txt(message?.id),
+                createdAt:
+                    message?.createdAt,
+                unread:
+                    communicationMessageUnread(
+                        state,
+                        message
+                    ),
+                data:
+                    message
+            })
+        );
+
+    const notifications =
+        visibleCommunicationNotifications(
+            state
+        ).map(
+            (notification) => ({
+                kind:
+                    "NOTIFICATION",
+                id:
+                    txt(
+                        notification?.id
+                    ),
+                createdAt:
+                    notification
+                        ?.createdAt,
+                unread:
+                    communicationNotificationUnread(
+                        notification
+                    ),
+                data:
+                    notification
+            })
+        );
+
+    const items = [
+        ...messages,
+        ...notifications
+    ].sort(
+        (first, second) =>
+            String(
+                second?.createdAt ??
+                ""
+            ).localeCompare(
+                String(
+                    first?.createdAt ??
+                    ""
+                )
+            )
+    );
+
+    return `
+        <section
+            class="communication-panel"
+        >
+            <div
+                class="communication-section-heading"
+            >
+                <div>
+                    <h2>
+                        Eingang
+                    </h2>
+
+                    <p>
+                        Nachrichten und Systemhinweise für
+                        dein Benutzerkonto.
+                    </p>
+                </div>
+
+                ${items.some(
+                    (item) =>
+                        item.unread
+                )
+                    ? `
+                        <button
+                            type="button"
+                            class="communication-small-button"
+                            data-communication-mark-all-read
+                        >
+                            Alle gelesen
+                        </button>
+                    `
+                    : ""
+                }
+            </div>
+
+            <div
+                class="communication-inbox-list"
+            >
+                ${items.length
+                    ? items.map(
+                        (item) => {
+                            const entry =
+                                item.data;
+
+                            if (
+                                item.kind ===
+                                "NOTIFICATION"
+                            ) {
+                                return `
+                                    <article
+                                        class="communication-inbox-card ${item.unread ? "unread" : ""}"
+                                    >
+                                        <div
+                                            class="communication-inbox-topline"
+                                        >
+                                            <span
+                                                class="communication-kind-badge"
+                                            >
+                                                Hinweis
+                                            </span>
+
+                                            <span>
+                                                ${esc(
+                                                    communicationDateTime(
+                                                        entry
+                                                            ?.createdAt
+                                                    )
+                                                )}
+                                            </span>
+                                        </div>
+
+                                        <h3>
+                                            ${esc(
+                                                entry?.title
+                                            )}
+                                        </h3>
+
+                                        <p>
+                                            ${esc(
+                                                entry?.message
+                                            )}
+                                        </p>
+
+                                        ${item.unread
+                                            ? `
+                                                <button
+                                                    type="button"
+                                                    class="communication-read-button"
+                                                    data-communication-notification-read-id="${esc(
+                                                        entry?.id
+                                                    )}"
+                                                >
+                                                    Als gelesen markieren
+                                                </button>
+                                            `
+                                            : ""
+                                        }
+                                    </article>
+                                `;
+                            }
+
+                            const senderId =
+                                txt(
+                                    entry?.senderUserId
+                                );
+
+                            const outgoing =
+                                senderId ===
+                                userId;
+
+                            const sender =
+                                communicationUserById(
+                                    state,
+                                    senderId
+                                );
+
+                            return `
+                                <article
+                                    class="communication-inbox-card ${item.unread ? "unread" : ""}"
+                                >
+                                    <div
+                                        class="communication-inbox-topline"
+                                    >
+                                        <span
+                                            class="communication-kind-badge"
+                                        >
+                                            ${outgoing
+                                                ? "Gesendet"
+                                                : "Nachricht"
+                                            }
+                                        </span>
+
+                                        <span>
+                                            ${esc(
+                                                communicationDateTime(
+                                                    entry
+                                                        ?.createdAt
+                                                )
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    <h3>
+                                        ${esc(
+                                            entry?.subject ??
+                                            "Nachricht"
+                                        )}
+                                    </h3>
+
+                                    <p>
+                                        ${esc(
+                                            entry?.message
+                                        )}
+                                    </p>
+
+                                    <small>
+                                        ${outgoing
+                                            ? "Von dir gesendet"
+                                            : `Von ${esc(
+                                                userName(
+                                                    sender
+                                                )
+                                            )}`
+                                        }
+                                    </small>
+
+                                    ${item.unread
+                                        ? `
+                                            <button
+                                                type="button"
+                                                class="communication-read-button"
+                                                data-communication-message-read-id="${esc(
+                                                    entry?.id
+                                                )}"
+                                            >
+                                                Als gelesen markieren
+                                            </button>
+                                        `
+                                        : ""
+                                    }
+                                </article>
+                            `;
+                        }
+                    ).join("")
+                    : `
+                        <div
+                            class="communication-empty"
+                        >
+                            Keine Nachrichten oder Hinweise
+                            vorhanden.
+                        </div>
+                    `
+                }
+            </div>
+        </section>
+    `;
+}
+
+function communicationCanManageTicket(
+    state,
+    ticket
+) {
+    const role =
+        communicationRole(state);
+
+    if (
+        [
+            "SUPER_ADMIN",
+            "ADMIN"
+        ].includes(role)
+    ) {
+        return true;
+    }
+
+    if (
+        role !==
+        "OBJEKTLEITER"
+    ) {
+        return false;
+    }
+
+    return communicationObjectIds(
+        state
+    ).includes(
+        txt(
+            ticket?.objectId
+        )
+    );
+}
+
+function communicationTicketThread(
+    state,
+    ticketId
+) {
+    return arr(state?.messages)
+        .filter(
+            (message) =>
+                txt(
+                    message?.relatedTicketId
+                ) ===
+                txt(ticketId)
+        )
+        .sort(
+            (first, second) =>
+                String(
+                    first?.createdAt ??
+                    ""
+                ).localeCompare(
+                    String(
+                        second?.createdAt ??
+                        ""
+                    )
+                )
+        );
+}
+
+function renderCommunicationThread(
+    state,
+    ticket
+) {
+    const messages =
+        communicationTicketThread(
+            state,
+            ticket?.id
+        );
+
+    const replyDraft =
+        runtime.communicationReplyDraft;
+
+    const presets = [
+        "Wird geprüft.",
+        "Der Vorgang ist in Bearbeitung.",
+        "Bitte weitere Informationen senden.",
+        "Vielen Dank für die Rückmeldung."
+    ];
+
+    return `
+        <div
+            class="communication-thread"
+        >
+            <div>
+                <strong>
+                    Verlauf
+                </strong>
+
+                <p>
+                    Antworten werden direkt diesem Ticket
+                    zugeordnet.
+                </p>
+            </div>
+
+            <div
+                class="communication-thread-list"
+            >
+                ${messages.length
+                    ? messages.map(
+                        (message) => {
+                            const sender =
+                                communicationUserById(
+                                    state,
+                                    message?.senderUserId
+                                );
+
+                            return `
+                                <article>
+                                    <div>
+                                        <strong>
+                                            ${esc(
+                                                userName(
+                                                    sender
+                                                )
+                                            )}
+                                        </strong>
+
+                                        <span>
+                                            ${esc(
+                                                communicationDateTime(
+                                                    message?.createdAt
+                                                )
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    <p>
+                                        ${esc(
+                                            message?.message
+                                        )}
+                                    </p>
+                                </article>
+                            `;
+                        }
+                    ).join("")
+                    : `
+                        <div
+                            class="communication-empty compact"
+                        >
+                            Noch keine Antworten vorhanden.
+                        </div>
+                    `
+                }
+            </div>
+
+            <div
+                class="communication-reply-options"
+            >
+                ${presets.map(
+                    (preset) => `
+                        <button
+                            type="button"
+                            class="${replyDraft.ticketId === txt(ticket?.id) && replyDraft.preset === preset ? "selected" : ""}"
+                            data-communication-reply-ticket-id="${esc(
+                                ticket?.id
+                            )}"
+                            data-communication-reply-preset="${esc(
+                                preset
+                            )}"
+                        >
+                            ${esc(preset)}
+                        </button>
+                    `
+                ).join("")}
+            </div>
+
+            <label
+                class="communication-text-field"
+            >
+                Eigene Antwort (optional)
+
+                <textarea
+                    id="communication-reply-text"
+                    rows="3"
+                    maxlength="600"
+                    placeholder="Zusätzliche Antwort eingeben"
+                >${esc(
+                    replyDraft.ticketId === txt(ticket?.id)
+                        ? replyDraft.customText
+                        : ""
+                )}</textarea>
+            </label>
+
+            <button
+                type="button"
+                class="primary"
+                data-communication-reply-submit-id="${esc(
+                    ticket?.id
+                )}"
+            >
+                Antwort senden
+            </button>
+        </div>
+    `;
+}
+
+function renderCommunicationTicketCard(
+    state,
+    ticket
+) {
+    const expanded =
+        runtime
+            .communicationExpandedTicketId ===
+        txt(ticket?.id);
+
+    const canManage =
+        communicationCanManageTicket(
+            state,
+            ticket
+        );
+
+    const status =
+        txt(
+            ticket?.status
+        ).toUpperCase();
+
+    const object =
+        communicationObjectById(
+            state,
+            ticket?.objectId
+        );
+
+    const room =
+        communicationRoomById(
+            state,
+            ticket?.roomId
+        );
+
+    const creator =
+        communicationUserById(
+            state,
+            ticket?.createdByUserId ??
+            ticket?.employeeId
+        );
+
+    return `
+        <article
+            class="communication-ticket-card"
+        >
+            <div
+                class="communication-ticket-topline"
+            >
+                <span
+                    class="communication-priority ${communicationPriorityTone(
+                        ticket?.priority
+                    )}"
+                >
+                    ${esc(
+                        communicationPriorityLabel(
+                            ticket?.priority
+                        )
+                    )}
+                </span>
+
+                <span
+                    class="communication-status ${communicationStatusTone(
+                        status
+                    )}"
+                >
+                    ${esc(
+                        communicationStatusLabel(
+                            status
+                        )
+                    )}
+                </span>
+            </div>
+
+            <div
+                class="communication-ticket-heading"
+            >
+                <div>
+                    <small>
+                        ${esc(
+                            communicationTypeLabel(
+                                ticket?.type
+                            )
+                        )}
+                    </small>
+
+                    <h3>
+                        ${esc(
+                            ticket?.title
+                        )}
+                    </h3>
+                </div>
+
+                <span>
+                    ${esc(
+                        communicationDateTime(
+                            ticket?.createdAt
+                        )
+                    )}
+                </span>
+            </div>
+
+            <p>
+                ${esc(
+                    ticket?.description
+                )}
+            </p>
+
+            <div
+                class="communication-detail-list"
+            >
+                <div>
+                    <span>Objekt</span>
+                    <strong>
+                        ${esc(
+                            objectName(
+                                object
+                            )
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Raum</span>
+                    <strong>
+                        ${esc(
+                            room?.name ??
+                            "Gesamtes Objekt"
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Gemeldet von</span>
+                    <strong>
+                        ${esc(
+                            userName(
+                                creator
+                            )
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Vorgang</span>
+                    <strong>
+                        ${esc(
+                            ticket?.id
+                        )}
+                    </strong>
+                </div>
+            </div>
+
+            ${canManage
+                ? `
+                    <div
+                        class="communication-ticket-actions"
+                    >
+                        ${[
+                            "OPEN"
+                        ].includes(status)
+                            ? `
+                                <button
+                                    type="button"
+                                    class="primary"
+                                    data-communication-ticket-action="start"
+                                    data-communication-ticket-id="${esc(
+                                        ticket?.id
+                                    )}"
+                                >
+                                    Bearbeitung starten
+                                </button>
+                            `
+                            : ""
+                        }
+
+                        ${[
+                            "OPEN",
+                            "IN_PROGRESS"
+                        ].includes(status)
+                            ? `
+                                <button
+                                    type="button"
+                                    class="communication-resolve-button"
+                                    data-communication-ticket-action="resolve"
+                                    data-communication-ticket-id="${esc(
+                                        ticket?.id
+                                    )}"
+                                >
+                                    Als erledigt markieren
+                                </button>
+                            `
+                            : ""
+                        }
+
+                        ${[
+                            "RESOLVED",
+                            "CLOSED",
+                            "COMPLETED"
+                        ].includes(status)
+                            ? `
+                                <button
+                                    type="button"
+                                    class="secondary"
+                                    data-communication-ticket-action="reopen"
+                                    data-communication-ticket-id="${esc(
+                                        ticket?.id
+                                    )}"
+                                >
+                                    Wieder öffnen
+                                </button>
+                            `
+                            : ""
+                        }
+                    </div>
+                `
+                : ""
+            }
+
+            <button
+                type="button"
+                class="communication-thread-toggle"
+                data-communication-ticket-toggle-id="${esc(
+                    ticket?.id
+                )}"
+                aria-expanded="${expanded ? "true" : "false"}"
+            >
+                ${expanded
+                    ? "Verlauf schließen"
+                    : `Verlauf und Antworten (${communicationTicketThread(
+                        state,
+                        ticket?.id
+                    ).length})`
+                }
+            </button>
+
+            ${expanded
+                ? renderCommunicationThread(
+                    state,
+                    ticket
+                )
+                : ""
+            }
+        </article>
+    `;
+}
+
+function formatCommunicationMoney(
+    value,
+    currency = "EUR"
+) {
+    const amount =
+        Number(value);
+
+    if (
+        !Number.isFinite(amount)
+    ) {
+        return "";
+    }
+
+    return new Intl.NumberFormat(
+        "de-DE",
+        {
+            style:
+                "currency",
+            currency:
+                txt(currency) ||
+                "EUR"
+        }
+    ).format(amount);
+}
+
+function communicationCanManageCustomerRequest(
+    state,
+    request
+) {
+    const role =
+        communicationRole(state);
+
+    if (
+        [
+            "SUPER_ADMIN",
+            "ADMIN"
+        ].includes(role)
+    ) {
+        return true;
+    }
+
+    return (
+        role ===
+            "OBJEKTLEITER" &&
+        communicationObjectIds(
+            state
+        ).includes(
+            txt(
+                request?.objectId
+            )
+        )
+    );
+}
+
+function renderCommunicationCustomerRequestCard(
+    state,
+    request
+) {
+    const canManage =
+        communicationCanManageCustomerRequest(
+            state,
+            request
+        );
+
+    const status =
+        txt(
+            request?.status
+        ).toUpperCase();
+
+    const object =
+        communicationObjectById(
+            state,
+            request?.objectId
+        );
+
+    const room =
+        communicationRoomById(
+            state,
+            request?.roomId
+        );
+
+    const price =
+        formatCommunicationMoney(
+            request?.pricing
+                ?.estimatedPrice,
+            request?.pricing
+                ?.currency
+        );
+
+    return `
+        <article
+            class="communication-ticket-card customer-request-card"
+        >
+            <div
+                class="communication-ticket-topline"
+            >
+                <span
+                    class="communication-priority ${communicationPriorityTone(
+                        request?.priority
+                    )}"
+                >
+                    Kundenanfrage
+                </span>
+
+                <span
+                    class="communication-status ${communicationStatusTone(
+                        status
+                    )}"
+                >
+                    ${esc(
+                        communicationStatusLabel(
+                            status
+                        )
+                    )}
+                </span>
+            </div>
+
+            <div
+                class="communication-ticket-heading"
+            >
+                <div>
+                    <small>
+                        ${esc(
+                            communicationTypeLabel(
+                                request?.type
+                            )
+                        )}
+                    </small>
+
+                    <h3>
+                        ${esc(
+                            request?.title
+                        )}
+                    </h3>
+                </div>
+
+                <span>
+                    ${esc(
+                        communicationDateTime(
+                            request?.createdAt
+                        )
+                    )}
+                </span>
+            </div>
+
+            <p>
+                ${esc(
+                    request?.description
+                )}
+            </p>
+
+            <div
+                class="communication-detail-list"
+            >
+                <div>
+                    <span>Objekt</span>
+                    <strong>
+                        ${esc(
+                            objectName(
+                                object
+                            )
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Raum</span>
+                    <strong>
+                        ${esc(
+                            room?.name ??
+                            "Gesamtes Objekt"
+                        )}
+                    </strong>
+                </div>
+
+                ${request?.requestedDate
+                    ? `
+                        <div>
+                            <span>Gewünschter Termin</span>
+                            <strong>
+                                ${esc(
+                                    formatDateOnly(
+                                        request?.requestedDate
+                                    )
+                                )}
+                            </strong>
+                        </div>
+                    `
+                    : ""
+                }
+
+                ${price
+                    ? `
+                        <div>
+                            <span>Preis</span>
+                            <strong>
+                                ${esc(price)}
+                            </strong>
+                        </div>
+                    `
+                    : ""
+                }
+
+                <div>
+                    <span>Vorgang</span>
+                    <strong>
+                        ${esc(
+                            request?.id
+                        )}
+                    </strong>
+                </div>
+            </div>
+
+            ${canManage
+                ? `
+                    <div
+                        class="communication-ticket-actions"
+                    >
+                        ${status === "OPEN"
+                            ? `
+                                <button
+                                    type="button"
+                                    class="primary"
+                                    data-communication-request-action="start"
+                                    data-communication-request-id="${esc(
+                                        request?.id
+                                    )}"
+                                >
+                                    Bearbeitung starten
+                                </button>
+                            `
+                            : ""
+                        }
+
+                        ${[
+                            "OPEN",
+                            "IN_PROGRESS",
+                            "APPROVED"
+                        ].includes(status)
+                            ? `
+                                <button
+                                    type="button"
+                                    class="communication-resolve-button"
+                                    data-communication-request-action="complete"
+                                    data-communication-request-id="${esc(
+                                        request?.id
+                                    )}"
+                                >
+                                    Anfrage abschließen
+                                </button>
+                            `
+                            : ""
+                        }
+                    </div>
+                `
+                : ""
+            }
+        </article>
+    `;
+}
+
+function renderCommunicationTickets(
+    state
+) {
+    const tickets =
+        visibleCommunicationTickets(
+            state
+        );
+
+    const customerRequests =
+        visibleCommunicationCustomerRequests(
+            state,
+            tickets
+        );
+
+    const items = [
+        ...tickets.map(
+            (ticket) => ({
+                kind:
+                    "TICKET",
+                createdAt:
+                    ticket?.createdAt,
+                data:
+                    ticket
+            })
+        ),
+        ...customerRequests.map(
+            (request) => ({
+                kind:
+                    "CUSTOMER_REQUEST",
+                createdAt:
+                    request?.createdAt,
+                data:
+                    request
+            })
+        )
+    ].sort(
+        (first, second) =>
+            String(
+                second?.createdAt ??
+                ""
+            ).localeCompare(
+                String(
+                    first?.createdAt ??
+                    ""
+                )
+            )
+    );
+
+    return `
+        <section
+            class="communication-panel"
+        >
+            <div
+                class="communication-section-heading"
+            >
+                <div>
+                    <h2>
+                        ${communicationRole(state) === "KUNDE"
+                            ? "Meine Anfragen"
+                            : "Tickets und Meldungen"
+                        }
+                    </h2>
+
+                    <p>
+                        Status, Verlauf und Bearbeitung der
+                        erfassten Vorgänge.
+                    </p>
+                </div>
+
+                <strong>
+                    ${items.length}
+                </strong>
+            </div>
+
+            <div
+                class="communication-ticket-list"
+            >
+                ${items.length
+                    ? items.map(
+                        (item) =>
+                            item.kind ===
+                            "TICKET"
+                                ? renderCommunicationTicketCard(
+                                    state,
+                                    item.data
+                                )
+                                : renderCommunicationCustomerRequestCard(
+                                    state,
+                                    item.data
+                                )
+                    ).join("")
+                    : `
+                        <div
+                            class="communication-empty"
+                        >
+                            Noch keine Vorgänge vorhanden.
+                        </div>
+                    `
+                }
+            </div>
+        </section>
+    `;
+}
+
+function renderCommunicationNew(
+    state
+) {
+    const {
+        role,
+        objects,
+        rooms,
+        typeOptions,
+        quickOptions,
+        draft
+    } = ensureCommunicationDraft(
+        state
+    );
+
+    const customerMode =
+        role ===
+        "KUNDE";
+
+    const selectedObject =
+        communicationObjectById(
+            state,
+            draft.objectId
+        );
+
+    const selectedRoom =
+        communicationRoomById(
+            state,
+            draft.roomId
+        );
+
+    const description = [
+        txt(draft.quickText),
+        txt(draft.customText)
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+    return `
+        <section
+            class="communication-panel"
+        >
+            <div
+                class="communication-section-heading"
+            >
+                <div>
+                    <h2>
+                        ${customerMode
+                            ? "Neue Kundenanfrage"
+                            : "Neue Meldung"
+                        }
+                    </h2>
+
+                    <p>
+                        Strukturierte Schnellmeldung. Ein
+                        zusätzlicher Freitext ist optional.
+                    </p>
+                </div>
+            </div>
+
+            <div
+                class="communication-field-group"
+            >
+                <strong>
+                    1. Objekt
+                </strong>
+
+                <div
+                    class="communication-choice-grid"
+                >
+                    ${objects.map(
+                        (object) => {
+                            const id =
+                                objectId(object);
+
+                            return `
+                                <button
+                                    type="button"
+                                    class="${draft.objectId === id ? "selected" : ""}"
+                                    data-communication-object-id="${esc(id)}"
+                                >
+                                    ${esc(
+                                        objectName(
+                                            object
+                                        )
+                                    )}
+                                </button>
+                            `;
+                        }
+                    ).join("") || `
+                        <div
+                            class="communication-empty"
+                        >
+                            Kein Objekt verfügbar.
+                        </div>
+                    `}
+                </div>
+            </div>
+
+            <div
+                class="communication-field-group"
+            >
+                <strong>
+                    2. Raum oder Bereich
+                </strong>
+
+                <div
+                    class="communication-choice-grid"
+                >
+                    <button
+                        type="button"
+                        class="${!draft.roomId ? "selected" : ""}"
+                        data-communication-room-id=""
+                    >
+                        Gesamtes Objekt
+                    </button>
+
+                    ${rooms.map(
+                        (room) => `
+                            <button
+                                type="button"
+                                class="${draft.roomId === txt(room?.id) ? "selected" : ""}"
+                                data-communication-room-id="${esc(
+                                    room?.id
+                                )}"
+                            >
+                                ${esc(
+                                    room?.name
+                                )}
+                            </button>
+                        `
+                    ).join("")}
+                </div>
+            </div>
+
+            <div
+                class="communication-field-group"
+            >
+                <strong>
+                    3. Art der Meldung
+                </strong>
+
+                <div
+                    class="communication-choice-grid"
+                >
+                    ${typeOptions.map(
+                        ([
+                            value,
+                            label
+                        ]) => `
+                            <button
+                                type="button"
+                                class="${draft.type === value ? "selected" : ""}"
+                                data-communication-type="${esc(value)}"
+                            >
+                                ${esc(label)}
+                            </button>
+                        `
+                    ).join("")}
+                </div>
+            </div>
+
+            <div
+                class="communication-field-group"
+            >
+                <strong>
+                    4. Dringlichkeit
+                </strong>
+
+                <div
+                    class="communication-choice-grid three"
+                >
+                    ${[
+                        [
+                            "LOW",
+                            "Niedrig"
+                        ],
+                        [
+                            "MEDIUM",
+                            "Normal"
+                        ],
+                        [
+                            "HIGH",
+                            "Dringend"
+                        ]
+                    ].map(
+                        ([
+                            value,
+                            label
+                        ]) => `
+                            <button
+                                type="button"
+                                class="${draft.priority === value ? "selected" : ""}"
+                                data-communication-priority="${value}"
+                            >
+                                ${label}
+                            </button>
+                        `
+                    ).join("")}
+                </div>
+            </div>
+
+            <div
+                class="communication-field-group"
+            >
+                <strong>
+                    5. Passende Beschreibung
+                </strong>
+
+                <div
+                    class="communication-quick-grid"
+                >
+                    ${quickOptions.map(
+                        (option) => `
+                            <button
+                                type="button"
+                                class="${draft.quickText === option ? "selected" : ""}"
+                                data-communication-quick="${esc(
+                                    option
+                                )}"
+                            >
+                                ${esc(option)}
+                            </button>
+                        `
+                    ).join("")}
+                </div>
+            </div>
+
+            <label
+                class="communication-text-field"
+            >
+                Zusätzliche Angaben (optional)
+
+                <textarea
+                    id="communication-details"
+                    rows="4"
+                    maxlength="600"
+                    placeholder="Weitere Einzelheiten eingeben"
+                >${esc(
+                    draft.customText
+                )}</textarea>
+            </label>
+
+            <div
+                class="communication-preview"
+            >
+                <span>
+                    Vorschau
+                </span>
+
+                <strong>
+                    ${esc(
+                        communicationTypeLabel(
+                            draft.type
+                        )
+                    )}
+                    ·
+                    ${esc(
+                        selectedRoom?.name ??
+                        objectName(
+                            selectedObject
+                        )
+                    )}
+                </strong>
+
+                <p>
+                    ${esc(description)}
+                </p>
+            </div>
+
+            <button
+                type="button"
+                class="primary communication-submit-button"
+                data-communication-create
+                ${objects.length
+                    ? ""
+                    : "disabled"
+                }
+            >
+                ${customerMode
+                    ? "Anfrage absenden"
+                    : "Meldung absenden"
+                }
+            </button>
+
+            <div
+                id="communication-form-message"
+                class="message"
+                aria-live="polite"
+            ></div>
+        </section>
+    `;
+}
+
+function renderCommunicationPage(
+    state
+) {
+    const role =
+        communicationRole(state);
+
+    const allowed =
+        [
+            "SUPER_ADMIN",
+            "ADMIN",
+            "OBJEKTLEITER",
+            "MITARBEITER",
+            "BUCHHALTUNG",
+            "KUNDE"
+        ].includes(role);
+
+    const unreadCount =
+        communicationUnreadCount(
+            state
+        );
+
+    const openTicketCount =
+        communicationOpenTicketCount(
+            state
+        );
+
+    const highPriorityCount =
+        visibleCommunicationTickets(
+            state
+        ).filter(
+            (ticket) =>
+                txt(
+                    ticket?.priority
+                ).toUpperCase() ===
+                    "HIGH" &&
+                ![
+                    "RESOLVED",
+                    "CLOSED",
+                    "COMPLETED"
+                ].includes(
+                    txt(
+                        ticket?.status
+                    ).toUpperCase()
+                )
+        ).length;
+
+    if (
+        runtime.communicationConfirmation
+    ) {
+        return `
+            <section
+                class="content-page communication-page"
+            >
+                ${communicationStyles()}
+                ${renderCommunicationConfirmation(
+                    runtime.communicationConfirmation
+                )}
+            </section>
+        `;
+    }
+
+    return `
+        <section
+            class="content-page communication-page"
+        >
+            ${communicationStyles()}
+
+            <header
+                class="dashboard-heading"
+            >
+                <div>
+                    <span class="eyebrow">
+                        KOMMUNIKATION
+                    </span>
+
+                    <h1>
+                        Meldungen und Tickets
+                    </h1>
+
+                    <p>
+                        ${role === "KUNDE"
+                            ? "Anfragen senden und den Bearbeitungsstatus verfolgen."
+                            : "Nachrichten lesen, Probleme melden und Vorgänge bearbeiten."
+                        }
+                    </p>
+                </div>
+            </header>
+
+            ${allowed
+                ? `
+                    ${renderCommunicationNotice()}
+
+                    <section
+                        class="communication-summary-grid"
+                    >
+                        <article>
+                            <span>Ungelesen</span>
+                            <strong>${unreadCount}</strong>
+                        </article>
+
+                        <article>
+                            <span>Offene Tickets</span>
+                            <strong>${openTicketCount}</strong>
+                        </article>
+
+                        <article>
+                            <span>Dringend</span>
+                            <strong>${highPriorityCount}</strong>
+                        </article>
+                    </section>
+
+                    <nav
+                        class="communication-tabs"
+                        aria-label="Kommunikationsbereiche"
+                    >
+                        ${[
+                            [
+                                "INBOX",
+                                "Eingang"
+                            ],
+                            [
+                                "TICKETS",
+                                role === "KUNDE"
+                                    ? "Meine Anfragen"
+                                    : "Tickets"
+                            ],
+                            [
+                                "NEW",
+                                role === "KUNDE"
+                                    ? "Neue Anfrage"
+                                    : "Neue Meldung"
+                            ]
+                        ].map(
+                            ([
+                                value,
+                                label
+                            ]) => `
+                                <button
+                                    type="button"
+                                    class="${runtime.communicationTab === value ? "active" : ""}"
+                                    data-communication-tab="${value}"
+                                >
+                                    ${esc(label)}
+                                </button>
+                            `
+                        ).join("")}
+                    </nav>
+
+                    ${runtime.communicationTab === "INBOX"
+                        ? renderCommunicationInbox(
+                            state
+                        )
+                        : runtime.communicationTab === "TICKETS"
+                            ? renderCommunicationTickets(
+                                state
+                            )
+                            : renderCommunicationNew(
+                                state
+                            )
+                    }
+                `
+                : `
+                    <div
+                        class="communication-empty"
+                    >
+                        Für diese Rolle ist der Bereich nicht
+                        freigegeben.
+                    </div>
+                `
+            }
+        </section>
+    `;
+}
+
+function communicationStyles() {
+    return `
+        <style>
+            .communication-page {
+                display: grid;
+                gap: 18px;
+            }
+
+            .communication-page h1,
+            .communication-page h2,
+            .communication-page h3,
+            .communication-page p {
+                margin: 0;
+            }
+
+            .communication-summary-grid {
+                display: grid;
+                grid-template-columns:
+                    repeat(3, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .communication-summary-grid article {
+                display: grid;
+                gap: 7px;
+                padding: 15px;
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                background: var(--panel);
+            }
+
+            .communication-summary-grid span {
+                color: var(--soft);
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            .communication-summary-grid strong {
+                font-size: 24px;
+            }
+
+            .communication-tabs {
+                display: grid;
+                grid-template-columns:
+                    repeat(3, minmax(0, 1fr));
+                gap: 8px;
+                padding: 7px;
+                border: 1px solid var(--border);
+                border-radius: 15px;
+                background: #08172b;
+            }
+
+            .communication-tabs button {
+                min-width: 0;
+                min-height: 46px;
+                padding: 8px;
+                border: 0;
+                border-radius: 10px;
+                background: transparent;
+                color: var(--soft);
+                font-weight: 800;
+                touch-action: manipulation;
+            }
+
+            .communication-tabs button.active {
+                background: #10233f;
+                color: var(--text);
+                box-shadow:
+                    0 0 0 1px var(--blue);
+            }
+
+            .communication-panel,
+            .communication-confirmation {
+                display: grid;
+                gap: 16px;
+                padding: 19px;
+                border: 1px solid var(--border);
+                border-radius: 18px;
+                background: var(--panel);
+                box-shadow:
+                    0 16px 45px
+                    rgba(0, 0, 0, .14);
+            }
+
+            .communication-section-heading {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 14px;
+            }
+
+            .communication-section-heading p {
+                margin-top: 5px;
+                color: var(--soft);
+                line-height: 1.45;
+            }
+
+            .communication-section-heading > strong {
+                display: grid;
+                min-width: 42px;
+                min-height: 42px;
+                place-items: center;
+                border-radius: 12px;
+                background: #10233f;
+            }
+
+            .communication-small-button,
+            .communication-read-button,
+            .communication-thread-toggle {
+                min-height: 42px;
+                padding: 8px 11px;
+                border: 1px solid var(--border);
+                border-radius: 11px;
+                background: #10233f;
+                color: var(--text);
+                font-weight: 800;
+            }
+
+            .communication-inbox-list,
+            .communication-ticket-list,
+            .communication-thread-list {
+                display: grid;
+                gap: 11px;
+            }
+
+            .communication-inbox-card,
+            .communication-ticket-card {
+                display: grid;
+                gap: 12px;
+                padding: 15px;
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                background: #08172b;
+            }
+
+            .communication-inbox-card.unread {
+                border-color:
+                    rgba(95, 127, 255, .58);
+                box-shadow:
+                    inset 4px 0 0 var(--blue);
+            }
+
+            .communication-inbox-card p,
+            .communication-ticket-card > p {
+                color: var(--soft);
+                line-height: 1.5;
+            }
+
+            .communication-inbox-card > small {
+                color: var(--soft);
+            }
+
+            .communication-inbox-topline,
+            .communication-ticket-topline,
+            .communication-ticket-heading,
+            .communication-thread-list article > div {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 12px;
+            }
+
+            .communication-inbox-topline > span:last-child,
+            .communication-ticket-heading > span,
+            .communication-thread-list article span {
+                color: var(--soft);
+                font-size: 12px;
+            }
+
+            .communication-kind-badge,
+            .communication-priority,
+            .communication-status {
+                display: inline-flex;
+                min-height: 29px;
+                align-items: center;
+                padding: 5px 9px;
+                border-radius: 999px;
+                font-size: 11px;
+                font-weight: 900;
+            }
+
+            .communication-kind-badge {
+                background:
+                    rgba(95, 127, 255, .18);
+                color: #b9c5ff;
+            }
+
+            .communication-priority.high {
+                background:
+                    rgba(235, 87, 87, .18);
+                color: #ff9c9c;
+            }
+
+            .communication-priority.medium {
+                background:
+                    rgba(255, 171, 64, .15);
+                color: #ffd18d;
+            }
+
+            .communication-priority.low {
+                background:
+                    rgba(255, 255, 255, .08);
+                color: var(--soft);
+            }
+
+            .communication-status.open {
+                background:
+                    rgba(255, 171, 64, .15);
+                color: #ffd18d;
+            }
+
+            .communication-status.progress {
+                background:
+                    rgba(95, 127, 255, .18);
+                color: #b9c5ff;
+            }
+
+            .communication-status.success {
+                background:
+                    rgba(39, 174, 96, .17);
+                color: #7df0b1;
+            }
+
+            .communication-ticket-heading small {
+                color: var(--soft);
+                font-weight: 800;
+            }
+
+            .communication-ticket-heading h3 {
+                margin-top: 4px;
+                font-size: 18px;
+            }
+
+            .communication-detail-list {
+                display: grid;
+                overflow: hidden;
+                border: 1px solid var(--border);
+                border-radius: 12px;
+            }
+
+            .communication-detail-list > div {
+                display: grid;
+                grid-template-columns:
+                    minmax(105px, .8fr)
+                    minmax(0, 1.4fr);
+                gap: 12px;
+                padding: 10px 12px;
+                border-bottom:
+                    1px solid var(--border);
+            }
+
+            .communication-detail-list > div:last-child {
+                border-bottom: 0;
+            }
+
+            .communication-detail-list span {
+                color: var(--soft);
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            .communication-detail-list strong {
+                min-width: 0;
+                overflow-wrap: anywhere;
+                text-align: right;
+            }
+
+            .communication-ticket-actions,
+            .communication-confirmation-actions {
+                display: grid;
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+                gap: 9px;
+            }
+
+            .communication-ticket-actions button,
+            .communication-confirmation-actions button {
+                min-height: 48px;
+                padding: 9px 11px;
+                border-radius: 12px;
+                font-weight: 900;
+            }
+
+            .communication-ticket-actions .secondary,
+            .communication-confirmation-actions .secondary {
+                border: 1px solid var(--border);
+                background: #10233f;
+                color: var(--text);
+            }
+
+            .communication-resolve-button {
+                border: 1px solid
+                    rgba(39, 174, 96, .52);
+                background:
+                    rgba(39, 174, 96, .14);
+                color: #7df0b1;
+            }
+
+            .communication-thread {
+                display: grid;
+                gap: 12px;
+                padding: 14px;
+                border: 1px solid
+                    rgba(95, 127, 255, .4);
+                border-radius: 13px;
+                background:
+                    rgba(95, 127, 255, .07);
+            }
+
+            .communication-thread > div:first-child p {
+                margin-top: 4px;
+                color: var(--soft);
+                line-height: 1.4;
+            }
+
+            .communication-thread-list article {
+                display: grid;
+                gap: 7px;
+                padding: 11px;
+                border: 1px solid var(--border);
+                border-radius: 11px;
+                background: #08172b;
+            }
+
+            .communication-thread-list article p {
+                color: var(--soft);
+                line-height: 1.45;
+            }
+
+            .communication-reply-options,
+            .communication-choice-grid,
+            .communication-quick-grid {
+                display: grid;
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+
+            .communication-choice-grid.three {
+                grid-template-columns:
+                    repeat(3, minmax(0, 1fr));
+            }
+
+            .communication-reply-options button,
+            .communication-choice-grid button,
+            .communication-quick-grid button {
+                min-width: 0;
+                min-height: 48px;
+                padding: 9px 10px;
+                border: 1px solid var(--border);
+                border-radius: 11px;
+                background: #08172b;
+                color: var(--text);
+                font-weight: 800;
+                line-height: 1.3;
+                touch-action: manipulation;
+            }
+
+            .communication-reply-options button.selected,
+            .communication-choice-grid button.selected,
+            .communication-quick-grid button.selected {
+                border-color: var(--blue);
+                background:
+                    rgba(95, 127, 255, .22);
+                box-shadow:
+                    0 0 0 2px var(--blue);
+            }
+
+            .communication-field-group,
+            .communication-text-field {
+                display: grid;
+                gap: 9px;
+            }
+
+            .communication-field-group > strong,
+            .communication-text-field {
+                color: var(--soft);
+                font-weight: 800;
+            }
+
+            .communication-text-field textarea {
+                width: 100%;
+                min-height: 108px;
+                padding: 13px;
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                background: #08172b;
+                color: var(--text);
+                font: inherit;
+                line-height: 1.45;
+                resize: vertical;
+                opacity: 1;
+                pointer-events: auto;
+                touch-action: manipulation;
+                -webkit-appearance: none;
+                appearance: none;
+            }
+
+            .communication-text-field textarea:focus {
+                border-color: var(--blue);
+                outline: 2px solid var(--blue);
+                outline-offset: 2px;
+            }
+
+            .communication-preview {
+                display: grid;
+                gap: 6px;
+                padding: 14px;
+                border: 1px solid var(--border);
+                border-radius: 13px;
+                background: #08172b;
+            }
+
+            .communication-preview span,
+            .communication-preview p {
+                color: var(--soft);
+            }
+
+            .communication-preview p {
+                line-height: 1.45;
+            }
+
+            .communication-submit-button {
+                width: 100%;
+                min-height: 54px;
+            }
+
+            .communication-notice {
+                padding: 14px 16px;
+                border-radius: 13px;
+                font-weight: 800;
+            }
+
+            .communication-notice.success {
+                border: 1px solid
+                    rgba(39, 174, 96, .48);
+                background:
+                    rgba(39, 174, 96, .14);
+                color: #7df0b1;
+            }
+
+            .communication-notice.warning {
+                border: 1px solid
+                    rgba(255, 171, 64, .48);
+                background:
+                    rgba(255, 171, 64, .12);
+                color: #ffd18d;
+            }
+
+            .communication-confirmation {
+                border-color:
+                    rgba(39, 174, 96, .48);
+                background:
+                    linear-gradient(
+                        180deg,
+                        rgba(39, 174, 96, .14),
+                        var(--panel)
+                    );
+            }
+
+            .communication-confirmation p {
+                margin-top: 5px;
+                color: var(--soft);
+                line-height: 1.5;
+            }
+
+            .communication-confirmation-symbol {
+                display: grid;
+                width: 64px;
+                height: 64px;
+                place-items: center;
+                border: 2px solid
+                    rgba(39, 174, 96, .78);
+                border-radius: 50%;
+                color: #7df0b1;
+                font-size: 32px;
+                font-weight: 900;
+            }
+
+            .communication-empty {
+                padding: 15px;
+                border: 1px dashed var(--border);
+                border-radius: 12px;
+                color: var(--soft);
+                line-height: 1.45;
+            }
+
+            .communication-empty.compact {
+                padding: 11px;
+            }
+
+            @media (max-width: 640px) {
+                .communication-summary-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .communication-choice-grid,
+                .communication-quick-grid,
+                .communication-reply-options,
+                .communication-ticket-actions,
+                .communication-confirmation-actions {
+                    grid-template-columns:
+                        repeat(2, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 390px) {
+                .communication-panel,
+                .communication-confirmation,
+                .communication-inbox-card,
+                .communication-ticket-card {
+                    padding: 14px 12px;
+                }
+
+                .communication-tabs {
+                    grid-template-columns: 1fr;
+                }
+
+                .communication-detail-list > div {
+                    grid-template-columns: 1fr;
+                    gap: 4px;
+                }
+
+                .communication-detail-list strong {
+                    text-align: left;
+                }
+
+                .communication-ticket-heading {
+                    display: grid;
+                }
+
+                .communication-choice-grid.three {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    `;
+}
+
+function markCommunicationMessageRead(
+    state,
+    messageId
+) {
+    const userId =
+        communicationUserId(
+            state
+        );
+
+    const message =
+        arr(state?.messages)
+            .find(
+                (entry) =>
+                    txt(entry?.id) ===
+                    txt(messageId)
+            );
+
+    if (!message) {
+        throw new Error(
+            "Die Nachricht wurde nicht gefunden."
+        );
+    }
+
+    const readByUserIds = [
+        ...new Set([
+            ...arr(
+                message?.readByUserIds
+            ).map(String),
+            userId
+        ])
+    ];
+
+    updateCollectionEntry(
+        "messages",
+        messageId,
+        {
+            readByUserIds,
+            updatedAt:
+                new Date()
+                    .toISOString()
+        },
+        {
+            notify:
+                false,
+            persist:
+                true
+        }
+    );
+}
+
+function markCommunicationNotificationRead(
+    state,
+    notificationId
+) {
+    const notification =
+        arr(state?.notifications)
+            .find(
+                (entry) =>
+                    txt(entry?.id) ===
+                    txt(notificationId)
+            );
+
+    if (!notification) {
+        throw new Error(
+            "Der Hinweis wurde nicht gefunden."
+        );
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    updateCollectionEntry(
+        "notifications",
+        notificationId,
+        {
+            read:
+                true,
+            status:
+                "READ",
+            readAt:
+                timestamp,
+            updatedAt:
+                timestamp
+        },
+        {
+            notify:
+                false,
+            persist:
+                true
+        }
+    );
+}
+
+function markAllCommunicationRead(
+    state
+) {
+    visibleCommunicationMessages(
+        state
+    )
+        .filter(
+            (message) =>
+                communicationMessageUnread(
+                    state,
+                    message
+                )
+        )
+        .forEach(
+            (message) =>
+                markCommunicationMessageRead(
+                    state,
+                    message?.id
+                )
+        );
+
+    visibleCommunicationNotifications(
+        state
+    )
+        .filter(
+            communicationNotificationUnread
+        )
+        .forEach(
+            (notification) =>
+                markCommunicationNotificationRead(
+                    state,
+                    notification?.id
+                )
+        );
+
+    runtime.communicationNotice = {
+        tone:
+            "success",
+        text:
+            "Alle Nachrichten und Hinweise wurden als gelesen markiert."
+    };
+
+    renderApp(runtime);
+}
+
+function createCommunicationEntry(
+    state
+) {
+    const {
+        role,
+        objects,
+        draft
+    } = ensureCommunicationDraft(
+        state
+    );
+
+    const selectedObject =
+        objects.find(
+            (object) =>
+                objectId(object) ===
+                txt(draft.objectId)
+        );
+
+    if (!selectedObject) {
+        throw new Error(
+            "Bitte wähle ein gültiges Objekt aus."
+        );
+    }
+
+    const selectedRoom =
+        communicationRoomById(
+            state,
+            draft.roomId
+        );
+
+    const description = [
+        txt(draft.quickText),
+        txt(draft.customText)
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+    if (!description) {
+        throw new Error(
+            "Bitte wähle eine Beschreibung aus."
+        );
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    const currentUser =
+        state?.currentUser ?? {};
+
+    const managerId =
+        communicationManagerId(
+            state,
+            selectedObject
+        );
+
+    const typeLabel =
+        communicationTypeLabel(
+            draft.type
+        );
+
+    const title =
+        `${typeLabel} · ${selectedRoom?.name ?? objectName(selectedObject)}`;
+
+    if (
+        role ===
+        "KUNDE"
+    ) {
+        const requestId =
+            createId(
+                "REQUEST"
+            );
+
+        const ticketId =
+            createId(
+                "TICKET"
+            );
+
+        const request = {
+            id:
+                requestId,
+            customerUserId:
+                communicationUserId(
+                    state
+                ),
+            customerId:
+                txt(
+                    currentUser?.customerId
+                ),
+            objectId:
+                objectId(
+                    selectedObject
+                ),
+            roomId:
+                txt(
+                    selectedRoom?.id
+                ) || null,
+            type:
+                txt(draft.type),
+            category:
+                txt(draft.type),
+            priority:
+                txt(draft.priority),
+            status:
+                "OPEN",
+            title,
+            description,
+            requestedDate:
+                null,
+            preferredTime:
+                null,
+            recurring:
+                false,
+            recurrenceRule:
+                null,
+            attachments:
+                [],
+            customerVisible:
+                true,
+            requiresApproval:
+                draft.type !==
+                "INFORMATION",
+            approval: {
+                status:
+                    draft.type ===
+                    "INFORMATION"
+                        ? "NOT_REQUIRED"
+                        : "PENDING",
+                approvedByUserId:
+                    null,
+                approvedAt:
+                    null,
+                rejectedByUserId:
+                    null,
+                rejectedAt:
+                    null,
+                reason:
+                    ""
+            },
+            assignment: {
+                assignedToUserId:
+                    managerId ||
+                    null,
+                assignedEmployeeId:
+                    null,
+                plannedShiftId:
+                    null
+            },
+            pricing: {
+                priceRequired:
+                    draft.type ===
+                    "ADDITIONAL_SERVICE",
+                estimatedPrice:
+                    null,
+                currency:
+                    "EUR",
+                customerApprovalRequired:
+                    draft.type ===
+                    "ADDITIONAL_SERVICE",
+                customerApproved:
+                    false,
+                customerApprovedAt:
+                    null
+            },
+            relatedTicketId:
+                ticketId,
+            createdAt:
+                timestamp,
+            updatedAt:
+                timestamp,
+            completedAt:
+                null,
+            source:
+                "LOCAL_TEST"
+        };
+
+        const ticket = {
+            id:
+                ticketId,
+            relatedCustomerRequestId:
+                requestId,
+            objectId:
+                request.objectId,
+            roomId:
+                request.roomId,
+            createdByUserId:
+                request.customerUserId,
+            assignedToUserId:
+                managerId,
+            type:
+                "CUSTOMER_REQUEST",
+            requestType:
+                request.type,
+            priority:
+                request.priority,
+            status:
+                "OPEN",
+            title,
+            description,
+            channel:
+                "CUSTOMER_PORTAL",
+            attachments:
+                [],
+            customerVisible:
+                true,
+            createdAt:
+                timestamp,
+            updatedAt:
+                timestamp,
+            resolvedAt:
+                null,
+            source:
+                "LOCAL_TEST"
+        };
+
+        addCollectionEntry(
+            "customerRequests",
+            request,
+            {
+                notify:
+                    false,
+                persist:
+                    true
+            }
+        );
+
+        addCollectionEntry(
+            "tickets",
+            ticket,
+            {
+                notify:
+                    false,
+                persist:
+                    true
+            }
+        );
+
+        createCommunicationNotification({
+            recipientUserId:
+                managerId,
+            objectId:
+                request.objectId,
+            type:
+                "CUSTOMER_REQUEST",
+            priority:
+                request.priority,
+            title:
+                "Neue Kundenanfrage",
+            message:
+                `${userName(currentUser)}: ${title}`,
+            relatedEntityType:
+                "TICKET",
+            relatedEntityId:
+                ticketId
+        });
+
+        runtime.communicationConfirmation = {
+            id:
+                requestId,
+            heading:
+                "Anfrage wurde übermittelt",
+            message:
+                "Die zuständige Objektleitung wurde informiert.",
+            objectName:
+                objectName(
+                    selectedObject
+                ),
+            typeLabel,
+            statusLabel:
+                "Offen"
+        };
+    }
+    else {
+        const ticket = {
+            id:
+                createId(
+                    "TICKET"
+                ),
+            objectId:
+                objectId(
+                    selectedObject
+                ),
+            roomId:
+                txt(
+                    selectedRoom?.id
+                ) || null,
+            createdByUserId:
+                communicationUserId(
+                    state
+                ),
+            assignedToUserId:
+                managerId,
+            type:
+                txt(draft.type),
+            priority:
+                txt(draft.priority),
+            status:
+                "OPEN",
+            title,
+            description,
+            channel:
+                "APP",
+            attachments:
+                [],
+            customerVisible:
+                false,
+            createdAt:
+                timestamp,
+            updatedAt:
+                timestamp,
+            resolvedAt:
+                null,
+            source:
+                "LOCAL_TEST"
+        };
+
+        addCollectionEntry(
+            "tickets",
+            ticket,
+            {
+                notify:
+                    false,
+                persist:
+                    true
+            }
+        );
+
+        createCommunicationNotification({
+            recipientUserId:
+                managerId,
+            objectId:
+                ticket.objectId,
+            type:
+                "TICKET_CREATED",
+            priority:
+                ticket.priority,
+            title:
+                "Neue Meldung",
+            message:
+                `${userName(currentUser)}: ${title}`,
+            relatedEntityType:
+                "TICKET",
+            relatedEntityId:
+                ticket.id
+        });
+
+        runtime.communicationConfirmation = {
+            id:
+                ticket.id,
+            heading:
+                "Meldung wurde gespeichert",
+            message:
+                "Die zuständige Objektleitung wurde informiert.",
+            objectName:
+                objectName(
+                    selectedObject
+                ),
+            typeLabel,
+            statusLabel:
+                "Offen"
+        };
+    }
+
+    runtime.communicationNotice =
+        null;
+
+    runtime.communicationExpandedTicketId =
+        "";
+
+    renderApp(runtime);
+}
+
+function findCommunicationTicket(
+    state,
+    ticketId
+) {
+    return arr(state?.tickets)
+        .find(
+            (ticket) =>
+                txt(ticket?.id) ===
+                txt(ticketId) &&
+                isCommunicationTicket(
+                    ticket
+                )
+        ) ?? null;
+}
+
+function updateCommunicationTicketStatus(
+    state,
+    ticketId,
+    action
+) {
+    const ticket =
+        findCommunicationTicket(
+            state,
+            ticketId
+        );
+
+    if (!ticket) {
+        throw new Error(
+            "Das Ticket wurde nicht gefunden."
+        );
+    }
+
+    if (
+        !communicationCanManageTicket(
+            state,
+            ticket
+        )
+    ) {
+        throw new Error(
+            "Für dieses Ticket fehlt die Bearbeitungsberechtigung."
+        );
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    const configuration = {
+        start: {
+            status:
+                "IN_PROGRESS",
+            notice:
+                "Das Ticket ist jetzt in Bearbeitung."
+        },
+        resolve: {
+            status:
+                "RESOLVED",
+            notice:
+                "Das Ticket wurde als erledigt markiert."
+        },
+        reopen: {
+            status:
+                "OPEN",
+            notice:
+                "Das Ticket wurde wieder geöffnet."
+        }
+    }[action];
+
+    if (!configuration) {
+        throw new Error(
+            "Unbekannte Ticketaktion."
+        );
+    }
+
+    const updated =
+        updateCollectionEntry(
+            "tickets",
+            ticketId,
+            {
+                status:
+                    configuration.status,
+                updatedAt:
+                    timestamp,
+                resolvedAt:
+                    configuration.status ===
+                    "RESOLVED"
+                        ? timestamp
+                        : null,
+                reviewedByUserId:
+                    communicationUserId(
+                        state
+                    ),
+                reviewedByUserName:
+                    userName(
+                        state?.currentUser
+                    )
+            },
+            {
+                notify:
+                    false,
+                persist:
+                    true
+            }
+        );
+
+    const customerRequest =
+        arr(
+            state?.customerRequests
+        ).find(
+            (request) =>
+                txt(
+                    request?.relatedTicketId
+                ) ===
+                    txt(ticketId) ||
+                txt(request?.id) ===
+                    txt(
+                        ticket
+                            ?.relatedCustomerRequestId
+                    )
+        );
+
+    if (customerRequest) {
+        const requestStatus =
+            configuration.status ===
+            "RESOLVED"
+                ? "COMPLETED"
+                : configuration.status;
+
+        updateCollectionEntry(
+            "customerRequests",
+            customerRequest.id,
+            {
+                status:
+                    requestStatus,
+                updatedAt:
+                    timestamp,
+                completedAt:
+                    requestStatus ===
+                    "COMPLETED"
+                        ? timestamp
+                        : null
+            },
+            {
+                notify:
+                    false,
+                persist:
+                    true
+            }
+        );
+    }
+
+    createCommunicationNotification({
+        recipientUserId:
+            ticket?.createdByUserId ??
+            ticket?.employeeId,
+        objectId:
+            ticket?.objectId,
+        type:
+            "TICKET_STATUS_CHANGED",
+        priority:
+            ticket?.priority,
+        title:
+            `Ticket ${communicationStatusLabel(configuration.status)}`,
+        message:
+            `${ticket?.title}: ${configuration.notice}`,
+        relatedEntityType:
+            "TICKET",
+        relatedEntityId:
+            ticketId
+    });
+
+    runtime.communicationNotice = {
+        tone:
+            "success",
+        text:
+            configuration.notice
+    };
+
+    runtime.communicationExpandedTicketId =
+        txt(updated?.id) ||
+        txt(ticketId);
+
+    renderApp(runtime);
+}
+
+function updateCommunicationCustomerRequestStatus(
+    state,
+    requestId,
+    action
+) {
+    const request =
+        arr(
+            state?.customerRequests
+        ).find(
+            (entry) =>
+                txt(entry?.id) ===
+                txt(requestId)
+        );
+
+    if (!request) {
+        throw new Error(
+            "Die Kundenanfrage wurde nicht gefunden."
+        );
+    }
+
+    if (
+        !communicationCanManageCustomerRequest(
+            state,
+            request
+        )
+    ) {
+        throw new Error(
+            "Für diese Kundenanfrage fehlt die Bearbeitungsberechtigung."
+        );
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    const status =
+        action ===
+        "start"
+            ? "IN_PROGRESS"
+            : action ===
+                "complete"
+                ? "COMPLETED"
+                : "";
+
+    if (!status) {
+        throw new Error(
+            "Unbekannte Anfrageaktion."
+        );
+    }
+
+    updateCollectionEntry(
+        "customerRequests",
+        requestId,
+        {
+            status,
+            updatedAt:
+                timestamp,
+            completedAt:
+                status ===
+                "COMPLETED"
+                    ? timestamp
+                    : null
+        },
+        {
+            notify:
+                false,
+            persist:
+                true
+        }
+    );
+
+    createCommunicationNotification({
+        recipientUserId:
+            request?.customerUserId,
+        objectId:
+            request?.objectId,
+        type:
+            "CUSTOMER_REQUEST_STATUS",
+        priority:
+            request?.priority,
+        title:
+            `Anfrage ${communicationStatusLabel(status)}`,
+        message:
+            `${request?.title}: ${communicationStatusLabel(status)}`,
+        relatedEntityType:
+            "CUSTOMER_REQUEST",
+        relatedEntityId:
+            requestId
+    });
+
+    runtime.communicationNotice = {
+        tone:
+            "success",
+        text:
+            status ===
+            "COMPLETED"
+                ? "Die Kundenanfrage wurde abgeschlossen."
+                : "Die Kundenanfrage ist jetzt in Bearbeitung."
+    };
+
+    renderApp(runtime);
+}
+
+function sendCommunicationTicketReply(
+    state,
+    ticketId
+) {
+    const ticket =
+        findCommunicationTicket(
+            state,
+            ticketId
+        );
+
+    if (!ticket) {
+        throw new Error(
+            "Das Ticket wurde nicht gefunden."
+        );
+    }
+
+    const visible =
+        visibleCommunicationTickets(
+            state
+        ).some(
+            (entry) =>
+                txt(entry?.id) ===
+                txt(ticketId)
+        );
+
+    if (!visible) {
+        throw new Error(
+            "Für dieses Ticket fehlt die Zugriffsberechtigung."
+        );
+    }
+
+    const replyDraft =
+        runtime.communicationReplyDraft;
+
+    const replyText = [
+        replyDraft.ticketId ===
+            txt(ticketId)
+            ? txt(
+                replyDraft.preset
+            )
+            : "",
+        replyDraft.ticketId ===
+            txt(ticketId)
+            ? txt(
+                replyDraft.customText
+            )
+            : ""
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+    if (!replyText) {
+        throw new Error(
+            "Bitte wähle eine Antwort oder gib einen Text ein."
+        );
+    }
+
+    const currentUserId =
+        communicationUserId(
+            state
+        );
+
+    const recipientUserIds = [
+        txt(
+            ticket?.createdByUserId ??
+            ticket?.employeeId
+        ),
+        txt(
+            ticket?.assignedToUserId
+        )
+    ]
+        .filter(Boolean)
+        .filter(
+            (userId) =>
+                userId !==
+                currentUserId
+        );
+
+    const uniqueRecipientIds = [
+        ...new Set(
+            recipientUserIds
+        )
+    ];
+
+    if (!uniqueRecipientIds.length) {
+        const managerId =
+            communicationManagerId(
+                state,
+                communicationObjectById(
+                    state,
+                    ticket?.objectId
+                )
+            );
+
+        if (
+            managerId &&
+            managerId !==
+            currentUserId
+        ) {
+            uniqueRecipientIds.push(
+                managerId
+            );
+        }
+    }
+
+    const timestamp =
+        new Date()
+            .toISOString();
+
+    const message = {
+        id:
+            createId(
+                "MESSAGE"
+            ),
+        senderUserId:
+            currentUserId,
+        recipientUserIds:
+            uniqueRecipientIds,
+        objectId:
+            txt(
+                ticket?.objectId
+            ),
+        relatedTicketId:
+            txt(ticketId),
+        subject:
+            `Antwort: ${ticket?.title}`,
+        message:
+            replyText,
+        type:
+            "TICKET_REPLY",
+        priority:
+            txt(
+                ticket?.priority
+            ) ||
+            "MEDIUM",
+        status:
+            "SENT",
+        readByUserIds: [
+            currentUserId
+        ],
+        attachments:
+            [],
+        createdAt:
+            timestamp,
+        updatedAt:
+            timestamp,
+        source:
+            "LOCAL_TEST"
+    };
+
+    addCollectionEntry(
+        "messages",
+        message,
+        {
+            notify:
+                false,
+            persist:
+                true
+        }
+    );
+
+    uniqueRecipientIds.forEach(
+        (recipientUserId) =>
+            createCommunicationNotification({
+                recipientUserId,
+                objectId:
+                    ticket?.objectId,
+                type:
+                    "TICKET_REPLY",
+                priority:
+                    ticket?.priority,
+                title:
+                    "Neue Ticketantwort",
+                message:
+                    `${userName(state?.currentUser)} hat auf ${ticket?.title} geantwortet.`,
+                relatedEntityType:
+                    "TICKET",
+                relatedEntityId:
+                    ticketId
+            })
+    );
+
+    runtime.communicationReplyDraft = {
+        ticketId:
+            txt(ticketId),
+        preset:
+            "",
+        customText:
+            ""
+    };
+
+    runtime.communicationNotice = {
+        tone:
+            "success",
+        text:
+            "Die Antwort wurde gesendet."
+    };
+
+    runtime.communicationExpandedTicketId =
+        txt(ticketId);
+
+    renderApp(runtime);
+}
+
 function renderGeneric(route) {
     const title = ({
         [ROUTES.TASKS]:
@@ -6768,6 +10985,16 @@ function renderShell(state) {
 
     if (
         runtime.route ===
+        ROUTES.COMMUNICATION
+    ) {
+        page =
+            renderCommunicationPage(
+                state
+            );
+    }
+
+    if (
+        runtime.route ===
         ROUTES.MORE
     ) {
         page =
@@ -7238,6 +11465,429 @@ async function handleClick(event) {
             : null;
 
     if (!eventElement) {
+        return;
+    }
+
+    const communicationTabButton =
+        eventElement.closest(
+            "[data-communication-tab]"
+        );
+
+    if (communicationTabButton) {
+        event.preventDefault();
+
+        runtime.communicationTab =
+            txt(
+                communicationTabButton.getAttribute(
+                    "data-communication-tab"
+                )
+            ).toUpperCase();
+
+        runtime.communicationNotice =
+            null;
+
+        runtime.communicationExpandedTicketId =
+            "";
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationObjectButton =
+        eventElement.closest(
+            "[data-communication-object-id]"
+        );
+
+    if (communicationObjectButton) {
+        event.preventDefault();
+
+        runtime.communicationDraft.objectId =
+            txt(
+                communicationObjectButton.getAttribute(
+                    "data-communication-object-id"
+                )
+            );
+
+        runtime.communicationDraft.roomId =
+            "";
+
+        runtime.communicationNotice =
+            null;
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationRoomButton =
+        eventElement.closest(
+            "[data-communication-room-id]"
+        );
+
+    if (communicationRoomButton) {
+        event.preventDefault();
+
+        runtime.communicationDraft.roomId =
+            txt(
+                communicationRoomButton.getAttribute(
+                    "data-communication-room-id"
+                )
+            );
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationTypeButton =
+        eventElement.closest(
+            "[data-communication-type]"
+        );
+
+    if (communicationTypeButton) {
+        event.preventDefault();
+
+        runtime.communicationDraft.type =
+            txt(
+                communicationTypeButton.getAttribute(
+                    "data-communication-type"
+                )
+            ).toUpperCase();
+
+        runtime.communicationDraft.quickText =
+            "";
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationPriorityButton =
+        eventElement.closest(
+            "[data-communication-priority]"
+        );
+
+    if (communicationPriorityButton) {
+        event.preventDefault();
+
+        runtime.communicationDraft.priority =
+            txt(
+                communicationPriorityButton.getAttribute(
+                    "data-communication-priority"
+                )
+            ).toUpperCase();
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationQuickButton =
+        eventElement.closest(
+            "[data-communication-quick]"
+        );
+
+    if (communicationQuickButton) {
+        event.preventDefault();
+
+        runtime.communicationDraft.quickText =
+            txt(
+                communicationQuickButton.getAttribute(
+                    "data-communication-quick"
+                )
+            );
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationCreateButton =
+        eventElement.closest(
+            "[data-communication-create]"
+        );
+
+    if (communicationCreateButton) {
+        event.preventDefault();
+
+        try {
+            createCommunicationEntry(
+                runtime.state
+            );
+        }
+        catch (error) {
+            const message =
+                document.getElementById(
+                    "communication-form-message"
+                );
+
+            if (message) {
+                message.textContent =
+                    error instanceof Error
+                        ? error.message
+                        : String(error);
+            }
+            else {
+                window.alert(
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+                );
+            }
+        }
+
+        return;
+    }
+
+    const communicationConfirmationButton =
+        eventElement.closest(
+            "[data-communication-confirmation-action]"
+        );
+
+    if (communicationConfirmationButton) {
+        event.preventDefault();
+
+        const action =
+            txt(
+                communicationConfirmationButton.getAttribute(
+                    "data-communication-confirmation-action"
+                )
+            );
+
+        runtime.communicationConfirmation =
+            null;
+
+        runtime.communicationNotice =
+            null;
+
+        runtime.communicationDraft.customText =
+            "";
+
+        if (action === "overview") {
+            runtime.communicationTab =
+                "TICKETS";
+        }
+        else if (action === "new") {
+            runtime.communicationTab =
+                "NEW";
+            runtime.communicationDraft.quickText =
+                "";
+        }
+        else {
+            throw new Error(
+                "Unbekannte Bestätigungsaktion."
+            );
+        }
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationMessageReadButton =
+        eventElement.closest(
+            "[data-communication-message-read-id]"
+        );
+
+    if (communicationMessageReadButton) {
+        event.preventDefault();
+
+        markCommunicationMessageRead(
+            runtime.state,
+            communicationMessageReadButton.getAttribute(
+                "data-communication-message-read-id"
+            )
+        );
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationNotificationReadButton =
+        eventElement.closest(
+            "[data-communication-notification-read-id]"
+        );
+
+    if (communicationNotificationReadButton) {
+        event.preventDefault();
+
+        markCommunicationNotificationRead(
+            runtime.state,
+            communicationNotificationReadButton.getAttribute(
+                "data-communication-notification-read-id"
+            )
+        );
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationMarkAllButton =
+        eventElement.closest(
+            "[data-communication-mark-all-read]"
+        );
+
+    if (communicationMarkAllButton) {
+        event.preventDefault();
+
+        markAllCommunicationRead(
+            runtime.state
+        );
+        return;
+    }
+
+    const communicationTicketToggleButton =
+        eventElement.closest(
+            "[data-communication-ticket-toggle-id]"
+        );
+
+    if (communicationTicketToggleButton) {
+        event.preventDefault();
+
+        const ticketId =
+            txt(
+                communicationTicketToggleButton.getAttribute(
+                    "data-communication-ticket-toggle-id"
+                )
+            );
+
+        runtime.communicationExpandedTicketId =
+            runtime.communicationExpandedTicketId ===
+                ticketId
+                ? ""
+                : ticketId;
+
+        runtime.communicationReplyDraft = {
+            ticketId,
+            preset:
+                "",
+            customText:
+                ""
+        };
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationTicketActionButton =
+        eventElement.closest(
+            "[data-communication-ticket-action]"
+        );
+
+    if (communicationTicketActionButton) {
+        event.preventDefault();
+
+        try {
+            updateCommunicationTicketStatus(
+                runtime.state,
+                communicationTicketActionButton.getAttribute(
+                    "data-communication-ticket-id"
+                ),
+                communicationTicketActionButton.getAttribute(
+                    "data-communication-ticket-action"
+                )
+            );
+        }
+        catch (error) {
+            runtime.communicationNotice = {
+                tone:
+                    "warning",
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+            };
+
+            renderApp(runtime);
+        }
+
+        return;
+    }
+
+    const communicationRequestActionButton =
+        eventElement.closest(
+            "[data-communication-request-action]"
+        );
+
+    if (communicationRequestActionButton) {
+        event.preventDefault();
+
+        try {
+            updateCommunicationCustomerRequestStatus(
+                runtime.state,
+                communicationRequestActionButton.getAttribute(
+                    "data-communication-request-id"
+                ),
+                communicationRequestActionButton.getAttribute(
+                    "data-communication-request-action"
+                )
+            );
+        }
+        catch (error) {
+            runtime.communicationNotice = {
+                tone:
+                    "warning",
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+            };
+
+            renderApp(runtime);
+        }
+
+        return;
+    }
+
+    const communicationReplyPresetButton =
+        eventElement.closest(
+            "[data-communication-reply-preset]"
+        );
+
+    if (communicationReplyPresetButton) {
+        event.preventDefault();
+
+        runtime.communicationReplyDraft.ticketId =
+            txt(
+                communicationReplyPresetButton.getAttribute(
+                    "data-communication-reply-ticket-id"
+                )
+            );
+
+        runtime.communicationReplyDraft.preset =
+            txt(
+                communicationReplyPresetButton.getAttribute(
+                    "data-communication-reply-preset"
+                )
+            );
+
+        renderApp(runtime);
+        return;
+    }
+
+    const communicationReplySubmitButton =
+        eventElement.closest(
+            "[data-communication-reply-submit-id]"
+        );
+
+    if (communicationReplySubmitButton) {
+        event.preventDefault();
+
+        try {
+            sendCommunicationTicketReply(
+                runtime.state,
+                communicationReplySubmitButton.getAttribute(
+                    "data-communication-reply-submit-id"
+                )
+            );
+        }
+        catch (error) {
+            runtime.communicationNotice = {
+                tone:
+                    "warning",
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : String(error)
+            };
+
+            renderApp(runtime);
+        }
+
         return;
     }
 
@@ -8241,6 +12891,20 @@ async function handleClick(event) {
 
         if (
             nextRoute !==
+            ROUTES.COMMUNICATION
+        ) {
+            runtime.communicationExpandedTicketId = "";
+            runtime.communicationNotice = null;
+            runtime.communicationConfirmation = null;
+            runtime.communicationReplyDraft = {
+                ticketId: "",
+                preset: "",
+                customText: ""
+            };
+        }
+
+        if (
+            nextRoute !==
             ROUTES.MORE
         ) {
             runtime.moreSection = "";
@@ -8317,6 +12981,23 @@ async function handleClick(event) {
             runtime.taskRoomId = "";
             runtime.taskExpandedId = "";
             runtime.taskNotice = null;
+            runtime.communicationTab = "INBOX";
+            runtime.communicationExpandedTicketId = "";
+            runtime.communicationNotice = null;
+            runtime.communicationConfirmation = null;
+            runtime.communicationDraft = {
+                objectId: "",
+                roomId: "",
+                type: "",
+                priority: "MEDIUM",
+                quickText: "",
+                customText: ""
+            };
+            runtime.communicationReplyDraft = {
+                ticketId: "",
+                preset: "",
+                customText: ""
+            };
 
             await runtime
                 .onLogout?.();
@@ -8347,6 +13028,48 @@ async function handleClick(event) {
     }
 }
 
+
+function handleInput(event) {
+    const target =
+        event.target;
+
+    if (
+        !(target instanceof HTMLTextAreaElement)
+    ) {
+        return;
+    }
+
+    if (
+        target.id ===
+        "communication-details"
+    ) {
+        runtime.communicationDraft.customText =
+            String(
+                target.value ??
+                ""
+            ).slice(
+                0,
+                600
+            );
+
+        return;
+    }
+
+    if (
+        target.id ===
+        "communication-reply-text"
+    ) {
+        runtime.communicationReplyDraft.customText =
+            String(
+                target.value ??
+                ""
+            ).slice(
+                0,
+                600
+            );
+    }
+}
+
 function bindEvents() {
     const app = root();
 
@@ -8370,6 +13093,10 @@ function bindEvents() {
         handleClick
     );
 
+    app.addEventListener(
+        "input",
+        handleInput
+    );
 
     eventsBound = true;
 }
