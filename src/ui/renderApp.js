@@ -6421,6 +6421,18 @@ function communicationTicketTypeOptions(
             "Schaden"
         ],
         [
+            "TASK_NOT_COMPLETED",
+            "Aufgabe nicht erledigt"
+        ],
+        [
+            "COMPLAINT",
+            "Beschwerde"
+        ],
+        [
+            "IMPORTANT_INFO",
+            "Wichtige Mitteilung"
+        ],
+        [
             "ACCESS",
             "Zugang nicht möglich"
         ],
@@ -6449,6 +6461,10 @@ function communicationTypeLabel(
     const labels = {
         DAMAGE:
             "Schaden",
+        TASK_NOT_COMPLETED:
+            "Aufgabe nicht erledigt",
+        IMPORTANT_INFO:
+            "Wichtige Mitteilung",
         ACCESS:
             "Zugang",
         QUALITY:
@@ -6491,6 +6507,16 @@ function communicationQuickOptions(
             "Ausstattung oder Gegenstand ist beschädigt.",
             "Ein Defekt beeinträchtigt die Arbeit.",
             "Eine Reparatur oder Prüfung ist erforderlich."
+        ],
+        TASK_NOT_COMPLETED: [
+            "Eine geplante Aufgabe konnte nicht erledigt werden.",
+            "Eine Aufgabe wurde ausgelassen oder ist noch offen.",
+            "Die Aufgabe muss nachgeholt oder neu zugeteilt werden."
+        ],
+        IMPORTANT_INFO: [
+            "Es gibt eine wichtige Information zum Objekt oder Arbeitsablauf.",
+            "Die Objektleitung muss über eine Änderung informiert werden.",
+            "Der Hinweis soll dokumentiert und weitergeleitet werden."
         ],
         ACCESS: [
             "Ein Raum ist verschlossen oder nicht zugänglich.",
@@ -8531,8 +8557,9 @@ function renderCommunicationNew(
                     </h2>
 
                     <p>
-                        Strukturierte Schnellmeldung. Ein
-                        zusätzlicher Freitext ist optional.
+                        Beschwerde, nicht erledigte Aufgabe
+                        oder wichtigen Hinweis strukturiert
+                        übermitteln. Freitext ist optional.
                     </p>
                 </div>
             </div>
@@ -8853,7 +8880,7 @@ function renderCommunicationPage(
                     <p>
                         ${role === "KUNDE"
                             ? "Anfragen senden und den Bearbeitungsstatus verfolgen."
-                            : "Nachrichten lesen, Probleme melden und Vorgänge bearbeiten."
+                            : "Beschwerden, nicht erledigte Aufgaben, Schäden und wichtige Hinweise übermitteln."
                         }
                     </p>
                 </div>
